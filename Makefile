@@ -40,8 +40,8 @@ ps:
 
 clean:
 	@$(COMPOSE) down -v --remove-orphans
-	@docker volume prune -af
-	@docker system prune -af --volumes
+	@docker volume prune -f
+	@docker system prune -f --volumes
 
 fclean: clean
 	@echo "Removing dev certificates and postgres database"
