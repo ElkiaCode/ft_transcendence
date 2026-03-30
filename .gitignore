@@ -1,0 +1,36 @@
+# env / secrets
+.env
+.env.*
+!.env.example
+
+# dependencies
+node_modules/
+apps/*/node_modules/
+
+# build outputs
+apps/web/.next/
+apps/api/dist/
+coverage/
+*.log
+
+# package manager caches
+.npm/
+.pnpm-store/
+
+# prisma local sqlite files if ever created by mistake
+apps/api/prisma/*.db
+apps/api/prisma/*.db-journal
+
+# editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# local nginx certs
+infra/nginx/certs/*.crt
+infra/nginx/certs/*.key
+
+# temp files
+*.swp
+*.swo
