@@ -41,7 +41,8 @@ model Profile {
   userId      String   @unique
   displayName String
   bio         String?
-  avatarUrl   String?
+  avatarUrl   String? // ← URL publique pour afficher l'avatar
+  avatarKey   String? // ← Clé MinIO (chemin) pour retrouver/supprimer le fichier
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
