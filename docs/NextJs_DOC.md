@@ -1,0 +1,1 @@
+*file used throughout development to understand nextJS*  
