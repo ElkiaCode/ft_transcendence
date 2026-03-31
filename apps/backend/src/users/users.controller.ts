@@ -1,14 +1,24 @@
-import { Controller, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Controller, Patch, UploadedFile, UseInterceptors, Req } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { UsersService } from './users.service';
+import { Request } from 'express';
 
-@Controller('users') 
-export class UsersController { 
-    constructor(private usersService: UsersService) {} 
-    
-    @Post('me/avatar') 
-    @UseInterceptors(FileInterceptor('file')) 
-    uploadAvatar(userId: number, @UploadedFile() file: Express.Multer.File) { 
-        return this.usersService.uploadAvatar(userId, file); 
-    }
+interface AuthenticatedRequest extends Request {
+  user: { id: string; email?: string; username?: string };
+}
+
+@Controller('users')
+export class UsersController {
+  constructor(private usersService: UsersService) {}
+
+  @Patch('me/avatar')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  async uploadAvatar(
+    @Req() req: AuthenticatedRequest,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    const userId = req.user.id;
+    return this.usersService.update(userId, {}, file);
+  }
 }
