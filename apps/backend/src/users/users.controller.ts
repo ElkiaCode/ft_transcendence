@@ -1,6 +1,7 @@
 import { Controller, Patch, UploadedFile, UseInterceptors, Req } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
+import * as multer from 'multer';
 import { UsersService } from './users.service';
 import { Request } from 'express';
 
@@ -16,7 +17,7 @@ export class UsersController {
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   async uploadAvatar(
     @Req() req: AuthenticatedRequest,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: any,
   ) {
     const userId = req.user.id;
     return this.usersService.update(userId, {}, file);

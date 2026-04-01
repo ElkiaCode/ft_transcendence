@@ -1,9 +1,53 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
-import { PrismaClient } from '../generated/prisma/client';
+import { Injectable, OnModuleInit, OnApplicationShutdown } from '@nestjs/common';
+import { Pool } from 'pg';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { PrismaClient } from '../generated/prisma';
 
 @Injectable()
-export class PrismaService extends PrismaClient implements OnModuleInit {
+export class PrismaService implements OnModuleInit, OnApplicationShutdown {
+  private prisma: PrismaClient;
+
+  constructor() {
+    const connectionString = `${process.env.DATABASE_URL}`;
+    const pool = new Pool({ connectionString });
+    const adapter = new PrismaPg(pool);
+    this.prisma = new PrismaClient({ adapter });
+  }
+
   async onModuleInit() {
-    await this.$connect();
+    await this.prisma.$connect();
+  }
+
+  async onApplicationShutdown() {
+    await this.prisma.$disconnect();
+  }
+
+  // Expose Prisma client properties
+  get user() {
+    return this.prisma.user;
+  }
+
+  get profile() {
+    return this.prisma.profile;
+  }
+
+  get oAuthAccount() {
+    return this.prisma.oAuthAccount;
+  }
+
+  get refreshToken() {
+    return this.prisma.refreshToken;
+  }
+
+  get $connect() {
+    return this.prisma.$connect.bind(this.prisma);
+  }
+
+  get $disconnect() {
+    return this.prisma.$disconnect.bind(this.prisma);
+  }
+
+  get $transaction() {
+    return this.prisma.$transaction.bind(this.prisma);
   }
 }

@@ -4,6 +4,7 @@ import { ProfileResponseDto } from './dto/profile-response.dto';
 import { PrismaService } from './prisma.service';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { s3Client } from './minio.client';
+import * as multer from 'multer';
 
 @Injectable()
 export class UsersService {
@@ -22,7 +23,7 @@ export class UsersService {
   async update(
     id: string,
     updateUserDto: UpdateProfileDto,
-    file?: Express.Multer.File,
+    file?: any,
   ): Promise<ProfileResponseDto> {
     const user = await this.findOne(id);
 
