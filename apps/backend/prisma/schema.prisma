@@ -23,6 +23,8 @@ model User {
   email             String       @unique
   username          String       @unique
   passwordHash      String?
+  bio               String?
+  avatar            String?
   globalRole        GlobalRole   @default(USER)
   isActive          Boolean      @default(true)
   isBanned          Boolean      @default(false)
