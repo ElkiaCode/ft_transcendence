@@ -1,0 +1,34 @@
+added : PrismaModule    ---> for DB access
+        AuthModule      ---> for auth logic
+        UsersModule     ---> for current-user logic
+
+Creation of DTO (data transfer object) usefull for : register
+                                                     login
+They validate incoming data such as : email
+                                      username
+                                      password
+
+AuthService ---> Main auth logic lives 
+
+for registering :   normalize email and username
+                    check whether email already exists
+                    check whether username already exists
+                    hash the password
+                    create the user in PostgreSQL
+                    create a profile linked to that user
+                    sign a JWT access token
+                    return the token and the public user object
+
+for loging :    find the user by email
+                verify the password against the stored hash
+                reject inactive or banned users
+                sign a JWT access token
+                return the token and the public user object
+
+Expose route for Auth : POST /api/auth/register
+                        POST /api/auth/login
+
+Using Bycrypt the password is crypted inside the database.
+during register, the password is hashed
+during login, the provided password is compared to the hash
+

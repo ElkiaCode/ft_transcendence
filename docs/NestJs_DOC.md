@@ -147,3 +147,209 @@ Here:
 - `@Post()` maps `POST /users`
 - `@Param('id')` pulls a route parameter from `req.params`
 - `@Body()` pulls the request body from `req.body`
+
+## Service / Provider = contain buisness logic  
+
+Services, repositories, helpers, and factories can all be providers. The key idea is that providers can be injected as dependencies, and Nest handles the wiring. Controllers should delegate complex tasks to providers.  
+
+`Provider` vs `Service` :
+
+- `Provider` is the broad Nest term.  
+- `Service` is the common naming convention for a profider containing buisnnes logic.  
+
+So every service is usually a provider, but not every provider is necessarily called a service.  
+
+exemple :
+```ts
+// users/users.service.ts
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { CreateUserDto } from './dto/create-user.dto';
+
+type User = {
+  id: number;
+  email: string;
+  name: string;
+  passwordHash: string;
+  role: 'user' | 'admin';
+};
+
+@Injectable()
+export class UsersService {
+  private users: User[] = [];
+  private nextId = 1;
+
+  findOne(id: number) {
+    const user = this.users.find((u) => u.id === id);
+
+    if (!user) {
+      throw new NotFoundException(`User ${id} not found`);
+    }
+
+    return user;
+  }
+
+  create(dto: CreateUserDto) {
+    const existing = this.users.find((u) => u.email === dto.email);
+
+    if (existing) {
+      throw new ConflictException('Email already exists');
+    }
+
+    const user: User = {
+      id: this.nextId++,
+      email: dto.email,
+      name: dto.name,
+      passwordHash: `hashed:${dto.password}`,
+      role: dto.role ?? 'user',
+    };
+
+    this.users.push(user);
+    return user;
+  }
+}
+```
+
+Here are the service rules :  
+
+- Email must be unique.  
+- Password must be hashed.  
+- throw 404 if user not found.  
+
+### `@Injectable()` purpose  
+
+Provider are injectable dependencies and are managed by Nest's runtime system.  
+`@Injectable()` marks the class so Nest can create amd inject it where needed.  
+
+```ts
+constructor(private readonly usersService: UsersService) {}  
+```
+
+Nest see this constructor parameter, look in the current module for a provider matching `UsersService` create it if needed and inject it.  
+
+
+## DTO = describe and validate incoming data  
+
+A `DTO` is usually just a class that describes the expected input shape.  
+Nest’s controller docs show `DTO` classes used with `@Body()`, and that `ValidationPipe` and `class-transformer` so validation rules can be declared in DTO classes.  
+
+A `DTO` answer :
+- What fields are allowed ?  
+- whitch fields are required ?  
+- what type each fields should be ?  
+- what constrain apply ?  
+
+Example :  
+``` ts
+// users/dto/create-user.dto.ts
+import { IsEmail, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
+
+export class CreateUserDto {
+  @IsEmail()
+  email: string;
+
+  @IsString()
+  @MinLength(2)
+  name: string;
+
+  @IsString()
+  @MinLength(8)
+  password: string;
+
+  @IsOptional()
+  @IsIn(['user', 'admin'])
+  role?: 'user' | 'admin';
+}
+```
+
+But this is not enough, we also need `ValidationPipe` to enforce validation rules for incoming payload declared via DTO annotation.  
+
+If we enable validation gloabally :
+```ts
+// main.ts
+import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
+import { AppModule } from './app.module';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+  app.setGlobalPrefix('api');
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
+
+  app.useGlobalFilters(new HttpExceptionFilter());
+
+  await app.listen(3000);
+}
+bootstrap();
+```
+
+Here :
+- `whitelist: true` strips properties not decorated in the validation class
+- `forbidNonWhitelisted: true` throws instead of silently allowing extra properties
+- `transform: true` transforms payloads into DTO-typed objects automatically
+
+so if the client send :
+```json
+{
+  "email": "alice@example.com",
+  "name": "Alice",
+  "password": "supersecret123",
+  "role": "admin",
+  "isSuperUser": true
+}
+```
+
+then :
+- `with whitelist: true`, isSuperUser is removed
+- `with forbidNonWhitelisted: true`, the request is rejected instead
+- `with transform: true`, Nest converts the plain payload into the DTO class form
+
+## Guard = decide whether the request is allowed  
+
+`Guards` have a single responsibility: determine whether a request will be handled by the route handler, depending on runtime conditions such as permissions or roles.  
+
+Typical uses:
+- is the user authenticated?
+- does the token exist?
+- does the user have the required role?
+- is this API key valid?
+
+Exemple of of an API guard :  
+```ts
+// common/guards/api-key.guard.ts
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
+
+@Injectable()
+export class ApiKeyGuard implements CanActivate {
+  canActivate(context: ExecutionContext): boolean {
+    const request = context.switchToHttp().getRequest();
+    const apiKey = request.headers['x-api-key'];
+
+    if (apiKey !== 'my-secret-key') {
+      throw new UnauthorizedException('Invalid API key');
+    }
+
+    return true;
+  }
+}
+```
+
+If the condition fail the should should not RUN !
+
