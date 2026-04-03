@@ -17,6 +17,7 @@ Here is a summarize of each feature of Nest : - Module              ---> groups 
 
 Let's us a simple request, the example route ---> POST /users
 
+<pre>
 The client send :  
 {  
   "email": "alice@example.com",  
@@ -24,6 +25,7 @@ The client send :
   "password": "supersecret123",  
   "role": "admin"  
 }  
+</pre>
 
 In NestJs the request pass through this flow : *middleware* -> *guard* -> *interceptor* (before) -> *DTO validation/pipe* -> *controller* -> *service* -> *interceptor* (after) -> response and if something go wrong along the way an *exeception filter* can shape the error response.  
 
