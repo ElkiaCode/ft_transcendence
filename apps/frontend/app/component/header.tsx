@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useState } from "react";
 
 function LoginModal({ onClose }: { onClose: () => void }) {
+  const handleLogin42 = () => {
+    const url = `https://api.intra.42.fr/oauth/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code`;
+    window.location.href = url;
+  };
   return (
     <div
       className="fixed inset-0 flex items-center justify-center bg-black/50 z-50"
@@ -16,7 +20,11 @@ function LoginModal({ onClose }: { onClose: () => void }) {
         <h1 className="text-xl text-black font-bold mb-4">Login</h1>
         <input className="border w-full text-black p-2 mt-2" placeholder="Email"/>
         <input className="border w-full text-black p-2 mt-2" placeholder="Password" type="password"/>
-        <button className="mt-4 w-full bg-black text-white p-2">Login</button>
+        <button className="mt-4 w-full bg-black cursor-pointer text-white p-2">Login</button>
+        <button
+          onClick={handleLogin42}
+          className="w-full bg-gray-800 text-white py-2 rounded hover:bg-gray-700 cursor-pointer">continue with 42
+        </button>
       </div>
     </div>
   );
@@ -37,7 +45,7 @@ function RegisterModal({ onClose }: { onClose: () => void }) {
         <input className="border text-black w-full p-2 mt-2" placeholder="Email"/>
         <input className="border text-black w-full p-2 mt-2" placeholder="Password" type="password"/>
         <input className="border text-black w-full p-2 mt-2" placeholder="Confirm password" type="password"/>
-        <button className="mt-4 w-full bg-black text-white p-2">Create an account</button>
+        <button className="mt-4 w-full bg-black cursor-pointer text-white p-2">Create an account</button>
       </div>
     </div>
   );
