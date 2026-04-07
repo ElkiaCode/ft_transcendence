@@ -353,3 +353,252 @@ export class ApiKeyGuard implements CanActivate {
 
 If the condition fail the should should not RUN !
 
+## Interceptor = Wraps execution before/after handler logic  
+
+`Interceptor` are class implemeting `NestInterceptor`.  
+They can bind logic before/after method execution transform returned results, transform exceptions, extend behavior, and even fully override execution, such as for caching.  
+They receive `ExecutionContext` and `CallHandler`, and if `handle()` is never called, the route handler never runs.  
+
+They are perfect for :
+- timing request  
+- logging duration  
+- wrapping all reponse in a common shape  
+- serialization 
+- catching  
+- mapping null values
+- retry/timeout pattern
+
+Example :  
+```ts
+// common/interceptors/response-envelope.interceptor.ts
+import {
+  CallHandler,
+  ExecutionContext,
+  Injectable,
+  NestInterceptor,
+} from '@nestjs/common';
+import { Observable, map } from 'rxjs';
+
+@Injectable()
+export class ResponseEnvelopeInterceptor
+  implements NestInterceptor
+{
+  intercept(
+    context: ExecutionContext,
+    next: CallHandler,
+  ): Observable<any> {
+    const request = context.switchToHttp().getRequest();
+    const startedAt = Date.now();
+
+    return next.handle().pipe(
+      map((data) => ({
+        data,
+        meta: {
+          path: request.url,
+          durationMs: Date.now() - startedAt,
+        },
+      })),
+    );
+  }
+}
+```
+
+Here, if the controller return :
+```json
+{
+  "id": 1,
+  "email": "alice@example.com"
+}
+```
+
+The Interceptor can transform it to :  
+```json
+{
+  "data": {
+    "id": 1,
+    "email": "alice@example.com"
+  },
+  "meta": {
+    "path": "/api/users",
+    "durationMs": 4
+  }
+}
+```
+
+Binding `Interceptor` : they can be method, controller, or global scoped with `@UseInterceptors()` or `useGlobalInterceptors()`  
+
+```ts
+@Controller('users')
+@UseInterceptors(ResponseEnvelopeInterceptor)
+export class UsersController {}
+```
+
+## Filter = format unhandled errors  
+
+It's the Nest built-in execption layer that process unhandled exception across the application.  
+`HttpException` and its subclasses are handled by the built-in global exception filter, and unknown exceptions default to a `500 Internal server error response`. Custom exception filters let you take control of how errors are returned.   
+
+A Filter is for reponse shaping.  
+
+Typical uses :  
+- always return a custom Json Format  
+- include `timestamp` and `path`  
+- hide internal details  
+- standardize errors across the backend  
+
+Example :  
+```ts
+// common/filters/http-exception.filter.ts
+import {
+  ArgumentsHost,
+  Catch,
+  ExceptionFilter,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
+
+@Catch()
+export class HttpExceptionFilter implements ExceptionFilter {
+  catch(exception: unknown, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse();
+    const request = ctx.getRequest();
+
+    const status =
+      exception instanceof HttpException
+        ? exception.getStatus()
+        : HttpStatus.INTERNAL_SERVER_ERROR;
+
+    const message =
+      exception instanceof HttpException
+        ? exception.message
+        : 'Internal server error';
+
+    response.status(status).json({
+      success: false,
+      statusCode: status,
+      message,
+      path: request.url,
+      timestamp: new Date().toISOString(),
+    });
+  }
+}
+```
+
+Let's suppose that `UserServices.create()` Throws :  
+```ts
+throw new ConflictException('Email already exists');  
+```
+
+Without a custom filter, Nest’s built-in exception layer already sends a valid HTTP error response.
+With a custom  filter, i can shape it consistently for the frontend. Nest docs show a custom `HttpExceptionFilter` that adds fields like `statusCode`, `timestamp`, and `path`.  
+
+## Middleware = runs early in the request pipeline  
+
+`Middleware` is a function called before the route handler, with access to request, response and `next()`.  
+They are equivalent by default to Express middleware when using the Express adapter, and they are configured with `configure()` in a module, not inside the `@Module()` metadata.  
+
+They are good for :  
+- request logging  
+- attaching request id  
+- parsing or enriching data request  
+- reading raw header  
+- setting up per request context  
+
+## Let's put them all together  
+
+We will take for example the flow of `POST /api/users`.  
+
+### Step 1: Middleware run  
+
+`RequestLoggerMiddleware` runs first
+
+it might :  
+- generate a request ID  
+- log POST /api/users
+- attach `requestID` to `req`  
+
+this happend before guard and validation  
+
+### Step 2: Guard Run  
+
+`ApiKeyGuard` checks `x-api-key`.  
+- if invalid: throws `UnauthorizedException`  
+- if valid: returns `true` and Nest continues  
+
+Guards run after middleware and before interceptors/pipes.  
+
+### Step 3: Interceptor start wrapping execution  
+
+ResponseEnvelopeInterceptor begins its `intercept()` method.  
+
+It can record start time before calling `next.handle()`. Nest docs explain that `handle()` invokes the route handler stream, and not calling it means the handler never executes.  
+
+### Step 4: DTO validation happens  
+
+`ValidationPipe` checks the `CreateUserDto` rules:  
+- `email` must be a valid email
+- `name` must be a string of at least length 2
+- `password` must be at least length 8
+- `role` must be `user` or `admin` if present
+
+If invalid, an exception is thrown. Nest docs recommend validation of incoming data and document how `ValidationPipe` uses DTO classes.  
+
+### Step 5: Controller receives the validated body  
+
+The controller finally runs :
+```ts
+@Post()
+create(@Body() dto: CreateUserDto) {
+  return this.usersService.create(dto);
+}
+```
+
+The controller’s job here is tiny by design. It just hands off to the service. That matches Nest’s recommended split of responsibilities.  
+
+### Step 6: Service performs business logic  
+
+`UsersService.create(dto)`:  
+- checks duplicate email
+- hashes password
+- stores the user
+- returns the created object
+
+If email exists, it throws `ConflictException`.  
+
+### Step 7: Interceptor transforms the result  
+
+The interceptor receives the returned value and wraps it:
+```json
+{
+  "data": {
+    "id": 1,
+    "email": "alice@example.com",
+    "name": "Alice",
+    "passwordHash": "hashed:supersecret123",
+    "role": "admin"
+  },
+  "meta": {
+    "path": "/api/users",
+    "durationMs": 5
+  }
+}
+```
+
+### Step 8: If anything threw, the filter formats the error  
+
+If the guard failed, or validation failed, or the service threw a `ConflictException`, the filter shapes the final error JSON.  
+
+That is the job of exception filters.  
+
+## The shortest possible memory aid
+
+For one incoming request:
+
+1. Middleware: “A request arrived.”  
+2. Guard: “Is this allowed?”  
+3. Pipe/DTO validation: “Is this input valid?”  
+4. Controller: “Which service method should I call?”  
+5. Service: “Do the real work.”  
+6. Interceptor: “Wrap/transform the result.”  
+7. Filter: “If something failed, shape the error.”  
