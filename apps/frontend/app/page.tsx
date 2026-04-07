@@ -1,7 +1,5 @@
 "use client";
 
-
-
 function Card({ title, description }: { title: string; description: string })
 {
   return (
