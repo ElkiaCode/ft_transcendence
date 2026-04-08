@@ -1,4 +1,4 @@
 export class UpdateProfileDto {
-  bio?: string;
-  avatar?: string;
+	displayName?: string;
+	bio?: string;
 }

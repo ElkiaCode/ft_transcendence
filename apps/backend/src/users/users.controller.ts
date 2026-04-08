@@ -1,8 +1,15 @@
-import { Controller, Patch, UploadedFile, UseInterceptors, Req } from '@nestjs/common';
+import {
+  Controller,
+  Patch,
+  Body,
+  UploadedFile,
+  UseInterceptors,
+  Req,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
-import * as multer from 'multer';
 import { UsersService } from './users.service';
+import { UpdateProfileDto } from './dto/dto';
 import { Request } from 'express';
 
 interface AuthenticatedRequest extends Request {
@@ -13,13 +20,20 @@ interface AuthenticatedRequest extends Request {
 export class UsersController {
   constructor(private usersService: UsersService) {}
 
+  @Patch('me')
+  async updateProfile(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: UpdateProfileDto,
+  ) {
+    return this.usersService.updateProfile(req.user.id, dto);
+  }
+
   @Patch('me/avatar')
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   async uploadAvatar(
     @Req() req: AuthenticatedRequest,
-    @UploadedFile() file: any,
+    @UploadedFile() file: Express.Multer.File,
   ) {
-    const userId = req.user.id;
-    return this.usersService.update(userId, {}, file);
+    return this.usersService.updateAvatar(req.user.id, file);
   }
 }
