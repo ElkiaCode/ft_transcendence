@@ -2,8 +2,8 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { UpdateProfileDto } from './dto/dto';
 import { ProfileResponseDto } from './dto/profile-response.dto';
 import { PrismaService } from './prisma.service';
-import { PutObjectCommand } from '@aws-sdk/client-s3';
-import { s3Client } from './minio.client';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class UsersService {
@@ -43,23 +43,20 @@ export class UsersService {
     const user = await this.findOne(userId);
     if (!user.profile) throw new NotFoundException('Profile not found');
 
-    const bucketName = 'avatars';
-    const avatarKey = `${userId}-${Date.now()}-${file.originalname}`;
+    const uploadDir = '/tmp/avatars';
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
 
-    await s3Client.send(
-      new PutObjectCommand({
-        Bucket: bucketName,
-        Key: avatarKey,
-        Body: file.buffer,
-        ContentType: file.mimetype,
-      }),
-    );
+    const avatarKey = `${userId}-${Date.now()}-${file.originalname}`;
+    const filePath = path.join(uploadDir, avatarKey);
+    fs.writeFileSync(filePath, file.buffer);
 
     const updated = await this.prisma.profile.update({
       where: { userId },
       data: {
         avatarKey,
-        avatarUrl: `http://localhost:9000/${bucketName}/${avatarKey}`,
+        avatarUrl: `/tmp/avatars/${avatarKey}`,
       },
     });
 

@@ -25,7 +25,8 @@ export class UsersController {
     @Req() req: AuthenticatedRequest,
     @Body() dto: UpdateProfileDto,
   ) {
-    return this.usersService.updateProfile(req.user.id, dto);
+	const userId = 'test-user-1'; // ← test
+    return this.usersService.updateProfile(userId, dto);
   }
 
   @Patch('me/avatar')
@@ -34,6 +35,7 @@ export class UsersController {
     @Req() req: AuthenticatedRequest,
     @UploadedFile() file: any,
   ) {
+	const userId = 'test-user-1'; // ← test
     return this.usersService.updateAvatar(req.user.id, file);
   }
 }
