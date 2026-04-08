@@ -38,7 +38,7 @@ export class UsersService {
 
   async updateAvatar(
     userId: string,
-    file: Express.Multer.File,
+    file: any,
   ): Promise<ProfileResponseDto> {
     const user = await this.findOne(userId);
     if (!user.profile) throw new NotFoundException('Profile not found');

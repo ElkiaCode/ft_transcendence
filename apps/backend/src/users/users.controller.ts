@@ -32,7 +32,7 @@ export class UsersController {
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
   async uploadAvatar(
     @Req() req: AuthenticatedRequest,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: any,
   ) {
     return this.usersService.updateAvatar(req.user.id, file);
   }
