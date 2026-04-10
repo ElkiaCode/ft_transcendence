@@ -5,7 +5,7 @@ import * as bcrypt from 'bcrypt';
 import { UpdateProfileDto } from './dto/dto';
 import { ProfileResponseDto } from './dto/profile-response.dto';
 import * as fs from 'fs';
-import * as path from 'path';
+//import * as path from 'path';
 
 @Injectable()
 export class UsersService {
@@ -51,14 +51,14 @@ export class UsersService {
         }
 
         const avatarKey = `${userId}-${Date.now()}-${file.originalname}`;
-        const filePath = path.join(uploadDir, avatarKey);
-        fs.writeFileSync(filePath, file.buffer);
+        //const filePath = path.join(uploadDir, avatarKey);
+        //fs.writeFileSync(filePath, file.buffer);
 
         const updated = await this.prisma.profile.update({
         where: { userId },
         data: {
-        avatarKey,
-        avatarUrl: `/tmp/avatars/${avatarKey}`,
+        //avatarKey,
+        //avatarUrl: `/tmp/avatars/${avatarKey}`,
         },
     });
 
