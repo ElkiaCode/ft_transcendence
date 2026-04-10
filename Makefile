@@ -21,6 +21,10 @@ cert:
 		echo "HTTPS certificate created..."; \
 	fi
 
+folder:
+	@mkdir -p data/postgres_data
+	@mkdir -p data/uploads
+
 up: cert
 	@$(COMPOSE) up --build -d
 
@@ -46,7 +50,7 @@ clean:
 fclean: clean
 	@echo "Removing dev certificates and postgres database"
 	@rm -f "$(CERT_CRT)" "$(CERT_KEY)"
-	@sudo rm -rf ./data/postgres
+	@sudo rm -rf ./data/postgres_data
 	@echo "Done."
 
 

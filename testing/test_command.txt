@@ -1,0 +1,51 @@
+docker compose exec backend npx prisma migrate deploy
+
+register :
+curl -k -X POST https://localhost/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","username":"testuser","password":"password123"}'
+
+
+login :
+curl -k -i -c cookies.txt -X POST https://localhost/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"password123"}'
+
+
+Promote a user to admin :
+docker compose exec postgres sh -lc \
+'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "UPDATE \"User\" SET \"globalRole\" = '\''ADMIN'\'' WHERE email = '\''test@example.com'\'';"'
+
+refresh-cookie:
+curl -k -i -b cookies.txt -c cookies.txt -X POST https://localhost/api/auth/refresh
+
+logout:
+curl -k -i -b cookies.txt -c cookies.txt -X POST https://localhost/api/auth/logout
+
+ban another user as admin/moderator:
+curl -k -X POST https://localhost/api/admin/users/USER_ID_HERE/ban \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN"
+
+unban another user as admin/moderator:
+curl -k -X POST https://localhost/api/admin/users/USER_ID_HERE/unban \
+  -H "Authorization: Bearer ADMIN_ACCESS_TOKEN"
+
+erase data using password:
+curl -k -X POST https://localhost/api/users/me/erase-data \
+  -H "Authorization: Bearer USER_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"currentPassword":"password123"}'
+
+erase data with Oauth only user:
+curl -k -X POST https://localhost/api/users/me/erase-data \
+  -H "Authorization: Bearer USER_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+
+Get me :
+curl -k https://localhost/api/users/me -H "Authorization: Bearer YOUR_TOKEN"
+
+
+and verify in postgre :
+
+docker compose exec postgres sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT id,email,username,\"globalRole\" FROM \"User\";"'
