@@ -6,6 +6,7 @@
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
+  moduleFormat = "cjs"
 }
 
 datasource db {
@@ -63,10 +64,12 @@ model OAuthAccount {
 model RefreshToken {
   id         String    @id @default(cuid())
   userId     String
-  tokenHash  String
+  tokenHash  String    @unique
   expiresAt  DateTime
   revokedAt  DateTime?
   createdAt  DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

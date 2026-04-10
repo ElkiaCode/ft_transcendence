@@ -1,0 +1,24 @@
+docker compose exec backend npx prisma migrate deploy
+
+register :
+
+curl -k -X POST https://localhost/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","username":"testuser","password":"password123"}'
+
+
+login :
+
+curl -k -X POST https://localhost/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"password123"}'
+
+
+Get me :
+
+curl -k https://localhost/api/users/me -H "Authorization: Bearer YOUR_TOKEN"
+
+
+and verify in postgre :
+
+docker compose exec postgres sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT id,email,username,\"globalRole\" FROM \"User\";"'
