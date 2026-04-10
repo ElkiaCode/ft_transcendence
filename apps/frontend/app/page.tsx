@@ -12,6 +12,7 @@ function Card({ title, description }: { title: string; description: string })
   );
 }
 
+
 function Section() {
   const projects = [
     { id: 1, title: "test 1", description: "test" },
