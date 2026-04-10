@@ -1,4 +1,4 @@
-const API_URL = 'http://localhost/api';
+const API_URL = 'https://localhost/api';
 
 export async function apiLogin(email: string, password: string) {
   const res = await fetch(`${API_URL}/auth/login`, {
@@ -16,7 +16,7 @@ export async function apiLogin(email: string, password: string) {
   return res.json();
 }
 
-export async function apiRegister(email: string, username: string, password: string) {
+export async function apiRegister(username: string, email: string, password: string) {
   const res = await fetch(`${API_URL}/auth/register`, {
     method: 'POST',
     credentials: 'include',

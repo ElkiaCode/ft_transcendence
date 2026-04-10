@@ -2,12 +2,7 @@ import type { Metadata } from "next";
 import Header from "./component/header";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-
-function Footer()
-{
-  return <p className="bg-gray-200 p-4 text-3xl text-center text-black">© 2026</p>;
-}
-
+import IsAuth from "./component/isAuth";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,10 +22,11 @@ export const metadata: Metadata = {
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr">
-      <body className={`${geistSans.variable} ${geistMono.variable} min-h-screen flex flex-col`}>
-        <Header />
-        <main className="flex-1">{children}</main>
-        <Footer />
+      <body className={`${geistSans.variable} ${geistMono.variable} h-screen flex flex-col`}>
+        <IsAuth>
+          <Header />
+        <main className="flex-1 overflow-hidden">{children}</main>
+        </IsAuth>
       </body>
     </html>
   );
