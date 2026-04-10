@@ -1,9 +1,17 @@
-import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Patch, UploadedFile, UseInterceptors, Req } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/types/jwt-payload.type';
 import { EraseMyDataDto } from 'src/auth/dto/erase-my-data.dto';
+import { UpdateProfileDto } from './dto/dto';
+import { Request } from 'express';
+
+interface AuthenticatedRequest extends Request {
+  user: { id: string; email?: string; username?: string };
+}
 
 @Controller('users')
 export class UsersController {
@@ -15,6 +23,23 @@ export class UsersController {
     return this.usersService.getMe(user.sub);
   }
 
+  @Patch('update/profile')
+  async updateProfile(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: UpdateProfileDto,
+  ) {
+    return this.usersService.updateProfile(req.user.id, dto);
+  }
+
+  @Patch('update/avatar')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  async uploadAvatar(
+    @Req() req: AuthenticatedRequest,
+    @UploadedFile() file: any,
+  ) {
+    return this.usersService.updateAvatar(req.user.id, file);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Post('me/erase-data')
   eraseMyData(
@@ -24,3 +49,4 @@ export class UsersController {
     return this.usersService.eraseMyData(user.sub, dto);
   }
 }
+

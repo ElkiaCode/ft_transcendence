@@ -25,6 +25,7 @@ CREATE TABLE "Profile" (
     "displayName" TEXT NOT NULL,
     "bio" TEXT,
     "avatarUrl" TEXT,
+    "avatarKey" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
