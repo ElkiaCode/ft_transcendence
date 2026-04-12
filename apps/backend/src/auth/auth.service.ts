@@ -20,7 +20,6 @@ export class AuthService {
   getRefreshTokenDays(): number {
     const raw = this.configService.get<string>('JWT_REFRESH_DAYS');
     const parsed = Number(raw);
-    
     return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_REFRESH_DAYS;
   }
 
@@ -32,7 +31,6 @@ export class AuthService {
     return new Date(Date.now() + this.getRefreshTokenMaxAgeMs());
   }
 
-  //
   async register(dto: RegisterDto) {
     const email = dto.email.trim().toLowerCase();
     const username = dto.username.trim();
@@ -218,6 +216,106 @@ export class AuthService {
         revokedAt: new Date(),
       },
     });
+  }
+
+  async loginWith42(code: string) {
+    // 1. Échanger le code contre un token 42
+    const tokenResponse = await fetch('https://api.intra.42.fr/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        grant_type: 'authorization_code',
+        client_id: this.configService.getOrThrow('FORTYTWO_CLIENT_ID'),
+        client_secret: this.configService.getOrThrow('FORTYTWO_CLIENT_SECRET'),
+        code,
+        redirect_uri: this.configService.getOrThrow('FORTYTWO_CALLBACK_URL'),
+      }),
+    });
+
+    if (!tokenResponse.ok) {
+      throw new UnauthorizedException('invalid 42 code');
+    }
+
+    const tokenData = await tokenResponse.json();
+    const accessToken42 = tokenData.access_token;
+
+    // 2. Récupérer les infos du user depuis l'API 42
+    const userResponse = await fetch('https://api.intra.42.fr/v2/me', {
+      headers: { Authorization: `Bearer ${accessToken42}` },
+    });
+
+    if (!userResponse.ok) {
+      throw new UnauthorizedException('failed to fetch 42 user');
+    }
+
+    const user42 = await userResponse.json();
+
+    // 3. Chercher ou créer le user en DB
+    let user = await this.prisma.user.findFirst({
+      where: {
+        oauthAccounts: {
+          some: {
+            provider: '42',
+            providerAccountId: String(user42.id),
+          },
+        },
+      },
+      include: { profile: true },
+    });
+
+    if (!user) {
+      const username = await this.generateUniqueUsername(user42.login);
+
+      user = await this.prisma.user.create({
+        data: {
+          email: user42.email,
+          username,
+          profile: {
+            create: {
+              displayName: user42.displayname ?? username,
+              avatarUrl: user42.image?.link ?? null,
+            },
+          },
+          oauthAccounts: {
+            create: {
+              provider: '42',
+              providerAccountId: String(user42.id),
+            },
+          },
+        },
+        include: { profile: true },
+      });
+    }
+
+    if (!user.isActive) throw new UnauthorizedException('account is inactive');
+    if (user.isBanned) throw new UnauthorizedException('account is banned');
+
+    // 4. Créer notre propre session JWT
+    const payload: JwtPayload = {
+      sub: user.id,
+      email: user.email,
+      username: user.username,
+      role: user.globalRole,
+    };
+
+    const session = await this.createSession(user.id, payload);
+
+    return {
+      accessToken: session.accessToken,
+      refreshToken: session.refreshToken,
+      user: this.toPublicUser(user),
+    };
+  }
+
+  private async generateUniqueUsername(base: string): Promise<string> {
+    let username = base;
+    let exists = await this.prisma.user.findUnique({ where: { username } });
+    let i = 1;
+    while (exists) {
+      username = `${base}${i++}`;
+      exists = await this.prisma.user.findUnique({ where: { username } });
+    }
+    return username;
   }
 
   async signAccessToken(payload: JwtPayload): Promise<string> {

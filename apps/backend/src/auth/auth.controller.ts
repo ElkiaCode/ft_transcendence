@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Req, Res } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Post, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -78,5 +78,26 @@ export class AuthController {
     clearRefreshCookie(response);
 
     return { success: true };
+  }
+
+  @Post('42/callback')
+  async loginWith42(
+    @Body('code') code: string,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    if (!code) throw new BadRequestException('missing code');
+
+    const result = await this.authService.loginWith42(code);
+
+    setRefreshCookie(
+      response,
+      result.refreshToken,
+      this.authService.getRefreshTokenDays(),
+    );
+
+    return {
+      accessToken: result.accessToken,
+      user: result.user,
+    };
   }
 }
