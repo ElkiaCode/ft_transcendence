@@ -5,6 +5,11 @@ import { useAuthStore } from "@/store/authStore";
 import Link from "next/link";
 import { useState } from "react";
 
+// Redirection vers 42
+// Apres login on est rediriger sur le front en recevant un champs "code"
+// On envoie ce code au backend pour obtenir un access token
+// Ca permet au back de get les infos du user et de le connecter
+
 function LoginModal({ onClose }: { onClose: () => void }) {
   const handleLogin42 = () => {
     const url = `https://api.intra.42.fr/oauth/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code`;
