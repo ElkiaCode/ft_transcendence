@@ -1,15 +1,28 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuthStore } from "@/store/authStore";
 import { apiMe } from "@/lib/api/auth";
 
 export default function IsAuth({ children }: { children: React.ReactNode }) {
   const setUser = useAuthStore((s) => s.setUser);
-    useEffect(() => {
-        apiMe().then(user => {
+  const [checkedAuth, setCheckedAuth] = useState(false);
+
+  useEffect(() => {
+    apiMe()
+      .then((user) => {
         if (user) setUser(user);
-        });
-    }, [setUser]);
-    return <>{children}</>;
+      })
+      .catch(() => {
+      })
+      .finally(() => {
+        setCheckedAuth(true);
+      });
+  }, [setUser]);
+
+  if (!checkedAuth) {
+    return null;
+  }
+
+  return <>{children}</>;
 }

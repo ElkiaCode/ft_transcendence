@@ -17,6 +17,9 @@ function Section() {
           <button className="bg-pink-500 text-white px-6 py-2 rounded-full hover:bg-green-500 transition cursor-pointer">
             Send
           </button>
+          <div className="w-10 h-10 bg-gray-400 rounded-full flex items-center justify-center text-white font-bold cursor-pointer">
+            
+          </div>
         </div>
       </div>
     </section>
