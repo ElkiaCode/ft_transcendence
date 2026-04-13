@@ -20,6 +20,74 @@ export class UsersService {
             return user;
     }
 
+    async searchUsers(currentUserId: string, rawQuery: string) {
+      const q = rawQuery?.trim() ?? '';
+
+      if (q.length < 2) {
+        return [];
+      }
+
+      const users = await this.prisma.user.findMany({
+        where: {
+          id: { not: currentUserId },
+          isActive: true,
+          isBanned: false,
+          OR: [
+            {
+              username: {
+                contains: q,
+                mode: 'insensitive',
+              },
+            },
+            {
+              profile: {
+                is: {
+                  displayName: {
+                    contains: q,
+                    mode: 'insensitive',
+                  },
+                },
+              },
+            },
+          ],
+          NOT: [
+            {
+              blocksInitiated: {
+                some: {
+                  blockedId: currentUserId,
+                },
+              },
+            },
+            {
+              blocksReceived: {
+                some: {
+                  blockerId: currentUserId,
+                },
+              },
+            },
+          ],
+        },
+        include: {
+          profile: true,
+        },
+        orderBy: [
+          { username: 'asc' },
+        ],
+        take: 20,
+      });
+
+      return users.map((user) => ({
+        id: user.id,
+        username: user.username,
+        profile: user.profile
+          ? {
+              displayName: user.profile.displayName,
+              avatarUrl: user.profile.avatarUrl,
+            }
+          : null,
+      }));
+  }
+    
     async updateProfile(
         userId: string,
         dto: UpdateProfileDto,
