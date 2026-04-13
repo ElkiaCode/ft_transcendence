@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Patch, UploadedFile, UseInterceptors, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Patch, UploadedFile, UseInterceptors, Req, Query } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -21,6 +21,15 @@ export class UsersController {
   @Get('me')
   getMe(@CurrentUser() user: JwtPayload) {
     return this.usersService.getMe(user.sub);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('search')
+  searchUsers(
+    @CurrentUser() user: JwtPayload,
+    @Query('q') q: string,
+  ) {
+    return this.usersService.searchUsers(user.sub, q);
   }
 
   @Patch('update/profile')

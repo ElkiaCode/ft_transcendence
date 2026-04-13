@@ -108,6 +108,7 @@ class User:
         if (result.returncode == 1):
             print(f"{self.username}: success: false\n")
             return
+        
         print(f"{self.username}: success: false\n")
 
     def eraseDataPassword(self):
@@ -133,6 +134,60 @@ class User:
     def unbanUser(self, userToUnban):
         response = requests.post(
             f"{BASE_URL}/admin/users/{userToUnban.id}/unban",
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            verify = False
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
+    def sendFriendRequest(self, toSend):
+        response = requests.post(
+            f"{BASE_URL}/relationships/users/{toSend.id}/friend-request",
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            verify = False
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
+    def acceptFriend(self, userAccepted):
+        response = requests.post(
+            f"{BASE_URL}/relationships/users/{userAccepted.id}/friend-accept",
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            verify = False
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
+    def removeFriend(self, toRemove):
+        response = requests.delete(
+            f"{BASE_URL}/relationships/users/{toRemove.id}/friend",
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            verify = False
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
+    def blockUser(self, toBlock):
+        response = requests.post(
+            f"{BASE_URL}/relationships/users/{toBlock.id}/block",
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            verify = False
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
+    def unblockUser(self, toUnblock):
+        response = requests.delete(
+            f"{BASE_URL}/relationships/users/{toUnblock.id}/block",
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            verify = False
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
+    def searchUser(self, userToSearch):
+        response = requests.get(
+            f"{BASE_URL}/users/search?q={userToSearch.username}",
             headers = { "Authorization": f"Bearer {self.accessToken}" },
             verify = False
         )

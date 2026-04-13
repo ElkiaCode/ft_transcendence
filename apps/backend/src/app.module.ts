@@ -7,9 +7,17 @@ import { UsersModule } from './users/users.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AdminModule } from './admin/admin.module';
 import { ConfigModule } from '@nestjs/config';
+import { RelationshipsModule } from './relationships/relationships.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, UsersModule, AdminModule, ConfigModule.forRoot({ isGlobal: true})],
+  imports: [
+    PrismaModule,
+    RelationshipsModule,
+    AuthModule,
+    UsersModule,
+    AdminModule,
+    ConfigModule.forRoot({ isGlobal: true})
+  ],
   controllers: [AppController, HealthController],
   providers: [AppService],
 })

@@ -1,4 +1,5 @@
 from users import *
+from database import *
 
 def testUnit():
     guillaume   = User("guillaume.roustan1@gmail.com", "laGuigue06", "pass1234")
@@ -57,6 +58,9 @@ def testUnit():
     print("guillaume ban yann:\n")
     guillaume.banUser(yann)
 
+    print("guillaume try to unban clement even tho he is not ban:\n")
+    guillaume.unbanUser(clement)
+
     print("yann try to loggin\n")
     yann.login()
 
@@ -65,6 +69,30 @@ def testUnit():
 
     print("yann retry to loggin\n")
     yann.login()
+
+    print("guillaume send a friend request to yann\n")
+    guillaume.sendFriendRequest(yann)
+
+    print("yann accept guillaume friend request\n")
+    yann.acceptFriend(guillaume)
+
+    print("yann don't like guillaume anymore and block him\n")
+    yann.blockUser(guillaume)
+
+    print("yann found redemption inside the heart of guillaume and decide to unblock him\n")
+    yann.unblockUser(guillaume)
+
+    print("guillaume send a friend request to clement\n")
+    guillaume.sendFriendRequest(clement)
+
+    print("clement accept the friend request\n")
+    clement.acceptFriend(guillaume)
+
+    print("guillaume is searching the user clement\n")
+    guillaume.searchUser(clement)
+
+    #print("check database:\n")
+    #full_database_audit()
 
     print("guillaume erase his data:\n")
     guillaume.eraseDataPassword()

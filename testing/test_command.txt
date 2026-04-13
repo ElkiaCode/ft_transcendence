@@ -42,9 +42,32 @@ curl -k -X POST https://localhost/api/users/me/erase-data \
   -H "Content-Type: application/json" \
   -d '{}'
 
+send a friend request:
+curl -k -X POST https://localhost/api/relationships/users/TARGET_USER_ID/friend-request \
+  -H "Authorization: Bearer ACTOR_ACCESS_TOKEN"
+
+accept friend request:
+curl -k -X POST https://localhost/api/relationships/users/REQUESTER_USER_ID/friend-accept \
+  -H "Authorization: Bearer ADDRESSEE_ACCESS_TOKEN"
+
+remove friend:
+curl -k -X DELETE https://localhost/api/relationships/users/TARGET_USER_ID/friend \
+  -H "Authorization: Bearer ACTOR_ACCESS_TOKEN"
+
+block user:
+curl -k -X POST https://localhost/api/relationships/users/TARGET_USER_ID/block \
+  -H "Authorization: Bearer ACTOR_ACCESS_TOKEN"
+
+unblock user:
+curl -k -X DELETE https://localhost/api/relationships/users/TARGET_USER_ID/block \
+  -H "Authorization: Bearer ACTOR_ACCESS_TOKEN"
+
+Get, search user:
+curl -k "https://localhost/api/users/search?q=test" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
 Get me :
 curl -k https://localhost/api/users/me -H "Authorization: Bearer YOUR_TOKEN"
-
 
 and verify in postgre :
 
