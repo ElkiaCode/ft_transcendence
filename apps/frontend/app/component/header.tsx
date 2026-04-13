@@ -2,6 +2,7 @@
 
 import { apiLogin, apiLogout, apiRegister } from "@/lib/api/auth";
 import { useAuthStore } from "@/store/authStore";
+import { handleBuildComplete } from "next/dist/build/adapter/build-complete";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -118,19 +119,23 @@ function RegisterModal({ onClose }: { onClose: () => void }) {
 export default function Header() {
   const [showLogin, setShowLogin] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
+  const logout = useAuthStore((s) => s.logout);
   const user = useAuthStore((s) => s.user);
+  const handleLogout = () => {
+    apiLogout();
+    logout();
+  };
   return (
     <>
       <header className="bg-gray-200 text-black p-4 flex items-center">
-        <h1 className="text-3xl font-bold">Transcendence</h1>
-        <nav className="flex gap-12 font-bold mx-auto">
-          <Link className="hover:text-gray-500 text-2xl" href="/">Accueil</Link>
+        <nav className="flex gap-12 font-bold mx-4">
+          <Link className="text-3xl font-bold" href="/">Transcendence</Link>
         </nav>
-          <div className="flex flex-col gap-2 mr-4">
+          <div className="flex flex-col gap-2 mr-4 ml-auto">
             {user ? (
               <div className="flex flex-col gap-1 items-end">
                 <span className="text-sm font-bold">{user.username}</span>
-                <button onClick={apiLogout} className="text-sm text-gray-500 cursor-pointer">logout</button>
+                <button onClick={handleLogout} className="text-sm cursor-pointer">logout</button>
               </div>
             ) : (
               <div className="flex flex-col gap-1">

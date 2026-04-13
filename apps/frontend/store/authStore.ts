@@ -4,7 +4,7 @@ interface User {
   id: string;
   username: string;
   email: string;
-  prodile: {
+  profile: {
     displayName: string;
     bio: string | null;
     avatarUrl: string | null;
