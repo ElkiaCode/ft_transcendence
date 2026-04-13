@@ -11,6 +11,7 @@ COPY . .
 
 RUN npx prisma generate && npm run build
 
+
 EXPOSE 3001
 
 CMD ["sh", "-lc", "npm run start:dev"]
