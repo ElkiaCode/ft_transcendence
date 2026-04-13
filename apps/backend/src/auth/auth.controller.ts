@@ -22,6 +22,12 @@ export class AuthController {
       this.authService.getRefreshTokenDays(),
     );
 
+    response.cookie('access_token', result.accessToken, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: false,
+    });
+
     return {
       accessToken: result.accessToken,
       user: result.user,
@@ -40,6 +46,12 @@ export class AuthController {
       result.refreshToken,
       this.authService.getRefreshTokenDays(),
     );
+
+    response.cookie('access_token', result.accessToken, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: false,
+    });
 
     return {
       accessToken: result.accessToken,
@@ -61,6 +73,12 @@ export class AuthController {
       this.authService.getRefreshTokenDays(),
     );
 
+    response.cookie('access_token', result.accessToken, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: false,
+    });
+
     return {
       accessToken: result.accessToken,
       user: result.user,
@@ -80,7 +98,7 @@ export class AuthController {
     return { success: true };
   }
 
-  @Get('42/callback')
+ @Get('42/callback')
   async loginWith42(
     @Query('code') code: string,
     @Res({ passthrough: true }) response: Response,
@@ -94,6 +112,12 @@ export class AuthController {
       result.refreshToken,
       this.authService.getRefreshTokenDays(),
     );
+
+    response.cookie('access_token', result.accessToken, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: false,
+    });
 
     return {
       accessToken: result.accessToken,

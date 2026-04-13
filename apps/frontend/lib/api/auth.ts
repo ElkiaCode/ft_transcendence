@@ -50,3 +50,13 @@ export async function apiMe() {
   const data = await res.json();
   return data.user ?? null;
 }
+
+export async function apiSearchUsers(query: string) {
+  const res = await fetch(`${API_URL}/users/search?q=${encodeURIComponent(query)}`, {
+    credentials: 'include',
+  });
+
+  if (!res.ok) return [];
+
+  return res.json();
+}

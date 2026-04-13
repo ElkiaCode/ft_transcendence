@@ -9,7 +9,15 @@ import type { JwtPayload } from '../types/jwt-payload.type';
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(configService: ConfigService, private readonly prisma: PrismaService) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+        (req) => {
+          if (req && req.cookies) {
+            return req.cookies['access_token'];
+          }
+          return null;
+        },
+      ]),
       ignoreExpiration: false,
       secretOrKey: configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
     });
