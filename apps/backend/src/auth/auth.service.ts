@@ -264,15 +264,13 @@ export class AuthService {
     });
 
     if (!user) {
-      const username = await this.generateUniqueUsername(user42.login);
-
       user = await this.prisma.user.create({
         data: {
           email: user42.email,
-          username,
+          username: user42.login,
           profile: {
             create: {
-              displayName: user42.displayname ?? username,
+              displayName: user42.displayname ?? user42.login,
               avatarUrl: user42.image?.link ?? null,
             },
           },
@@ -305,17 +303,6 @@ export class AuthService {
       refreshToken: session.refreshToken,
       user: this.toPublicUser(user),
     };
-  }
-
-  private async generateUniqueUsername(base: string): Promise<string> {
-    let username = base;
-    let exists = await this.prisma.user.findUnique({ where: { username } });
-    let i = 1;
-    while (exists) {
-      username = `${base}${i++}`;
-      exists = await this.prisma.user.findUnique({ where: { username } });
-    }
-    return username;
   }
 
   async signAccessToken(payload: JwtPayload): Promise<string> {
