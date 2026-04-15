@@ -55,7 +55,7 @@ export class RelationshipsController {
     );
   }
 
-  @Delete('users/:id/block')
+  @Delete('users/:id/unblock')
   unblockUser(
     @Param('id') targetUserId: string,
     @CurrentUser() actor: JwtPayload,

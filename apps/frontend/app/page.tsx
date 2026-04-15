@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { apiSearchUsers } from "@/lib/api/auth";
+import { addFriendRequest, apiSearchUsers, blockUser, unblockUser } from "@/lib/api/auth";
 
 interface SearchUser {
   id: string;
@@ -13,6 +13,7 @@ interface SearchUser {
 }
 
 function Section() {
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
   const handleSearch = async (value: string) => {
@@ -57,6 +58,33 @@ function Section() {
                   <p className="text-sm font-bold">{user.username}</p>
                   <p className="text-xs text-gray-500 font-normal">{user.profile?.displayName}</p>
                 </div>
+               <div className="relative ml-auto">
+                <button
+                  onClick={() => setOpenMenuId(openMenuId === user.id ? null : user.id)}
+                  className="px-2 py-1 text-gray-500 hover:text-gray-700 focus:outline-none"
+                >
+                  ⋯
+                </button>
+                {openMenuId === user.id && (
+                  <div className="absolute right-0 mt-2 w-40 bg-white shadow-lg rounded-lg z-10">
+                    <button
+                      onClick={() => addFriendRequest(user.id)}
+                      className="block w-full text-green-500 text-left px-4 py-2 hover:bg-gray-100">
+                      Add friend
+                    </button>
+                    <button
+                      onClick={() => blockUser(user.id)}
+                      className="block w-full text-red-500 text-left px-4 py-2 hover:bg-gray-100">
+                      Block User
+                    </button>
+                    <button
+                      onClick={() => unblockUser(user.id)}
+                      className="block w-full text-blue-500 text-left px-4 py-2 hover:bg-gray-100">
+                      Unblock User
+                    </button>
+                  </div>
+                )}
+                </div>
               </div>
             ))
           ) : (
@@ -64,6 +92,21 @@ function Section() {
               {searchQuery.length >= 2 ? 'No results found' : 'Search for users...'}
             </p>
           )}
+        </div>
+      </div>
+      <div className="flex-1 flex flex-col justify-end">
+        <div className="bg-white border-t border-gray-300 p-4 flex gap-2 items-center">
+          <input
+            type="text"
+            placeholder="Enter a message..."
+            className="flex-1 border border-gray-300  text-black rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button className="bg-pink-500 text-white px-6 py-2 rounded-full hover:bg-green-500 transition cursor-pointer">
+            Send
+          </button>
+          <div className="w-10 h-10 bg-gray-400 rounded-full flex items-center justify-center text-white font-bold cursor-pointer">
+            
+          </div>
         </div>
       </div>
     </section>

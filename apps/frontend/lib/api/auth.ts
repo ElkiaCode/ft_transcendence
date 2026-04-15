@@ -1,3 +1,5 @@
+import { useAuthStore } from "@/store/authStore";
+
 const API_URL = 'https://localhost/api';
 
 export async function apiLogin(email: string, password: string) {
@@ -7,13 +9,15 @@ export async function apiLogin(email: string, password: string) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
   });
+  const data = await res.json();
 
   if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.message || 'Erreur de connexion');
+    throw new Error(data.message || 'Erreur de connexion');
   }
+  useAuthStore.getState().setAccessToken(data.accessToken);
+  useAuthStore.getState().setUser(data.user);
 
-  return res.json();
+  return data.user;
 }
 
 export async function apiRegister(username: string, email: string, password: string) {
@@ -23,13 +27,15 @@ export async function apiRegister(username: string, email: string, password: str
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, username, password }),
   });
+  const data = await res.json();
 
   if (!res.ok) {
-    const error = await res.json();
-    throw new Error(error.message || 'Erreur lors de l\'inscription');
+    throw new Error(data.message || 'Erreur lors de l\'inscription');
   }
 
-  return res.json();
+  useAuthStore.getState().setAccessToken(data.accessToken);
+  useAuthStore.getState().setUser(data.user);
+  return data.user;
 }
 
 export async function apiLogout() {
@@ -37,26 +43,90 @@ export async function apiLogout() {
     method: 'POST',
     credentials: 'include',
   });
+  useAuthStore.getState().clear();
 }
 
-export async function apiMe() {
+export async function apiRefresh() {
   const res = await fetch(`${API_URL}/auth/refresh`, {
     method: 'POST',
     credentials: 'include',
   });
 
   if (!res.ok) return null;
-
   const data = await res.json();
-  return data.user ?? null;
+
+  useAuthStore.getState().setAccessToken(data.accessToken);
+  useAuthStore.getState().setUser(data.user);
+
+  return data.user;
 }
 
 export async function apiSearchUsers(query: string) {
+  const token = useAuthStore.getState().accessToken;
   const res = await fetch(`${API_URL}/users/search?q=${encodeURIComponent(query)}`, {
     credentials: 'include',
+    headers: token ? { 'Authorization': `Bearer ${token}` } : {},
   });
 
   if (!res.ok) return [];
 
   return res.json();
+}
+
+export async function addFriendRequest(userId: string) {
+  const token = useAuthStore.getState().accessToken;
+  const res = await fetch(`${API_URL}/relationships/users/${userId}/friend-request`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ userId }),
+  });
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.message || 'Erreur lors de l\'envoi de la demande d\'ami');
+  }
+
+  return data;
+}
+
+export async function blockUser(userId: string) {
+  const token = useAuthStore.getState().accessToken;
+  const res = await fetch(`${API_URL}/relationships/users/${userId}/block`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ userId }),
+  });
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.message || 'Erreur lors du blocage de l\'utilisateur');
+  }
+
+  return data;
+}
+
+export async function unblockUser(userId: string) {
+  const token = useAuthStore.getState().accessToken;
+  const res = await fetch(`${API_URL}/relationships/users/${userId}/unblock`, {
+    method: 'DELETE',
+    credentials: 'include',
+    headers: {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
+  });
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.message || 'Erreur lors du déblocage de l\'utilisateur');
+  }
+
+  return data;
 }
