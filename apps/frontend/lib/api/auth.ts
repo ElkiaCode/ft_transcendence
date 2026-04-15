@@ -73,6 +73,21 @@ export async function apiSearchUsers(query: string) {
   return res.json();
 }
 
+export async function apiGetMyFriends() {
+  const token = useAuthStore.getState().accessToken;
+  const res = await fetch(`${API_URL}/users/friends`, {
+    credentials: 'include',
+    headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.message || 'Erreur lors de la récupération des amis');
+  }
+
+  return res.json();
+}
+
 export async function addFriendRequest(userId: string) {
   const token = useAuthStore.getState().accessToken;
   const res = await fetch(`${API_URL}/relationships/users/${userId}/friend-request`, {

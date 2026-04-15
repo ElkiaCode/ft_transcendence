@@ -114,12 +114,12 @@ def testUnit():
     print("guillaume is searching the user clement\n")
     guillaume.searchUser(clement)
 
-    print("guillaume erase his data:\n")
-    guillaume.eraseDataPassword()
-    print("yann erase his data:\n")
-    yann.eraseDataPassword()
-    print("clement erase his data:\n")
-    clement.eraseDataPassword()
+    # print("guillaume erase his data:\n")
+    # guillaume.eraseDataPassword()
+    # print("yann erase his data:\n")
+    # yann.eraseDataPassword()
+    # print("clement erase his data:\n")
+    # clement.eraseDataPassword()
 
     #full_database_audit()
 

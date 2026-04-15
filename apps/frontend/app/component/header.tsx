@@ -1,15 +1,83 @@
 "use client";
 
-import { apiLogin, apiLogout, apiRegister } from "@/lib/api/auth";
+import { apiGetMyFriends, apiLogin, apiLogout, apiRegister } from "@/lib/api/auth";
 import { useAuthStore } from "@/store/authStore";
 import { handleBuildComplete } from "next/dist/build/adapter/build-complete";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 // Redirection vers 42
 // Apres login on est rediriger sur le front en recevant un champs "code"
 // On envoie ce code au backend pour obtenir un access token
 // Ca permet au back de get les infos du user et de le connecter
+
+function FriendInterface({ user }: { user: any }) {
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [friends, setFriends] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (openMenuId !== 'friends' || !user) return;
+
+    const loadFriends = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await apiGetMyFriends();
+        setFriends(data);
+      } catch (err: any) {
+        setError(err.message || 'Erreur lors de la récupération des amis');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadFriends();
+  }, [openMenuId, user]);
+
+  return (
+    <div className="relative flex items-center gap-4 ml-60">
+      <button
+        className="bg-blue-500 text-white px-6 py-2 rounded-full hover:bg-green-500 transition cursor-pointer"
+        onClick={() => setOpenMenuId(openMenuId === 'friends' ? null : 'friends')}
+      >
+        Friends
+      </button>
+
+      {openMenuId === 'friends' && (
+        <div className="absolute top-full mt-2 w-64 bg-white border border-gray-200 rounded shadow-lg z-10">
+          <div className="px-4 py-2 text-sm font-semibold text-gray-800 border-b border-gray-200">
+            Mes amis
+          </div>
+
+          {loading && (
+            <div className="px-4 py-3 text-sm text-gray-600">Chargement...</div>
+          )}
+
+          {error && (
+            <div className="px-4 py-3 text-sm text-red-500">{error}</div>
+          )}
+
+          {!loading && !error && friends.length === 0 && (
+            <div className="px-4 py-3 text-sm text-gray-600">Aucun ami trouvé.</div>
+          )}
+
+          {!loading && !error && friends.length > 0 && (
+            <div className="max-h-56 overflow-auto">
+              {friends.map((friend) => (
+                <div key={friend.id} className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100">
+                  {friend.username || friend.profile?.displayName || friend.email}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 function LoginModal({ onClose }: { onClose: () => void }) {
   const [email, setEmail] = useState('');
@@ -147,6 +215,7 @@ export default function Header() {
         <nav className="flex gap-12 font-bold mx-4">
           <Link className="text-3xl font-bold" href="/">Transcendence</Link>
         </nav>
+        < FriendInterface user={user} />
           <div className="flex flex-col gap-2 mr-4 ml-auto">
             {user ? (
               <div className="flex flex-col gap-1 items-end">
