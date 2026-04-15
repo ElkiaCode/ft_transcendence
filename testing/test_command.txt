@@ -62,7 +62,7 @@ unblock user:
 curl -k -X DELETE https://localhost/api/relationships/users/TARGET_USER_ID/block \
   -H "Authorization: Bearer ACTOR_ACCESS_TOKEN"
 
-Get, search user:
+search user:
 curl -k "https://localhost/api/users/search?q=test" \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
 

@@ -24,6 +24,12 @@ export class UsersController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('friends')
+  getAcceptedFriends(@CurrentUser() user: JwtPayload) { 
+    return this.usersService.getMyFriends(user.sub)
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('search')
   searchUsers(
     @CurrentUser() user: JwtPayload,

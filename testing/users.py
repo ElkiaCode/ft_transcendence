@@ -194,6 +194,33 @@ class User:
 
         print(f"{self.username}: {response.json()}\n")
 
+    def getMyFriends(self):
+        response = requests.get(
+            f"{BASE_URL}/users/friends",
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            verify = False
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
+    def getIncomingRequest(self):
+        response = requests.get(
+            f"{BASE_URL}/relationships/requests/incoming",
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            verify = False
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
+    def getOutcomingRequest(self):
+        response = requests.get(
+            f"{BASE_URL}/relationships/requests/outgoing",
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            verify = False
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
     def getMe(self):
         response = requests.get(
             f"{BASE_URL}/users/me",

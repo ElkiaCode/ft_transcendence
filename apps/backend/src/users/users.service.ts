@@ -211,5 +211,36 @@ export class UsersService {
       return {success: true, message: 'Your account have been erased'};
     }
   }
+
+  async getMyFriends(userId: string) {
+    const friendships = await this.prisma.friendship.findMany({
+      where: {
+        status: 'ACCEPTED',
+        OR: [
+          { requesterId: userId },
+          { addresseeId: userId },
+        ],
+      },
+      include: {
+        requester: {
+          include: { profile: true },
+        },
+        addressee: {
+          include: { profile: true },
+        },
+      },
+    });
+
+    return friendships.map((friendship) => {
+      const friend = friendship.requesterId === userId ? friendship.addressee : friendship.requester;
+
+      return {
+        id: friend.id,
+        username: friend.username,
+        displayName: friend.profile?.displayName ?? friend.username,
+        avatarUrl: friend.profile?.avatarUrl ?? null,
+      };
+    });
+  }
 }
 
