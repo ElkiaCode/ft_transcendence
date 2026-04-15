@@ -40,11 +40,13 @@ export async function apiLogout() {
 }
 
 export async function apiMe() {
-  const res = await fetch(`${API_URL}/auth/me`, {
+  const res = await fetch(`${API_URL}/auth/refresh`, {
+    method: 'POST',
     credentials: 'include',
   });
 
   if (!res.ok) return null;
 
-  return res.json();
+  const data = await res.json();
+  return data.user ?? null;
 }

@@ -2,6 +2,7 @@
 
 import { apiLogin, apiLogout, apiRegister } from "@/lib/api/auth";
 import { useAuthStore } from "@/store/authStore";
+import { handleBuildComplete } from "next/dist/build/adapter/build-complete";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -11,14 +12,11 @@ import { useState } from "react";
 // Ca permet au back de get les infos du user et de le connecter
 
 function LoginModal({ onClose }: { onClose: () => void }) {
-  const handleLogin42 = () => {
-    const url = `https://api.intra.42.fr/oauth/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code`;
-    window.location.href = url;
-  };
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const setUser = useAuthStore((s) => s.setUser);
+
   const handleLogin = async () => {
     setError('');
     try {
@@ -29,26 +27,45 @@ function LoginModal({ onClose }: { onClose: () => void }) {
       setError(err.message);
     }
   };
+
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50" onClick={onClose}>
       <div className="bg-white p-6 rounded w-96" onClick={e => e.stopPropagation()}>
         <h1 className="text-xl text-black font-bold mb-4">Login</h1>
         {error && <p className="text-red-500 text-sm mb-2">{error}</p>}
+
+        <button
+          onClick={() => window.location.href = 'http://localhost/api/auth/42/callback'}
+          className="w-full border border-gray-300 flex items-center justify-center gap-3 p-2 rounded hover:bg-gray-50 cursor-pointer"
+        >
+          <span className="text-black text-sm font-medium">Continue with</span>
+          <img src="/42_Logo.svg" alt="42" width={24} height={24} />
+        </button>
+
+        <div className="flex items-center gap-3 my-4">
+          <div className="flex-1 h-px bg-gray-200" />
+          <span className="text-gray-400 text-xs">or</span>
+          <div className="flex-1 h-px bg-gray-200" />
+        </div>
+
         <input
-          className="border text-black w-full p-2 mt-2"
+          className="border text-black w-full p-2"
           placeholder="Email"
           value={email}
           onChange={e => setEmail(e.target.value)}
         />
         <input
           className="border text-black w-full p-2 mt-2"
-          placeholder="Mot de passe"
+          placeholder="password"
           type="password"
           value={password}
           onChange={e => setPassword(e.target.value)}
         />
-        <button onClick={handleLogin} className="mt-4 w-full bg-black text-white p-2 cursor-pointer">
-          Connexion
+        <button
+          onClick={handleLogin}
+          className="mt-4 w-full bg-black text-white p-2 cursor-pointer rounded"
+        >
+          login
         </button>
       </div>
     </div>
@@ -118,19 +135,23 @@ function RegisterModal({ onClose }: { onClose: () => void }) {
 export default function Header() {
   const [showLogin, setShowLogin] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
+  const logout = useAuthStore((s) => s.logout);
   const user = useAuthStore((s) => s.user);
+  const handleLogout = () => {
+    apiLogout();
+    logout();
+  };
   return (
     <>
       <header className="bg-gray-200 text-black p-4 flex items-center">
-        <h1 className="text-3xl font-bold">Transcendence</h1>
-        <nav className="flex gap-12 font-bold mx-auto">
-          <Link className="hover:text-gray-500 text-2xl" href="/">Accueil</Link>
+        <nav className="flex gap-12 font-bold mx-4">
+          <Link className="text-3xl font-bold" href="/">Transcendence</Link>
         </nav>
-          <div className="flex flex-col gap-2 mr-4">
+          <div className="flex flex-col gap-2 mr-4 ml-auto">
             {user ? (
               <div className="flex flex-col gap-1 items-end">
                 <span className="text-sm font-bold">{user.username}</span>
-                <button onClick={apiLogout} className="text-sm text-gray-500 cursor-pointer">logout</button>
+                <button onClick={handleLogout} className="text-sm cursor-pointer">logout</button>
               </div>
             ) : (
               <div className="flex flex-col gap-1">
