@@ -1,4 +1,4 @@
-import { Controller, Delete, Param, Post, UseGuards } from '@nestjs/common';
+import { Controller, Delete, Param, Post, UseGuards, Get } from '@nestjs/common';
 import { RelationshipsService } from './relationships.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -64,5 +64,15 @@ export class RelationshipsController {
       actor.sub,
       targetUserId,
     );
+  }
+
+  @Get('requests/incoming')
+  incomingRequests(@CurrentUser() actor: JwtPayload) {
+    return this.relationshipsService.getIncomingFriendRequests(actor.sub);
+  }
+
+  @Get('requests/outgoing')
+  outgoingRequests(@CurrentUser() actor: JwtPayload) {
+    return this.relationshipsService.getOutGoingFriendRequests(actor.sub);
   }
 }

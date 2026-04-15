@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { FriendshipStatus } from 'src/generated/prisma';
 
 @Injectable()
 export class RelationshipsService {
@@ -172,6 +173,58 @@ export class RelationshipsService {
       message: 'friendship removed',
       removedFriendshipId: friendship.id,
     };
+  }
+
+  async getIncomingFriendRequests(userId: string) {
+    const request = await this.prisma.friendship.findMany({
+      where: {
+        status: 'PENDING',
+        addresseeId: userId
+      },
+      include: {
+        requester: {
+          include: { profile: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return request.map((request) => ({
+      FriendshiptId: request.id,
+      createdAt: request.createdAt,
+      user: {
+        id: request.requester.id,
+        username: request.requester.username,
+        displayName: request.requester.profile?.displayName ?? request.requester.username,
+        avatarUrl: request.requester.profile?.avatarUrl ?? null
+      }
+    }))
+  }
+
+  async getOutGoingFriendRequests(userId: string) {
+    const request = await this.prisma.friendship.findMany({
+      where: {
+        status: 'PENDING',
+        requesterId: userId
+      },
+      include: {
+        addressee: {
+          include: { profile: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return request.map((request) => ({
+      FriendshiptId: request.id,
+      createdAt: request.createdAt,
+      user: {
+        id: request.addressee.id,
+        username: request.addressee.username,
+        displayName: request.addressee.profile?.displayName ?? request.addressee.username,
+        avatarUtl: request.addressee.profile?.avatarUrl ?? null
+      }
+    }))
   }
 
   async blockUser(actorUserId: string, targetUserId: string) {

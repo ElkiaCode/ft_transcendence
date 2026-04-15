@@ -79,20 +79,40 @@ def testUnit():
     print("yann don't like guillaume anymore and block him\n")
     yann.blockUser(guillaume)
 
+    print("guillaume also block yann\n")
+    guillaume.blockUser(yann)
+
+    print("guillaume try to unbloc the relationship himself\n")
+    guillaume.unblockUser(yann)
+
     print("yann found redemption inside the heart of guillaume and decide to unblock him\n")
     yann.unblockUser(guillaume)
 
     print("guillaume send a friend request to clement\n")
     guillaume.sendFriendRequest(clement)
 
+    check_friendships()
+
     print("clement accept the friend request\n")
     clement.acceptFriend(guillaume)
 
+    print("yann envoie une demande d'amis a guillaume\n")
+    yann.sendFriendRequest(guillaume)
+
+    print("yann regarde ses requete d'amis pending\n")
+    yann.getOutcomingRequest()
+
+    print("guillaume regarde ses demande d'amis\n")
+    guillaume.getOutcomingRequest()
+
+    print("guillaume regarde ses amis\n")
+    guillaume.getMyFriends()
+
+    #check_friendships()
+    #check_database_user()
+
     print("guillaume is searching the user clement\n")
     guillaume.searchUser(clement)
-
-    #print("check database:\n")
-    #full_database_audit()
 
     print("guillaume erase his data:\n")
     guillaume.eraseDataPassword()
@@ -100,6 +120,8 @@ def testUnit():
     yann.eraseDataPassword()
     print("clement erase his data:\n")
     clement.eraseDataPassword()
+
+    #full_database_audit()
 
     if (os.path.exists(guillaume.cookies)):
         os.remove(guillaume.cookies)
