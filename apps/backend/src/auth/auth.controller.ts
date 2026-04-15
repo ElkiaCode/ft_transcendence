@@ -22,12 +22,6 @@ export class AuthController {
       this.authService.getRefreshTokenDays(),
     );
 
-    response.cookie('access_token', result.accessToken, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: false,
-    });
-
     return {
       accessToken: result.accessToken,
       user: result.user,
@@ -46,12 +40,6 @@ export class AuthController {
       result.refreshToken,
       this.authService.getRefreshTokenDays(),
     );
-
-    response.cookie('access_token', result.accessToken, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: false,
-    });
 
     return {
       accessToken: result.accessToken,
@@ -72,12 +60,6 @@ export class AuthController {
       result.refreshToken,
       this.authService.getRefreshTokenDays(),
     );
-
-    response.cookie('access_token', result.accessToken, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: false,
-    });
 
     return {
       accessToken: result.accessToken,
@@ -112,12 +94,6 @@ export class AuthController {
       result.refreshToken,
       this.authService.getRefreshTokenDays(),
     );
-
-    response.cookie('access_token', result.accessToken, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: false,
-    });
 
     return {
       accessToken: result.accessToken,
