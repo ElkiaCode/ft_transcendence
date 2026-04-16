@@ -220,16 +220,20 @@ export class AuthService {
 
   async loginWith42(code: string) {
     // 1. Échanger le code contre un token 42
+    const params = new URLSearchParams({
+      grant_type: 'authorization_code',
+      client_id: this.configService.getOrThrow('FORTYTWO_CLIENT_ID'),
+      client_secret: this.configService.getOrThrow('FORTYTWO_CLIENT_SECRET'),
+      code,
+      redirect_uri: this.configService.getOrThrow('FORTYTWO_CALLBACK_URL'),
+    });
+
     const tokenResponse = await fetch('https://api.intra.42.fr/oauth/token', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        grant_type: 'authorization_code',
-        client_id: this.configService.getOrThrow('FORTYTWO_CLIENT_ID'),
-        client_secret: this.configService.getOrThrow('FORTYTWO_CLIENT_SECRET'),
-        code,
-        redirect_uri: this.configService.getOrThrow('FORTYTWO_CALLBACK_URL'),
-      }),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString(),
     });
 
     if (!tokenResponse.ok) {

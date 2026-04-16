@@ -62,7 +62,6 @@ export class AuthController {
     );
 
     return {
-      accessToken: result.accessToken,
       user: result.user,
     };
   }
@@ -77,13 +76,15 @@ export class AuthController {
     await this.authService.logout(rawRefreshToken);
     clearRefreshCookie(response);
 
+    response.clearCookie('access_token');
+
     return { success: true };
   }
 
- @Get('42/callback')
+  @Get('42/callback')
   async loginWith42(
     @Query('code') code: string,
-    @Res({ passthrough: true }) response: Response,
+    @Res() response: Response,
   ) {
     if (!code) throw new BadRequestException('missing code');
 
@@ -95,9 +96,12 @@ export class AuthController {
       this.authService.getRefreshTokenDays(),
     );
 
-    return {
-      accessToken: result.accessToken,
-      user: result.user,
-    };
+    response.cookie('access_token', result.accessToken, {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'lax',
+    });
+
+    return response.redirect('https://localhost/'); // Changer pour ne pas avoir localhost  
   }
 }
