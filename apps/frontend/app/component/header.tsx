@@ -87,7 +87,7 @@ function RegisterModal({ onClose }: { onClose: () => void }) {
     if (password !== confirmPassword) {
       setError('password dismatch');
       return;
-    } Tailwind
+    }
     try {
       const user = await apiRegister(username, email, password);
       setUser(user);

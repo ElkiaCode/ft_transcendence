@@ -62,6 +62,7 @@ export class AuthController {
     );
 
     return {
+      accessToken: result.accessToken,
       user: result.user,
     };
   }
@@ -95,13 +96,6 @@ export class AuthController {
       result.refreshToken,
       this.authService.getRefreshTokenDays(),
     );
-
-    response.cookie('access_token', result.accessToken, {
-      httpOnly: true,
-      secure: false,
-      sameSite: 'lax',
-    });
-
     return response.redirect('https://localhost/'); // Changer pour ne pas avoir localhost  
   }
 }
