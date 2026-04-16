@@ -12,6 +12,8 @@ interface SearchUser {
   } | null;
 }
 
+
+
 function Section() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -63,7 +65,9 @@ function Section() {
                   onClick={() => setOpenMenuId(openMenuId === user.id ? null : user.id)}
                   className="px-2 py-1 text-gray-500 hover:text-gray-700 focus:outline-none"
                 >
-                  ⋯
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 3a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 7a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 7a1.5 1.5 0 110-3 1.5 1.5 0 010 3z" />
+                  </svg>
                 </button>
                 {openMenuId === user.id && (
                   <div className="absolute right-0 mt-2 w-40 bg-white shadow-lg rounded-lg z-10">
@@ -101,8 +105,7 @@ function Section() {
             placeholder="Enter a message..."
             className="flex-1 border border-gray-300  text-black rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          <button className="bg-pink-500 text-white px-6 py-2 rounded-full hover:bg-green-500 transition cursor-pointer">
-            Send
+          <button className="bg-pink-500 text-white px-6 py-2 rounded-full hover:bg-green-500 transition cursor-pointer">Send
           </button>
           <div className="w-10 h-10 bg-gray-400 rounded-full flex items-center justify-center text-white font-bold cursor-pointer">
             

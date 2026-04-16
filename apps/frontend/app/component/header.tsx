@@ -1,10 +1,11 @@
 "use client";
 
-import { apiGetMyFriends, apiLogin, apiLogout, apiRegister } from "@/lib/api/auth";
+import { acceptFriendRequest, apiGetMyFriends, apiGetPendingFriendRequests, apiLogin, apiLogout, apiRegister, declineFriendRequest } from "@/lib/api/auth";
 import { useAuthStore } from "@/store/authStore";
 import { handleBuildComplete } from "next/dist/build/adapter/build-complete";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
+import isAuth from "./isAuth";
 
 // Redirection vers 42
 // Apres login on est rediriger sur le front en recevant un champs "code"
@@ -16,68 +17,119 @@ function FriendInterface({ user }: { user: any }) {
   const [friends, setFriends] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const handleAccept = (userId: string) => async () => {
+    try {
+      await acceptFriendRequest(userId);
+      await loadFriends();
+    } catch (err: any) {
+      console.error('Error accepting friend request:', err);
+    }
+  };
+  const handleDecline = (userId: string) => async () => {
+    try {
+      await declineFriendRequest(userId);
+      await loadFriends();
+    } catch (err: any) {
+      console.error('Error declining friend request:', err);
+    }
+  };
+  const loadFriends = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await apiGetMyFriends();
+      const pendingReqs = await apiGetPendingFriendRequests();
+      setFriends(data);
+      setPendingRequests(pendingReqs);
+    } catch (err: any) {
+      setError(err.message || 'Error loading friends');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (openMenuId !== 'friends' || !user) return;
-
-    const loadFriends = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await apiGetMyFriends();
-        setFriends(data);
-      } catch (err: any) {
-        setError(err.message || 'Erreur lors de la récupération des amis');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadFriends();
   }, [openMenuId, user]);
 
   return (
-    <div className="relative flex items-center gap-4 ml-60">
-      <button
-        className="bg-blue-500 text-white px-6 py-2 rounded-full hover:bg-green-500 transition cursor-pointer"
-        onClick={() => setOpenMenuId(openMenuId === 'friends' ? null : 'friends')}
-      >
-        Friends
-      </button>
-
+    <div className="relative flex items-center gap-4 ml-4">
+      {user ? (
+        <button
+          className="bg-blue-500 text-white px-6 py-2 rounded-full hover:bg-green-500 transition cursor-pointer"
+          onClick={() => setOpenMenuId(openMenuId === 'friends' ? null : 'friends')}>
+          Friends
+        </button>
+      ) : null}
       {openMenuId === 'friends' && (
-        <div className="absolute top-full mt-2 w-64 bg-white border border-gray-200 rounded shadow-lg z-10">
-          <div className="px-4 py-2 text-sm font-semibold text-gray-800 border-b border-gray-200">
-            Mes amis
-          </div>
-
+        <div className="absolute top-full mt-2 w-128 bg-white border border-gray-200 rounded shadow-lg z-10 left-0 p-2 flex flex-col gap-2 text-sm text-gray-700">
           {loading && (
-            <div className="px-4 py-3 text-sm text-gray-600">Chargement...</div>
+            <div className="px-4 py-3 text-sm text-gray-600">Loading...</div>
           )}
-
           {error && (
             <div className="px-4 py-3 text-sm text-red-500">{error}</div>
           )}
-
-          {!loading && !error && friends.length === 0 && (
-            <div className="px-4 py-3 text-sm text-gray-600">Aucun ami trouvé.</div>
-          )}
-
-          {!loading && !error && friends.length > 0 && (
-            <div className="max-h-56 overflow-auto">
-              {friends.map((friend) => (
-                <div key={friend.id} className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100">
-                  {friend.username || friend.profile?.displayName || friend.email}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-2 border border-gray-200 rounded">
+              <div className="px-4 py-2 text-sm font-semibold text-gray-800 border-b border-gray-200">My friends</div>
+              {!loading && !error && friends.length === 0 && (
+                <div className="px-4 py-3 text-sm text-gray-600">No friends found.</div>
+              )}
+              {!loading && !error && friends.length > 0 && (
+                <div className="max-h-56 overflow-auto">
+                  {friends.map((friend) => (
+                    <div key={friend.id} className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-3">
+                      {friend.username || friend.profile?.displayName || friend.email}
+                      <div className="relative flex gap-2 ml-auto">
+                        <button
+                          onClick={handleDecline(friend.id)}
+                          className="w-6 h-6 rounded-full flex items-center justify-center text-white font-bold cursor-pointer">
+                            <img src="/remove.svg" alt="42" width={24} height={24} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          )}
+            <div className="space-y-2 border border-gray-200 rounded">
+              <div className="px-4 py-2 text-sm font-semibold text-gray-800 border-b border-gray-200">Pending requests</div>
+              {!loading && !error && pendingRequests.length === 0 && (
+                <div className="px-4 py-3 text-sm text-gray-600">No pending requests.</div>
+              )}
+              {!loading && !error && pendingRequests.length > 0 && (
+                <div className="max-h-56 overflow-auto">
+                  {pendingRequests.map((user) => (
+                    <div key={user.user.id} className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-3">
+                      <div className="w-8 h-8 bg-gray-400 rounded-full flex items-center justify-center text-white font-bold">
+                        {user.user.username[0].toUpperCase()}
+                      </div>
+                      <div>{user.user.username}</div>
+                      <div className="relative ml-auto flex gap-2">
+                        <button
+                          onClick={handleAccept(user.user.id)}
+                          className="w-6 h-6 rounded-full flex items-center justify-center text-white font-bold cursor-pointer">
+                          <img src="/check.svg" alt="42" width={24} height={24} />
+                        </button>
+                        <button
+                          onClick={handleDecline(user.user.id)}
+                          className="w-6 h-6 rounded-full flex items-center justify-center text-white font-bold cursor-pointer">
+                          <img src="/cancel.svg" alt="42" width={24} height={24} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
   );
 }
-
 
 function LoginModal({ onClose }: { onClose: () => void }) {
   const [email, setEmail] = useState('');
@@ -95,45 +147,36 @@ function LoginModal({ onClose }: { onClose: () => void }) {
       setError(err.message);
     }
   };
-
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50" onClick={onClose}>
       <div className="bg-white p-6 rounded w-96" onClick={e => e.stopPropagation()}>
         <h1 className="text-xl text-black font-bold mb-4">Login</h1>
         {error && <p className="text-red-500 text-sm mb-2">{error}</p>}
-
         <button
           onClick={() => window.location.href = 'http://localhost/api/auth/42/callback'}
-          className="w-full border border-gray-300 flex items-center justify-center gap-3 p-2 rounded hover:bg-gray-50 cursor-pointer"
-        >
+          className="w-full border border-gray-300 flex items-center justify-center gap-3 p-2 rounded hover:bg-gray-50 cursor-pointer">
           <span className="text-black text-sm font-medium">Continue with</span>
           <img src="/42_Logo.svg" alt="42" width={24} height={24} />
         </button>
-
         <div className="flex items-center gap-3 my-4">
           <div className="flex-1 h-px bg-gray-200" />
           <span className="text-gray-400 text-xs">or</span>
           <div className="flex-1 h-px bg-gray-200" />
         </div>
-
         <input
           className="border text-black w-full p-2"
           placeholder="Email"
           value={email}
-          onChange={e => setEmail(e.target.value)}
-        />
+          onChange={e => setEmail(e.target.value)}/>
         <input
           className="border text-black w-full p-2 mt-2"
           placeholder="password"
           type="password"
           value={password}
-          onChange={e => setPassword(e.target.value)}
-        />
+          onChange={e => setPassword(e.target.value)}/>
         <button
           onClick={handleLogin}
-          className="mt-4 w-full bg-black text-white p-2 cursor-pointer rounded"
-        >
-          login
+          className="mt-4 w-full bg-black text-white p-2 cursor-pointer rounded">login
         </button>
       </div>
     </div>
@@ -170,31 +213,25 @@ function RegisterModal({ onClose }: { onClose: () => void }) {
           className="border text-black w-full p-2 mt-2"
           placeholder="Username"
           value={username}
-          onChange={e => setUsername(e.target.value)}
-        />
+          onChange={e => setUsername(e.target.value)}/>
         <input
           className="border text-black w-full p-2 mt-2"
           placeholder="Email"
           value={email}
-          onChange={e => setEmail(e.target.value)}
-        />
+          onChange={e => setEmail(e.target.value)}/>
         <input
           className="border text-black w-full p-2 mt-2"
           placeholder="Mot de passe"
           type="password"
           value={password}
-          onChange={  e => setPassword(e.target.value) }
-        />
+          onChange={  e => setPassword(e.target.value) }/>
         <input
           className="border text-black w-full p-2 mt-2"
           placeholder="Confirm password"
           type="password"
           value={confirmPassword}
-          onChange={e => setConfirmPassword(e.target.value)}
-        />
-        <button onClick={handleRegister} className="mt-4 w-full bg-black text-white p-2 cursor-pointer">
-          register
-        </button>
+          onChange={e => setConfirmPassword(e.target.value)}/>
+        <button onClick={handleRegister} className="mt-4 w-full bg-black text-white p-2 cursor-pointer">register</button>
       </div>
     </div>
   )
