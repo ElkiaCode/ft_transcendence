@@ -168,8 +168,18 @@ export default function Header() {
               <Link href="/profils" className="flex items-center gap-3">
 
                 {/* avatar */}
-                <div className="w-10 h-10 ColorsS rounded-full flex items-center justify-center text-white font-bold">
-                  {user.username?.charAt(0).toUpperCase()}
+                <div className="w-10 h-10 ColorsS rounded-full flex items-center justify-center overflow-hidden">
+                  {user?.profile?.avatarUrl ? (
+                    <img
+                      src={user.profile.avatarUrl}
+                      alt="avatar"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-white font-bold">
+                      {user?.username?.charAt(0).toUpperCase()}
+                    </span>
+                  )}
                 </div>
 
                 {/* user info */}
