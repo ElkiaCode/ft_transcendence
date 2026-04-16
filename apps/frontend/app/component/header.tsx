@@ -163,28 +163,28 @@ export default function Header() {
 
           {user ? (
             <div className="flex items-center justify-between bg-white px-4 py-2 rounded-full shadow-md border">
-                        
+
               {/* LEFT SIDE */}
               <Link href="/profils" className="flex items-center gap-3">
-                      
+
                 {/* avatar */}
                 <div className="w-10 h-10 ColorsS rounded-full flex items-center justify-center text-white font-bold">
                   {user.username?.charAt(0).toUpperCase()}
                 </div>
-                      
+
                 {/* user info */}
                 <div className="flex flex-col">
                   <span className="text-xs text-gray-500">Connected with 42</span>
                   <span className="text-sm font-bold">{user.username}</span>
                 </div>
-                      
+
                 {/* status dot */}
-                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                <div className="w-2 h-2 ColorsS rounded-full animate-pulse" />
               </Link>
-                      
+
               {/* vertical separator */}
               <div className="w-px h-8 bg-gray-200 mx-4" />
-                      
+
               {/* RIGHT SIDE */}
               <button
                 onClick={handleLogout}
@@ -192,7 +192,7 @@ export default function Header() {
               >
                 logout
               </button>
-                      
+
             </div>
           ) : (
             <div className="flex flex-col gap-1">
