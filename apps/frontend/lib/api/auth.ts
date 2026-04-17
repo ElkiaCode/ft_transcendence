@@ -14,7 +14,6 @@ export async function apiLogin(email: string, password: string) {
   if (!res.ok) {
     throw new Error(data.message || 'Erreur de connexion');
   }
-  useAuthStore.getState().setAccessToken(data.accessToken);
   useAuthStore.getState().setUser(data.user);
 
   return data.user;
@@ -129,4 +128,23 @@ export async function unblockUser(userId: string) {
   }
 
   return data;
+}
+
+export async function apiLoginWith42(code: string) {
+  const res = await fetch(`${API_URL}/auth/42/callback`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code }),
+  });
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.message || 'Erreur de connexion 42');
+  }
+
+  useAuthStore.getState().setAccessToken(data.accessToken);
+  useAuthStore.getState().setUser(data.user);
+
+  return data.user;
 }
