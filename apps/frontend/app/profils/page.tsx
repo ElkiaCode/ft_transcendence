@@ -18,15 +18,6 @@ function Section() {
 
     loadUser();
   }, []);
-  //useEffect(() => {
-    //const params = new URLSearchParams(window.location.search);
-    //const token = params.get('accessToken');
-    //if (token) {
-    //  localStorage.setItem('token', token);
-    //  window.history.replaceState({}, '', '/profils');
-    //}
-    //apiGetMe().then(setUser);
-  //}, []);
 
   return (
     <section className="flex-1 flex items-center flex-col w-full gap-8 py-12">
