@@ -15,7 +15,6 @@ function Section() {
         setUser(userData);
       }
     }
-
     loadUser();
   }, []);
 

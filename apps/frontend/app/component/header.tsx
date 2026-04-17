@@ -183,6 +183,7 @@ export default function Header() {
                 </div>
 
                 {/* user info */}
+                  {/*TODO: display provider (42, local, etc) */}
                 <div className="flex flex-col">
                   <span className="text-xs text-gray-500">Connected with 42</span>
                   <span className="text-sm font-bold">{user.username}</span>
