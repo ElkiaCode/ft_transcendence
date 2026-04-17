@@ -1,17 +1,11 @@
-import { Controller, Get, Post, Body, UseGuards, Patch, UploadedFile, UseInterceptors, Req, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Patch, UploadedFile, UseInterceptors, Query } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { memoryStorage } from 'multer';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/types/jwt-payload.type';
 import { EraseMyDataDto } from 'src/auth/dto/erase-my-data.dto';
 import { UpdateProfileDto } from './dto/dto';
-import { Request } from 'express';
-
-interface AuthenticatedRequest extends Request {
-  user: { id: string; email?: string; username?: string };
-}
 
 @Controller('users')
 export class UsersController {
@@ -38,21 +32,23 @@ export class UsersController {
     return this.usersService.searchUsers(user.sub, q);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Patch('update/profile')
   async updateProfile(
-    @Req() req: AuthenticatedRequest,
+    @CurrentUser() user: JwtPayload,
     @Body() dto: UpdateProfileDto,
   ) {
-    return this.usersService.updateProfile(req.user.id, dto);
+    return this.usersService.updateProfile(user.sub, dto);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Patch('update/avatar')
-  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  @UseInterceptors(FileInterceptor('file'))
   async uploadAvatar(
-    @Req() req: AuthenticatedRequest,
-    @UploadedFile() file: any,
+    @CurrentUser() user: JwtPayload,
+    @UploadedFile() file: Express.Multer.File,
   ) {
-    return this.usersService.updateAvatar(req.user.id, file);
+    return this.usersService.updateAvatar(user.sub, file);
   }
 
   @UseGuards(JwtAuthGuard)
