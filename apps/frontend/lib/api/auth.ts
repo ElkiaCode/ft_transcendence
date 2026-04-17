@@ -148,3 +148,40 @@ export async function apiLoginWith42(code: string) {
 
   return data.user;
 }
+
+export async function getUser() {
+  try {
+    const res = await fetch(`${API_URL}/users/me`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'authorization': `Bearer ${useAuthStore.getState().accessToken}`,
+      },
+    });
+
+    if (!res.ok) {
+      console.error("Erreur HTTP:", res.status);
+      return null;
+    }
+
+    const data = await res.json();
+    return data;
+
+  } catch (error) {
+    console.error("Erreur fetch:", error);
+    return null;
+  }
+}
+
+export async function apiGetMe() {
+  const token = localStorage.getItem('token');
+
+  const res = await fetch(`${API_URL}/users/me`, {
+    credentials: 'include',
+    headers: {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
+  });
+  if (!res.ok) return null;
+  return res.json();
+}

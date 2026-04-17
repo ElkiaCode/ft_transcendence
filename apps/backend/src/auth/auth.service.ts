@@ -301,7 +301,6 @@ export class AuthService {
     };
 
     const session = await this.createSession(user.id, payload);
-
     return {
       accessToken: session.accessToken,
       refreshToken: session.refreshToken,
