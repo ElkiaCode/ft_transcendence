@@ -269,6 +269,7 @@ export default function Header() {
           <Link className="text-3xl font-bold" href="/">
             Transcendence
           </Link>
+          <FriendInterface user={user} />
         </nav>
 
         {/* RIGHT SIDE */}
@@ -336,12 +337,6 @@ export default function Header() {
           )}
 
         </div>
-
-        {/* profile link */}
-        <Link
-          className="w-12 h-12 bg-blue-500 rounded-full cursor-pointer"
-          href="/profils"
-        />
       </header>
 
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
