@@ -2,10 +2,11 @@
 
 import { acceptFriendRequest, apiGetMyFriends, apiGetPendingFriendRequests, apiLogin, apiLogout, apiRegister, declineFriendRequest } from "@/lib/api/auth";
 import { useAuthStore } from "@/store/authStore";
-import { handleBuildComplete } from "next/dist/build/adapter/build-complete";
+import { FetchStrategy } from "next/dist/client/components/segment-cache/types";
 import Link from "next/link";
 import { use, useEffect, useState } from "react";
 import isAuth from "./isAuth";
+import "../globals.css";
 
 // Redirection vers 42
 // Apres login on est rediriger sur le front en recevant un champs "code"
@@ -147,14 +148,22 @@ function LoginModal({ onClose }: { onClose: () => void }) {
       setError(err.message);
     }
   };
+
+  const handleLogin42 = () => {
+    const clientId = process.env.NEXT_PUBLIC_42_CLIENT_ID;
+    const redirectUri = "https://localhost/api/auth/42/callback";
+    window.location.href = `https://api.intra.42.fr/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code`;
+  };
+
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50" onClick={onClose}>
       <div className="bg-white p-6 rounded w-96" onClick={e => e.stopPropagation()}>
         <h1 className="text-xl text-black font-bold mb-4">Login</h1>
         {error && <p className="text-red-500 text-sm mb-2">{error}</p>}
         <button
-          onClick={() => window.location.href = 'http://localhost/api/auth/42/callback'}
-          className="w-full border border-gray-300 flex items-center justify-center gap-3 p-2 rounded hover:bg-gray-50 cursor-pointer">
+          onClick={handleLogin42}
+          className="w-full border border-gray-300 flex items-center justify-center gap-3 p-2 rounded hover:bg-gray-50 cursor-pointer"
+        >
           <span className="text-black text-sm font-medium">Continue with</span>
           <img src="/42_Logo.svg" alt="42" width={24} height={24} />
         </button>
@@ -190,6 +199,7 @@ function RegisterModal({ onClose }: { onClose: () => void }) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const setUser = useAuthStore((s) => s.setUser);
+
   const handleRegister = async () => {
     setError('');
     if (password !== confirmPassword) {
@@ -204,6 +214,7 @@ function RegisterModal({ onClose }: { onClose: () => void }) {
       setError(err.message);
     }
   };
+
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50" onClick={onClose}>
       <div className="bg-white p-6 rounded w-96" onClick={e => e.stopPropagation()}>
@@ -224,7 +235,8 @@ function RegisterModal({ onClose }: { onClose: () => void }) {
           placeholder="Mot de passe"
           type="password"
           value={password}
-          onChange={  e => setPassword(e.target.value) }/>
+          onChange={e => setPassword(e.target.value)}
+        />
         <input
           className="border text-black w-full p-2 mt-2"
           placeholder="Confirm password"
@@ -234,42 +246,106 @@ function RegisterModal({ onClose }: { onClose: () => void }) {
         <button onClick={handleRegister} className="mt-4 w-full bg-black text-white p-2 cursor-pointer">register</button>
       </div>
     </div>
-  )
+  );
 }
 
 export default function Header() {
   const [showLogin, setShowLogin] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
+
   const logout = useAuthStore((s) => s.logout);
   const user = useAuthStore((s) => s.user);
+
   const handleLogout = () => {
     apiLogout();
     logout();
   };
+
   return (
     <>
       <header className="bg-gray-200 text-black p-4 flex items-center">
+        
         <nav className="flex gap-12 font-bold mx-4">
-          <Link className="text-3xl font-bold" href="/">Transcendence</Link>
+          <Link className="text-3xl font-bold" href="/">
+            Transcendence
+          </Link>
         </nav>
-        < FriendInterface user={user} />
-          <div className="flex flex-col gap-2 mr-4 ml-auto">
-            {user ? (
-              <div className="flex flex-col gap-1 items-end">
-                <span className="text-sm font-bold">{user.username}</span>
-                <button onClick={handleLogout} className="text-sm cursor-pointer">logout</button>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-1">
-                <button onClick={() => setShowLogin(true)} className="text-sm cursor-pointer">login</button>
-                <button onClick={() => setShowRegister(true)} className="text-sm cursor-pointer">register</button>
-              </div>
-            )}
-          </div>
-        <Link className="w-12 h-12 bg-blue-500 rounded-full cursor-pointer" href="/profils"/>
+
+        {/* RIGHT SIDE */}
+        <div className="ml-auto flex items-center gap-4">
+
+          {user ? (
+            <div className="flex items-center justify-between bg-white px-4 py-2 rounded-full shadow-md border">
+
+              {/* LEFT SIDE */}
+              <Link href="/profils" className="flex items-center gap-3">
+
+                {/* avatar */}
+                <div className="w-10 h-10 ColorsS rounded-full flex items-center justify-center overflow-hidden">
+                  {user?.profile?.avatarUrl ? (
+                    <img
+                      src={user.profile.avatarUrl}
+                      alt="avatar"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-white font-bold">
+                      {user?.username?.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                </div>
+
+                {/* user info */}
+                <div className="flex flex-col">
+                  <span className="text-xs text-gray-500">Connected with 42</span>
+                  <span className="text-sm font-bold">{user.username}</span>
+                </div>
+
+                {/* status dot */}
+                <div className="w-2 h-2 ColorsS rounded-full animate-pulse" />
+              </Link>
+
+              {/* vertical separator */}
+              <div className="w-px h-8 bg-gray-200 mx-4" />
+
+              {/* RIGHT SIDE */}
+              <button
+                onClick={handleLogout}
+                className="text-xs text-gray-500 hover:text-red-500 hover:underline transition-colors"
+              >
+                logout
+              </button>
+
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1">
+              <button
+                onClick={() => setShowLogin(true)}
+                className="text-sm cursor-pointer"
+              >
+                login
+              </button>
+
+              <button
+                onClick={() => setShowRegister(true)}
+                className="text-sm cursor-pointer"
+              >
+                register
+              </button>
+            </div>
+          )}
+
+        </div>
+
+        {/* profile link */}
+        <Link
+          className="w-12 h-12 bg-blue-500 rounded-full cursor-pointer"
+          href="/profils"
+        />
       </header>
+
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
-      {showRegister && <RegisterModal onClose={() => setShowRegister(false)}/>}
+      {showRegister && <RegisterModal onClose={() => setShowRegister(false)} />}
     </>
   );
 }
