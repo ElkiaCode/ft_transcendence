@@ -183,9 +183,10 @@ export default function Header() {
                 </div>
 
                 {/* user info */}
-                  {/*TODO: display provider (42, local, etc) */}
                 <div className="flex flex-col">
-                  <span className="text-xs text-gray-500">Connected with 42</span>
+                  <span className="text-xs text-gray-500">
+                    {user?.provider === '42' ? 'Connected with 42' : 'Connected'}
+                  </span>
                   <span className="text-sm font-bold">{user.username}</span>
                 </div>
 
@@ -201,7 +202,9 @@ export default function Header() {
                 onClick={handleLogout}
                 className="text-xs text-gray-500 hover:text-red-500 hover:underline transition-colors"
               >
-                logout
+                <Link href="/" className="text-xs text-gray-500 hover:text-red-500 hover:underline transition-colors">
+                  logout
+                </Link>
               </button>
 
             </div>
