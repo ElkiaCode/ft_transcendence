@@ -285,7 +285,7 @@ export default function Header() {
                 <div className="w-10 h-10 ColorsS rounded-full flex items-center justify-center overflow-hidden">
                   {user?.profile?.avatarUrl ? (
                     <img
-                      src={user.profile.avatarUrl}
+                      src={`https://localhost/api${user.profile.avatarUrl}`}
                       alt="avatar"
                       className="w-full h-full object-cover"
                     />

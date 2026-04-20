@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getUser, apiUpdateProfile } from "@/lib/api/auth";
+import { getUser, apiUpdateProfile, apiUpdateAvatar } from "@/lib/api/auth";
 
 function EditModal({ user, onClose, onSave }: { user: any, onClose: () => void, onSave: (u: any) => void }) {
   const [displayName, setDisplayName] = useState(user?.profile?.displayName ?? '');
@@ -60,17 +60,34 @@ function Section() {
     loadUser();
   }, []);
 
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const updated = await apiUpdateAvatar(file);
+      setUser((prev: any) => ({ ...prev, profile: { ...prev.profile, ...updated.profile } }));
+    } catch (err: any) {
+      console.error(err.message);
+    }
+  };
+
   return (
     <section className="flex-1 flex items-center flex-col w-full gap-8 py-12">
-      <div className="w-48 h-48 bg-blue-500 rounded-full overflow-hidden flex items-center justify-center">
-        {user?.profile?.avatarUrl ? (
-          <img src={user.profile.avatarUrl} alt="avatar" className="w-full h-full object-cover" />
-        ) : (
+      <label className="w-48 h-48 bg-blue-500 rounded-full overflow-hidden flex items-center justify-center cursor-pointer relative group">
+      {user?.profile?.avatarUrl ? (
+       <img src={`https://localhost/api${user.profile.avatarUrl}`} alt="avatar" className="w-full h-full object-cover" />
+      ) : (
           <span className="text-white text-6xl font-bold">
             {user?.username?.charAt(0).toUpperCase() ?? "?"}
           </span>
         )}
-      </div>
+        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+          <span className="text-white text-sm font-bold">Change</span>
+        </div>
+        <input type="file" accept="image/jpeg,image/png" className="hidden" onChange={handleAvatarChange} />
+      </label>
+
       <div className="flex flex-col items-center gap-2">
         <h2 className="text-4xl text-black font-bold">{user?.profile?.displayName ?? user?.username ?? "..."}</h2>
         {user?.profile?.bio && (
@@ -90,7 +107,7 @@ function Section() {
         <EditModal
           user={user}
           onClose={() => setShowEdit(false)}
-         onSave={(updated) => setUser((prev: any) => ({ ...prev, profile: { ...prev.profile, ...(updated.profile ?? updated) } }))}
+          onSave={(updated) => setUser((prev: any) => ({ ...prev, profile: { ...prev.profile, ...(updated.profile ?? updated) } }))}
         />
       )}
     </section>
