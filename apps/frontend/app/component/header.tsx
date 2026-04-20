@@ -266,7 +266,7 @@ export default function Header() {
       <header className="bg-gray-200 text-black p-4 flex items-center">
         
         <nav className="flex gap-12 font-bold mx-4">
-          <Link className="text-3xl font-bold" href="/">
+          <Link className="text-3xl text-pink-500 font-bold" href="/">
             Transcendence
           </Link>
           <FriendInterface user={user} />

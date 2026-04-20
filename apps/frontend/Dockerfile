@@ -5,7 +5,7 @@ RUN apk add --no-cache libc6-compat wget
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 COPY . .
 
