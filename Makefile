@@ -48,9 +48,10 @@ clean:
 	@docker system prune -f --volumes
 
 fclean: clean
-	@echo "Removing dev certificates and postgres database"
+	@echo "Removing dev certificates, postgres database and image"
 	@rm -f "$(CERT_CRT)" "$(CERT_KEY)"
 	@sudo rm -rf ./data/postgres_data
+	@sudo rm -rf ./data/uploads
 	@echo "Done."
 
 

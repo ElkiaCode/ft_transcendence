@@ -1,8 +1,5 @@
 import type { Request, Response, CookieOptions } from 'express';
-import {
-  DEFAULT_REFRESH_DAYS,
-  REFRESH_COOKIE_NAME,
-} from '../constants/auth.constants';
+import { DEFAULT_REFRESH_DAYS, REFRESH_COOKIE_NAME } from '../constants/auth.constants';
 
 export function getRefreshTokenDays(raw?: string): number {
   const parsed = Number(raw);

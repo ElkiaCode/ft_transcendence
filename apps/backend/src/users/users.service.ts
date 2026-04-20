@@ -3,22 +3,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { EraseMyDataDto } from 'src/auth/dto/erase-my-data.dto';
 import * as bcrypt from 'bcrypt';
 import { UpdateProfileDto } from './dto/dto';
-import { ProfileResponseDto } from './dto/profile-response.dto';
-import * as fs from 'fs';
-//import * as path from 'path';
 
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
-
-    async findOne(id: string) {
-        const user = await this.prisma.user.findUnique({
-        where: { id },
-        include: { profile: true },
-        });
-        if (!user) throw new NotFoundException(`User #${id} not found`);
-            return user;
-    }
 
     async searchUsers(currentUserId: string, rawQuery: string) {
       const q = rawQuery?.trim() ?? '';
@@ -86,161 +74,205 @@ export class UsersService {
             }
           : null,
       }));
-  }
+    }
     
-    async updateProfile(
-        userId: string,
-        dto: UpdateProfileDto,
-        ): Promise<ProfileResponseDto> {
-        const user = await this.findOne(userId);
-        if (!user.profile) throw new NotFoundException('Profile not found');
+    async updateProfile(userId: string, dto: UpdateProfileDto) {
+        const user = await this.prisma.user.findUnique({
+          where: { id: userId },
+          include: {
+            profile: true
+          },
+        });
 
-        const updated = await this.prisma.profile.update({
-        where: { userId },
-        data: {
-        displayName: dto.displayName ?? user.profile.displayName,
-        bio: dto.bio ?? user.profile.bio,
-      },
-    });
-
-    return this.toProfileDto(updated);
-  }
-
-    async updateAvatar(
-        userId: string,
-        file: any,
-        ): Promise<ProfileResponseDto> {
-        const user = await this.findOne(userId);
-        if (!user.profile) throw new NotFoundException('Profile not found');
-
-        const uploadDir = '/tmp/avatars';
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
+        if (!user) {
+          throw new NotFoundException('User does not exist');
         }
 
-        const avatarKey = `${userId}-${Date.now()}-${file.originalname}`;
-        //const filePath = path.join(uploadDir, avatarKey);
-        //fs.writeFileSync(filePath, file.buffer);
+        if (user.isBanned) {
+          throw new BadRequestException('User is banned');
+        }
 
-        const updated = await this.prisma.profile.update({
-        where: { userId },
-        data: {
-        //avatarKey,
-        //avatarUrl: `/tmp/avatars/${avatarKey}`,
-        },
-    });
+        if (!user.isActive) {
+          throw new BadRequestException('User account is inactive');
+        }
 
-    return this.toProfileDto(updated);
-    }
+        const profile = await this.prisma.profile.upsert({
+          where: { userId },
+          update: {
+            ...(dto.displayName !== undefined && { displayName: dto.displayName }),
+            ...(dto.bio !== undefined && { bio: dto.bio }),
+          },
+          create: {
+            userId,
+            displayName: dto.displayName ?? user.username,
+            bio: dto.bio ?? '',
+          },
+        });
 
-    private toProfileDto(profile: {
-        id: string;
-        displayName: string;
-        bio?: string | null;
-        avatarUrl?: string | null;
-        createdAt: Date;
-        updatedAt: Date;
-        }): ProfileResponseDto {
         return {
-        id: profile.id,
-        displayName: profile.displayName,
-        bio: profile.bio ?? null,
-        avatarUrl: profile.avatarUrl ?? null,
-        createdAt: profile.createdAt,
-        updatedAt: profile.updatedAt,
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          profile: user.profile
+            ? {
+                displayName: profile.displayName,
+                bio: profile.bio,
+                avatarUrl: profile.avatarUrl,
+              }
+            : null
         };
     }
 
-  async getMe(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        profile: true,
-      },
-    });
-
-    if (!user) {
-      throw new NotFoundException('user not found');
-    }
-
-    return {
-      id: user.id,
-      email: user.email,
-      username: user.username,
-      globalRole: user.globalRole,
-      preferredLanguage: user.preferredLanguage,
-      isActive: user.isActive,
-      isBanned: user.isBanned,
-      profile: user.profile
-        ? {
-            displayName: user.profile.displayName,
-            bio: user.profile.bio,
-            avatarUrl: user.profile.avatarUrl,
-          }
-        : null,
-    };
-  }
-
-  async eraseMyData(userId: string, dto: EraseMyDataDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { id : userId},
-      include: {
-        profile: true,
-      },
-    });
-
-    if (!user) {
-      throw new NotFoundException('user not found');
-    }
-
-    if (user.passwordHash) {
-      if (!dto.currentPassword) {
-        throw new BadRequestException('current password is required');
-      }
-
-      const passwordOk = await bcrypt.compare(dto.currentPassword, user.passwordHash);
-
-      if (!passwordOk) {
-        throw new BadRequestException('invalid credentials');
-      }
-
-      await this.prisma.user.delete({
-        where: { id: userId}
+    async updateAvatar(userId: string, file: Express.Multer.File) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        include: {
+          profile: true,
+        },
       });
 
-      return {success: true, message: 'Your account have been erased'};
-    }
-  }
+      if (!user) {
+        throw new NotFoundException('User does not exist');
+      }
 
-  async getMyFriends(userId: string) {
-    const friendships = await this.prisma.friendship.findMany({
-      where: {
-        status: 'ACCEPTED',
-        OR: [
-          { requesterId: userId },
-          { addresseeId: userId },
-        ],
-      },
-      include: {
-        requester: {
-          include: { profile: true },
-        },
-        addressee: {
-          include: { profile: true },
-        },
-      },
-    });
+      if (!file) {
+        throw new NotFoundException('No file given');
+      }
 
-    return friendships.map((friendship) => {
-      const friend = friendship.requesterId === userId ? friendship.addressee : friendship.requester;
+      if (user.isBanned) {
+        throw new BadRequestException('User is banned');
+      }
+
+      if (!user.isActive) {
+        throw new BadRequestException('User account is inactive')
+      }
+
+      const allowedMimeTypes = ['image/jpeg', 'image/png'];
+      if (!allowedMimeTypes.includes(file.mimetype)) {
+        throw new BadRequestException('invalid file type');
+      }
+
+      const maxSize = 5 * 1024 * 1024;
+      if (file.size > maxSize) {
+        throw new BadRequestException('file is too large!');
+      }
+
+      const avatarPath = `/uploads/${file.filename}`;
+
+      const profile = await this.prisma.profile.upsert({
+        where: { userId },
+        update: {
+          avatarUrl: avatarPath,
+        },
+        create: {
+          userId,
+          displayName: user.username,
+          bio: '',
+          avatarUrl: avatarPath,
+        },
+      });
 
       return {
-        id: friend.id,
-        username: friend.username,
-        displayName: friend.profile?.displayName ?? friend.username,
-        avatarUrl: friend.profile?.avatarUrl ?? null,
+        message: 'file uploaded successfully',
+        avatarPath,
+        profile: {
+          displayName: profile.displayName,
+          bio: profile.bio,
+          avatarUrl: profile.avatarUrl,
+        },
       };
-    });
-  }
+    }
+
+    async getMe(userId: string) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        include: {
+          profile: true,
+        },
+      });
+
+      if (!user) {
+        throw new NotFoundException('user not found');
+      }
+
+      return {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        globalRole: user.globalRole,
+        preferredLanguage: user.preferredLanguage,
+        isActive: user.isActive,
+        isBanned: user.isBanned,
+        profile: user.profile
+          ? {
+              displayName: user.profile.displayName,
+              bio: user.profile.bio,
+              avatarUrl: user.profile.avatarUrl,
+            }
+          : null,
+      };
+    }
+
+    async eraseMyData(userId: string, dto: EraseMyDataDto) {
+      const user = await this.prisma.user.findUnique({
+        where: { id : userId},
+        include: {
+          profile: true,
+        },
+      });
+
+      if (!user) {
+        throw new NotFoundException('user not found');
+      }
+
+      if (user.passwordHash) {
+        if (!dto.currentPassword) {
+          throw new BadRequestException('current password is required');
+        }
+
+        const passwordOk = await bcrypt.compare(dto.currentPassword, user.passwordHash);
+
+        if (!passwordOk) {
+          throw new BadRequestException('invalid credentials');
+        }
+
+        await this.prisma.user.delete({
+          where: { id: userId}
+        });
+
+        return {success: true, message: 'Your account have been erased'};
+      }
+    }
+
+    async getMyFriends(userId: string) {
+      const friendships = await this.prisma.friendship.findMany({
+        where: {
+          status: 'ACCEPTED',
+          OR: [
+            { requesterId: userId },
+            { addresseeId: userId },
+          ],
+        },
+        include: {
+          requester: {
+            include: { profile: true },
+          },
+          addressee: {
+            include: { profile: true },
+          },
+        },
+      });
+
+      return friendships.map((friendship) => {
+        const friend = friendship.requesterId === userId ? friendship.addressee : friendship.requester;
+
+        return {
+          id: friend.id,
+          username: friend.username,
+          displayName: friend.profile?.displayName ?? friend.username,
+          avatarUrl: friend.profile?.avatarUrl ?? null,
+        };
+      });
+    }
 }
 

@@ -146,6 +146,30 @@ def check_refresh_tokens_by_email(email: str):
     """
     print(run_sql(sql))
 
+def check_conversation():
+    sql = f"""
+    SELECT id, type, title, "createdAt", "updatedAt"
+    FROM "Conversation"
+    ORDER BY "createdAt";
+    """
+    print(run_sql(sql))
+
+def check_conversation_participant():
+    sql = f"""
+    SELECT id, "conversationId", "userId", role, "joinedAt"
+    FROM "ConversationParticipant"
+    ORDER BY "joinedAt";
+    """
+    print(run_sql(sql))
+
+def check_conversation_message():
+    sql = f"""
+    SELECT id, "conversationId", "senderId", content, type, "createdAt"
+    FROM "Message"
+    ORDER BY "createdAt";
+    """
+    print(run_sql(sql))
+
 
 def count_rows():
     queries = [
@@ -203,6 +227,15 @@ def full_database_audit():
 
     print("=== BLOCKS WITH USERNAMES ===")
     check_blocks_with_usernames()
+
+    print("=== CONVERSATIONS ===")
+    check_conversation()
+
+    print("=== CONVERSATION WITH PARTICIPANTS ===")
+    check_conversation_participant()
+
+    print("=== CONVERSATION MESSAGES ===")
+    check_conversation_message()
 
     print("=== COUNTS ===")
     count_rows()
