@@ -181,7 +181,7 @@ export async function apiLoginWith42(code: string) {
   const data = await res.json();
 
   if (!res.ok) {
-    throw new Error(data.message || 'Erreur de connexion 42');
+    throw new Error(data.message || 'Connection error');
   }
 
   useAuthStore.getState().setAccessToken(data.accessToken);
@@ -225,4 +225,20 @@ export async function apiGetMe() {
   });
   if (!res.ok) return null;
   return res.json();
+}
+
+export async function apiUpdateProfile(displayName?: string, bio?: string) {
+  const token = useAuthStore.getState().accessToken;
+  const res = await fetch(`${API_URL}/users/update/profile`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ displayName, bio }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Error');
+  return data;
 }
