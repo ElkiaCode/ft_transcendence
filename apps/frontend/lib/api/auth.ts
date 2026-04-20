@@ -242,3 +242,5 @@ export async function apiUpdateProfile(displayName?: string, bio?: string) {
   if (!res.ok) throw new Error(data.message || 'Error');
   return data;
 }
+
+// TODO: add apiUpdateAvatar, apiUpdatePassword, apiDeleteAccount, etc.
