@@ -5,6 +5,7 @@ def testUnit():
     guillaume   = User("guillaume.roustan1@gmail.com", "laGuigue06", "pass1234")
     yann        = User("yann@gmail.com", "MegaYann", "pass1234")
     clement     = User("clem@gmail.com", "SuperClem", "pass1234")
+    toto        = User("toto@gmail.com", "toto", "totototo")
 
     print(f"Creation of user: guillaume, yann, clement...\n")
 
@@ -14,6 +15,8 @@ def testUnit():
     yann.register()
     print("clement se register\n")
     clement.register()
+    print("toto is registering into the app:\n")
+    toto.register()
 
     print("guillaume se login\n")
     guillaume.login()
@@ -21,6 +24,7 @@ def testUnit():
     yann.login()
     print("clement se login\n")
     clement.login()
+    toto.login()
 
     print("guillaume cree un channel de discution direct entre lui et yann\n")
     guillaume.createOrGetDirectConversation(yann)
@@ -36,7 +40,7 @@ def testUnit():
     #print("guillaume regarde tout les message de toute ces conversations\n")
     #guillaume.getMessageConversation()
 
-    #full_database_audit()
+    full_database_audit()
 
     #print("guillaume erase his data\n")
     #guillaume.eraseDataPassword()
