@@ -157,7 +157,7 @@ export class UsersService {
         throw new BadRequestException('file is too large!');
       }
 
-      const avatarPath = `/uploads/${file.filename}`;
+      const avatarPath = `${process.env.API_URL || 'https://localhost:3001'}/uploads/${file.filename}`;
 
       const profile = await this.prisma.profile.upsert({
         where: { userId },

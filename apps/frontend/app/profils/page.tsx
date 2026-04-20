@@ -60,10 +60,25 @@ function Section() {
     loadUser();
   }, []);
 
-  // TODO: handler file (just log pour l’instant)
-  const handleAvatarChange = (file: File | undefined) => {
+  const handleAvatarChange = async (file?: File) => {
     if (!file) return;
-    console.log("Selected avatar:", file);
+
+    try {
+      const formData = new FormData();
+      formData.append("avatar", file);
+
+      const updatedUser = await apiUpdateAvatar(file);
+
+      setUser((prev: any) => ({
+        ...prev,
+        profile: {
+          ...prev.profile,
+          avatarUrl: updatedUser.profile.avatarUrl,
+        },
+      }));
+    } catch (err) {
+      console.error("Avatar upload failed:", err);
+    }
   };
 
   return (
