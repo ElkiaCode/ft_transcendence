@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getUser, apiUpdateProfile } from "@/lib/api/auth";
+import { getUser, apiUpdateProfile, apiUpdateAvatar} from "@/lib/api/auth";
 
 function EditModal({ user, onClose, onSave }: { user: any, onClose: () => void, onSave: (u: any) => void }) {
   const [displayName, setDisplayName] = useState(user?.profile?.displayName ?? '');
@@ -60,7 +60,7 @@ function Section() {
     loadUser();
   }, []);
 
-  // 🆕 handler file (just log pour l’instant)
+  // TODO: handler file (just log pour l’instant)
   const handleAvatarChange = (file: File | undefined) => {
     if (!file) return;
     console.log("Selected avatar:", file);
