@@ -16,6 +16,7 @@ class User:
         self.password = password
         self.id = ''
         self.accessToken = ''
+        self.conversation = []
 
     def register(self):
         response = requests.post(
@@ -220,6 +221,69 @@ class User:
         )
 
         print(f"{self.username}: {response.json()}\n")
+
+    def updateProfile(self, profile):
+        response = requests.patch(
+            f"{BASE_URL}/users/update/profile",
+            json = profile,
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            verify = False
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
+    def upload_avatar(self, filepath):
+        with open(filepath, "rb") as f:
+            response = requests.patch(
+            f"{BASE_URL}/users/update/avatar",
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            files={"file": ("avatar.png", f, "image/png")},
+            verify = False,
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
+    def createOrGetDirectConversation(self, secondUser):
+        response = requests.post(
+            f"{BASE_URL}/chat/direct/{secondUser.id}",
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            verify = False
+        )
+        self.conversation.append(response.json()['id'])
+
+        print(f"{self.username}: {response.json()}\n")
+
+    def getMyConversation(self):
+        response = requests.get(
+            f"{BASE_URL}/chat/conversations",
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            verify = False
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
+    def getMessageConversation(self):
+        for i in range(len(self.conversation)) :
+            response = requests.get(
+                f"{BASE_URL}/chat/conversations/{self.conversation[i]}/messages",
+                headers = { "Authorization": f"Bearer {self.accessToken}" },
+                verify = False
+            )
+
+            print(f"{self.username}: {response.json()}\n")
+
+    def sendMessageConversation(self, message: str):
+        for i in range(len(self.conversation)) :
+            response = requests.post(
+                f"{BASE_URL}/chat/conversations/{self.conversation[i]}/messages",
+                headers = { "Authorization": f"Bearer {self.accessToken}" },
+                data = { "content": f"{message}" },
+                verify = False,
+            )
+
+            print(f"{self.username}: {response.json()}\n")
+        
+
 
     def getMe(self):
         response = requests.get(

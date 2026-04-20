@@ -8,6 +8,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AdminModule } from './admin/admin.module';
 import { ConfigModule } from '@nestjs/config';
 import { RelationshipsModule } from './relationships/relationships.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { RelationshipsModule } from './relationships/relationships.module';
     AuthModule,
     UsersModule,
     AdminModule,
+    ChatModule,
     ConfigModule.forRoot({ isGlobal: true})
   ],
   controllers: [AppController, HealthController],
