@@ -9,6 +9,8 @@ import { AdminModule } from './admin/admin.module';
 import { ConfigModule } from '@nestjs/config';
 import { RelationshipsModule } from './relationships/relationships.module';
 import { ChatModule } from './chat/chat.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { ModerationModule } from './moderation/moderation.module';
 
 @Module({
   imports: [
@@ -18,6 +20,8 @@ import { ChatModule } from './chat/chat.module';
     UsersModule,
     AdminModule,
     ChatModule,
+    NotificationsModule,
+    ModerationModule,
     ConfigModule.forRoot({ isGlobal: true})
   ],
   controllers: [AppController, HealthController],

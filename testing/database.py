@@ -170,6 +170,105 @@ def check_conversation_message():
     """
     print(run_sql(sql))
 
+def check_notification():
+    sql = f"""
+    SELECT id, "userId", type, title, body, "isRead", "createdAt"
+    FROM "Notification"
+    ORDER BY "createdAt" DESC;
+    """
+    print(run_sql(sql))
+
+def check_unread_notification():
+    sql = f"""
+    SELECT id, "userId", type, title, body, "createdAt"
+    FROM "Notification"
+    WHERE "isRead" = false
+    ORDER BY "createdAt" DESC;
+    """
+    print(run_sql(sql))
+
+def check_notification_username():
+    sql = f"""
+    SELECT
+    n.id,
+    u.username,
+    n.type,
+    n.title,
+    n.body,
+    n."isRead",
+    n."createdAt"
+    FROM "Notification" n
+    JOIN "User" u ON u.id = n."userId"
+    ORDER BY n."createdAt" DESC;
+    """
+    print(run_sql(sql))
+
+def check_all_report():
+    sql = f"""
+    SELECT
+    id,
+    "creatorId",
+    "targetType",
+    "targetUserId",
+    "targetMessageId",
+    reason,
+    status,
+    "createdAt",
+    "updatedAt"
+    FROM "Report"
+    ORDER BY "createdAt" DESC;
+    """
+    print(run_sql(sql))
+
+def check_open_report():
+    sql = f"""
+    SELECT
+    id,
+    "creatorId",
+    "targetType",
+    "targetUserId",
+    "targetMessageId",
+    reason,
+    status,
+    "createdAt"
+    FROM "Report"
+    WHERE status = 'OPEN'
+    ORDER BY "createdAt" DESC;
+    """
+    print(run_sql(sql))
+
+def check_resolved_report():
+    sql = f"""
+    SELECT
+    id,
+    "creatorId",
+    "targetType",
+    "targetUserId",
+    "targetMessageId",
+    reason,
+    status,
+    "createdAt",
+    "updatedAt"
+    FROM "Report"
+    WHERE status = 'RESOLVED'
+    ORDER BY "updatedAt" DESC;
+    """
+    print(run_sql(sql))
+
+def check_moderation_action():
+    sql = f"""
+    SELECT
+    id,
+    "reportId",
+    "moderatorId",
+    "targetUserId",
+    action,
+    note,
+    "createdAt"
+    FROM "ModerationAction"
+    ORDER BY "createdAt" DESC;
+    """
+    run_sql(sql)
 
 def count_rows():
     queries = [
@@ -179,6 +278,12 @@ def count_rows():
         'SELECT COUNT(*) AS refresh_tokens FROM "RefreshToken";',
         'SELECT COUNT(*) AS friendships FROM "Friendship";',
         'SELECT COUNT(*) AS blocks FROM "Block";',
+        'SELECT COUNT(*) AS conversation FROM "Conversation";',
+        'SELECT COUNT(*) AS conversation_participant FROM "ConversationParticipant";',
+        'SELECT COUNT(*) AS message FROM "Message";',
+        'SELECT COUNT(*) AS notifications_count FROM "Notification";',
+        'SELECT COUNT(*) AS reports_count FROM "Report";',
+        'SELECT COUNT(*) AS moderation_actions_count FROM "ModerationAction";'
     ]
 
     for sql in queries:
@@ -236,6 +341,27 @@ def full_database_audit():
 
     print("=== CONVERSATION MESSAGES ===")
     check_conversation_message()
+
+    print("=== NOTIFICATION ===")
+    check_notification()
+
+    print("=== UNREAD NOTIFICATION ===")
+    check_unread_notification()
+
+    print("=== NOTIFICATION USERNAME ===")
+    check_notification_username()
+
+    print("=== REPORT ===")
+    check_all_report()
+
+    print("=== OPEN REPORT ===")
+    check_open_report()
+
+    print("=== RESOLVED REPORT ===")
+    check_resolved_report()
+
+    print("=== MODERATION ACTION ===")
+    check_moderation_action()
 
     print("=== COUNTS ===")
     count_rows()
