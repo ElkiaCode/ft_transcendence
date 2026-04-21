@@ -26,8 +26,8 @@ def testUnit():
     clement.login()
     toto.login()
 
-    print("guillaume cree un channel de discution direct entre lui et yann\n")
-    guillaume.createOrGetDirectConversation(yann)
+    #print("guillaume cree un channel de discution direct entre lui et yann\n")
+    #guillaume.createOrGetDirectConversation(yann)
     #print("guillaume cree un channel de discution direct avec clement\n")
     #guillaume.createOrGetDirectConversation(clement)
 

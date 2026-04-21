@@ -22,9 +22,17 @@ interface AuthStore {
 
 export const useAuthStore = create<AuthStore>((set) => ({
   user: null,
-  setUser: (user) => set({ user }),
-  logout: () => set({ user: null }),
   accessToken: null,
+  setUser: (user) => set({ user }),
   setAccessToken: (token) => set({ accessToken: token }),
-  clear: () => set({ user: null, accessToken: null }),
+  logout: () =>
+    set({
+      user: null,
+      accessToken: null,
+    }),
+  clear: () =>
+    set({
+      user: null,
+      accessToken: null,
+    }),
 }));

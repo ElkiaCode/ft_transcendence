@@ -181,7 +181,7 @@ export async function apiLoginWith42(code: string) {
   const data = await res.json();
 
   if (!res.ok) {
-    throw new Error(data.message || 'Erreur de connexion 42');
+    throw new Error(data.message || 'Error during 42 login');
   }
 
   useAuthStore.getState().setAccessToken(data.accessToken);
