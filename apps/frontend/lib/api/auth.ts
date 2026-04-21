@@ -10,12 +10,10 @@ export async function apiLogin(email: string, password: string) {
     body: JSON.stringify({ email, password }),
   });
   const data = await res.json();
-
-  if (!res.ok) {
-    throw new Error(data.message || 'Erreur de connexion');
-  }
+  if (!res.ok)
+    throw new Error(data.message || 'Error during login');
+  useAuthStore.getState().setAccessToken(data.accessToken);
   useAuthStore.getState().setUser(data.user);
-
   return data.user;
 }
 
@@ -27,11 +25,8 @@ export async function apiRegister(username: string, email: string, password: str
     body: JSON.stringify({ email, username, password }),
   });
   const data = await res.json();
-
-  if (!res.ok) {
-    throw new Error(data.message || 'Erreur lors de l\'inscription');
-  }
-
+  if (!res.ok)
+    throw new Error(data.message || 'Error during registration');
   useAuthStore.getState().setAccessToken(data.accessToken);
   useAuthStore.getState().setUser(data.user);
   return data.user;
@@ -50,13 +45,10 @@ export async function apiRefresh() {
     method: 'POST',
     credentials: 'include',
   });
-
   if (!res.ok) return null;
-  const data = await res.json();
-
+    const data = await res.json();
   useAuthStore.getState().setAccessToken(data.accessToken);
   useAuthStore.getState().setUser(data.user);
-
   return data.user;
 }
 
@@ -66,9 +58,33 @@ export async function apiSearchUsers(query: string) {
     credentials: 'include',
     headers: token ? { 'Authorization': `Bearer ${token}` } : {},
   });
-
   if (!res.ok) return [];
+  return res.json();
+}
 
+export async function apiGetMyFriends() {
+  const token = useAuthStore.getState().accessToken;
+  const res = await fetch(`${API_URL}/users/friends`, {
+    credentials: 'include',
+    headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.message || 'Error fetching friends list');
+  }
+  return res.json();
+}
+
+export async function apiGetPendingFriendRequests() {
+  const token = useAuthStore.getState().accessToken;
+  const res = await fetch(`${API_URL}/relationships/requests/incoming`, {
+    credentials: 'include',
+    headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.message || 'Error fetching pending friend requests');
+  }
   return res.json();
 }
 
@@ -84,11 +100,9 @@ export async function addFriendRequest(userId: string) {
     body: JSON.stringify({ userId }),
   });
   const data = await res.json();
-
   if (!res.ok) {
-    throw new Error(data.message || 'Erreur lors de l\'envoi de la demande d\'ami');
+    throw new Error(data.message || 'Error sending friend request');
   }
-
   return data;
 }
 
@@ -104,11 +118,9 @@ export async function blockUser(userId: string) {
     body: JSON.stringify({ userId }),
   });
   const data = await res.json();
-
   if (!res.ok) {
-    throw new Error(data.message || 'Erreur lors du blocage de l\'utilisateur');
+    throw new Error(data.message || 'Error blocking user');
   }
-
   return data;
 }
 
@@ -122,14 +134,43 @@ export async function unblockUser(userId: string) {
     },
   });
   const data = await res.json();
-
   if (!res.ok) {
-    throw new Error(data.message || 'Erreur lors du déblocage de l\'utilisateur');
+    throw new Error(data.message || 'Error unblocking user');
   }
-
   return data;
 }
 
+export async function acceptFriendRequest(userId: string) {
+  const token = useAuthStore.getState().accessToken;
+  const res = await fetch(`${API_URL}/relationships/users/${userId}/friend-accept`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ userId }),
+  });
+  const data = await res.json();
+  if (!res.ok)
+    throw new Error(data.message || 'Error accepting friend request');
+  return data;
+}
+
+export async function declineFriendRequest(userId: string) {
+  const token = useAuthStore.getState().accessToken;
+  const res = await fetch(`${API_URL}/relationships/users/${userId}/remove-friend`, {
+    method: 'DELETE',
+    credentials: 'include',
+    headers: {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
+  });
+  const data = await res.json();
+  if (!res.ok)
+    throw new Error(data.message || 'Error declining friend request');
+  return data;
+}
 export async function apiLoginWith42(code: string) {
   const res = await fetch(`${API_URL}/auth/42/callback`, {
     method: 'POST',
@@ -147,4 +188,41 @@ export async function apiLoginWith42(code: string) {
   useAuthStore.getState().setUser(data.user);
 
   return data.user;
+}
+
+export async function getUser() {
+  try {
+    const res = await fetch(`${API_URL}/users/me`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'authorization': `Bearer ${useAuthStore.getState().accessToken}`,
+      },
+    });
+
+    if (!res.ok) {
+      console.error("Erreur HTTP:", res.status);
+      return null;
+    }
+
+    const data = await res.json();
+    return data;
+
+  } catch (error) {
+    console.error("Erreur fetch:", error);
+    return null;
+  }
+}
+
+export async function apiGetMe() {
+  const token = localStorage.getItem('token');
+
+  const res = await fetch(`${API_URL}/users/me`, {
+    credentials: 'include',
+    headers: {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
+  });
+  if (!res.ok) return null;
+  return res.json();
 }

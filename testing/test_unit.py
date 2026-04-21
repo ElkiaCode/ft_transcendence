@@ -6,6 +6,7 @@ def testUnit():
     guillaume   = User("guillaume.roustan1@gmail.com", "laGuigue06", "pass1234")
     yann        = User("yann@gmail.com", "MegaYann", "pass1234")
     clement     = User("clem@gmail.com", "SuperClem", "pass1234")
+    toto        = User("toto@gmail.com", "toto", "totototo")
 
     print(f"Creation of user: guillaume, yann, clement...\n")
 
@@ -15,6 +16,8 @@ def testUnit():
     yann.register()
     print("clement se register\n")
     clement.register()
+    print("toto is registering into the app:\n")
+    toto.register()
 
     print("guillaume se login\n")
     guillaume.login()
@@ -22,6 +25,7 @@ def testUnit():
     yann.login()
     print("clement se login\n")
     clement.login()
+    toto.login()
 
     print("Guillaume cree une converrsation avec yann\n")
     guillaume.createOrGetDirectConversation(yann)
@@ -56,7 +60,7 @@ def testUnit():
     print("clement efface toute ses donnees\n")
     clement.eraseDataPassword()
 
-    #full_database_audit()
+    full_database_audit()
 
     if (os.path.exists(guillaume.cookies)):
         os.remove(guillaume.cookies)

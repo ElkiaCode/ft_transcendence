@@ -33,7 +33,7 @@ export class RelationshipsController {
     );
   }
 
-  @Delete('users/:id/friend')
+  @Delete('users/:id/remove-friend')
   removeFriend(
     @Param('id') targetUserId: string,
     @CurrentUser() actor: JwtPayload,
