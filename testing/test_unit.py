@@ -25,7 +25,6 @@ def testUnit():
     yann.login()
     print("clement se login\n")
     clement.login()
-    toto.login()
 
     print("Guillaume cree une converrsation avec yann\n")
     guillaume.createOrGetDirectConversation(yann)
