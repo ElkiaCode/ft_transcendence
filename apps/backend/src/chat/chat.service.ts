@@ -192,7 +192,7 @@ export class ChatService {
 
       lastMessage: lastMessage?.content ?? null,
 
-      unreadCount: 0, // 👉 tu feras ça plus tard
+      unreadCount: 0,
     };
   });
 }

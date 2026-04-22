@@ -171,6 +171,7 @@ export async function declineFriendRequest(userId: string) {
     throw new Error(data.message || 'Error declining friend request');
   return data;
 }
+
 export async function apiLoginWith42(code: string) {
   const res = await fetch(`${API_URL}/auth/42/callback`, {
     method: 'POST',

@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import { addFriendRequest, apiSearchUsers, blockUser, unblockUser } from "@/lib/api/auth";
-import { apiGetConversations, apiGetMessages, apiSendMessage, createOrGetDirectConversation } from "@/lib/api/chat";
+import { apiGetConversations, apiGetMessages, createOrGetDirectConversation } from "@/lib/api/chat";
 import { useAuthStore } from "@/store/authStore";
+import { Socket } from "socket.io-client";
+import { getChatSocket, resetChatSocket } from "@/lib/socket/chat-socket";
 
 interface SearchUser {
   id: string;
@@ -217,6 +219,7 @@ function ChatPanel({
 
 
 function Section() {
+  const socketRef = useRef<Socket | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const user = useAuthStore((state) => state.user);
   const [messages, setMessages] = useState<any[]>([]);
@@ -305,11 +308,71 @@ function Section() {
   };
 
   const handleSend = async () => {
-    if (!messageInput.trim() || !selectedConv) return;
-    const newMsg = await apiSendMessage(selectedConv.id, messageInput);
-    setMessages((prev) => [...prev, newMsg]);
+    if (!messageInput.trim() || !selectedConv || !socketRef.current) return;
+
+    socketRef.current.emit('chat.sendMessage', {
+      conversationId: selectedConv.id,
+      content: messageInput,
+    });
+
     setMessageInput("");
   };
+
+useEffect(() => {
+  if (!user) return;
+
+  const token = useAuthStore.getState().accessToken;
+  const socket = getChatSocket(token);
+  socketRef.current = socket;
+
+  socket.on('chat.message.created', (msg) => {
+    setMessages((prev) => [...prev, msg]);
+    setConversations((prev) => {
+      const updated = prev.map((c) =>
+        c.id === msg.conversationId
+          ? { ...c, lastMessage: msg.content }
+          : c
+      );
+      const idx = updated.findIndex((c) => c.id === msg.conversationId);
+      if (idx > 0) {
+        const [conv] = updated.splice(idx, 1);
+        updated.unshift(conv);
+      }
+      return updated;
+    });
+  });
+
+  socket.on('chat.conversation.created', (conv) => {
+    setConversations((prev) => {
+      const exists = prev.find((c) => c.id === conv.id);
+      if (exists) return prev;
+      return [conv, ...prev];
+    });
+  });
+
+  return () => {
+    socket.off('chat.message.created');
+    socket.off('chat.conversation.created');
+  };
+}, [user]);
+
+useEffect(() => {
+  if (!user) {
+    resetChatSocket();
+    socketRef.current = null;
+  }
+}, [user]);
+
+useEffect(() => {
+  const socket = socketRef.current;
+  if (!socket || !selectedConv) return;
+
+  socket.emit('chat.joinConversation', { conversationId: selectedConv.id });
+
+  return () => {
+    socket.emit('chat.leaveConversation', { conversationId: selectedConv.id });
+  };
+}, [selectedConv]);
 
   return (
     <section className="flex flex-1 h-full relative">
