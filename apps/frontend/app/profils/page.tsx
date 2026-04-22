@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { getUser, apiUpdateProfile, apiUpdateAvatar} from "@/lib/api/auth";
+import { useAuthStore } from "@/store/authStore";
+import { useEffect, useState, useMemo } from "react";
 
 function EditModal({ user, onClose, onSave }: { user: any, onClose: () => void, onSave: (u: any) => void }) {
   const [displayName, setDisplayName] = useState(user?.profile?.displayName ?? '');
@@ -48,9 +49,45 @@ function EditModal({ user, onClose, onSave }: { user: any, onClose: () => void, 
   );
 }
 
+function MatrixBackground() {
+	const items = useMemo(() =>
+	Array.from({ length: 50 }).map((_, i) => ({
+	left: `${(i % 8) * 13}%`,
+	top: `${Math.floor(i / 8) * 16}%`,
+	}))
+	, []);
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+      {items.map((item, i) => (
+        <div
+          key={i}
+          className="absolute text-xs font-mono whitespace-nowrap"
+          style={{
+            color: '#00BABC',
+            opacity: 0.5,
+            left: item.left,
+            top: item.top,
+          }}
+        >
+          Hello, World!
+        </div>
+      ))}
+      <div
+        className="absolute inset-0 z-10"
+        style={{
+         background: 'radial-gradient(ellipse 30% 50% at 50% 30%, black 40%, transparent 100%)',
+        }}
+      />
+    </div>
+  );
+}
+
 function Section() {
   const [user, setUser] = useState<any>(null);
   const [showEdit, setShowEdit] = useState(false);
+  const setStoreUser = useAuthStore((s) => s.setUser);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     async function loadUser() {
@@ -62,32 +99,40 @@ function Section() {
 
   const handleAvatarChange = async (file?: File) => {
     if (!file) return;
-
     try {
-      const formData = new FormData();
-      formData.append("avatar", file);
-
       const updatedUser = await apiUpdateAvatar(file);
-
-      setUser((prev: any) => ({
-        ...prev,
-        profile: {
-          ...prev.profile,
-          avatarUrl: updatedUser.profile.avatarUrl,
-        },
-      }));
+      const fresh = await getUser();
+      setUser(fresh);
+      setStoreUser(fresh);
     } catch (err) {
       console.error("Avatar upload failed:", err);
     }
   };
 
+  const handleCopyLink = async () => {
+    const url = `${window.location.origin}/profils/${user?.username}`;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      const input = document.createElement('input');
+      input.value = url;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      document.body.removeChild(input);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
-    <section className="flex-1 flex items-center flex-col w-full gap-8 py-12">
+    <section className="flex-1 flex items-center flex-col w-full gap-8 py-12 relative z-10">
 
-      {/* 🟢 AVATAR + CHANGE BUTTON */}
-      <div className="relative w-48 h-48 bg-blue-500 rounded-full overflow-hidden flex items-center justify-center group">
-
-        {/* input file caché */}
+      {/* AVATAR */}
+      <div
+        className="relative w-48 h-48 ColorsS rounded-full overflow-hidden flex items-center justify-center group"
+        style={{ backgroundColor: user?.profile?.avatarUrl ? 'white' : undefined }}
+      >
         <input
           id="avatarInput"
           type="file"
@@ -108,36 +153,56 @@ function Section() {
           </span>
         )}
 
-        {/* overlay change */}
         <label
           htmlFor="avatarInput"
           className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center cursor-pointer"
         >
-          <span className="text-white font-semibold">
-            Change
-          </span>
+          <span className="text-white font-semibold">Change</span>
         </label>
       </div>
 
       {/* NAME + BIO */}
       <div className="flex flex-col items-center gap-2">
-        <h2 className="text-4xl text-black font-bold">
+        <h2 className="text-4xl font-bold text-white">
           {user?.profile?.displayName ?? user?.username ?? "..."}
         </h2>
         {user?.profile?.bio && (
-          <p className="text-gray-500 text-center max-w-md">
+          <p className="text-center max-w-md" style={{ color: '#00BABC' }}>
             {user.profile.bio}
           </p>
         )}
       </div>
 
-      {/* BUTTON EDIT */}
-      <div className="flex gap-4">
+      {/* BUTTONS */}
+      <div className="flex gap-3">
         <button
           onClick={() => setShowEdit(true)}
-          className="bg-black text-white px-6 py-2 rounded hover:text-gray-300 cursor-pointer"
+          className="text-black px-6 py-2 rounded cursor-pointer font-bold hover:opacity-80 transition"
+          style={{ backgroundColor: '#00BABC' }}
         >
           Edit profile
+        </button>
+
+        <button
+          onClick={handleCopyLink}
+          className="flex items-center gap-2 border text-white px-6 py-2 rounded cursor-pointer transition hover:bg-white/10"
+          style={{ borderColor: '#00BABC' }}
+        >
+          {copied ? (
+            <>
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              <span className="text-green-400 text-sm font-medium">Copied!</span>
+            </>
+          ) : (
+            <>
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-4 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              <span className="text-sm font-medium">Share profile</span>
+            </>
+          )}
         </button>
       </div>
 
@@ -162,7 +227,8 @@ function Section() {
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-gray-100 flex flex-col">
+    <main className="min-h-screen flex flex-col relative overflow-hidden bg-black">
+      <MatrixBackground />
       <Section />
     </main>
   );
