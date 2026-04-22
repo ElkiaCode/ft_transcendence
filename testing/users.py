@@ -16,7 +16,10 @@ class User:
         self.password = password
         self.id = ''
         self.accessToken = ''
+        self.role = ''
         self.conversation = []
+        self.message = []
+        self.notification = []
 
     def register(self):
         response = requests.post(
@@ -32,6 +35,7 @@ class User:
         if (response.status_code == 200 or response.status_code == 201):
             self.accessToken = response.json()['accessToken']
             self.id = response.json()['user']['id']
+            self.role = response.json()['user']['globalRole']
         
         print(f"{self.username}: {response.json()}\n")
 
@@ -54,6 +58,7 @@ class User:
         if (response.status_code == 200 or response.status_code == 201):
             self.accessToken = response.json()['accessToken']
             self.id = response.json()['user']['id']
+            self.role = response.json()['user']['globalRole']
 
         session.cookies.save(ignore_discard=True, ignore_expires=True)
         print(f"{self.username}: {response.json()}\n")
@@ -93,24 +98,30 @@ class User:
 
     def promoteAdmin(self):
         safe_email = self.email.replace("'", "''")
-        sql = f'UPDATE "User" SET "globalRole" = \'ADMIN\' WHERE email = \'{safe_email}\';'
+        sql = f'UPDATE "User" SET "globalRole" = \'ADMIN\' WHERE "email" = \'{safe_email}\';'
 
         result = subprocess.run(
             [
-            "docker", "compose", "exec", "-T",
-            "postgres",
-            "sh", "-lc",
-            'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+                "docker", "compose", "exec", "-T",
+                "postgres",
+                "sh", "-lc",
+                'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
             ],
             input=sql,
             capture_output=True,
             text=True
         )
-        if (result.returncode == 1):
-            print(f"{self.username}: success: false\n")
+
+        if result.returncode != 0:
+            print(f"{self.username}: success: false")
+            print("stderr:", result.stderr)
             return
-        
-        print(f"{self.username}: success: false\n")
+
+        if "UPDATE 1" in result.stdout:
+            print(f"{self.username}: success: true\n")
+        else:
+            print(f"{self.username}: success: false\n")
+            print("stdout:", result.stdout)
 
     def eraseDataPassword(self):
         response = requests.post(
@@ -250,6 +261,7 @@ class User:
             verify = False
         )
         self.conversation.append(response.json()['id'])
+        secondUser.conversation.append(response.json()['id'])
 
         print(f"{self.username}: {response.json()}\n")
 
@@ -282,8 +294,73 @@ class User:
             )
 
             print(f"{self.username}: {response.json()}\n")
+        self.message.append(message)
         
+    def getMyNotifications(self):
+        response = requests.get(
+            f"{BASE_URL}/motifications",
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            verify = False
+        )
 
+        print(f"{self.username}: {response.json()}\n")
+    
+    def markOneNotificationsAsRead(self):
+        response = requests.patch(
+            f"{BASE_URL}/notifications/{self.notification[0]}/read",
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            verify = False
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
+    def markAllNotificationsAsRead(self):
+        response = requests.patch(
+            f"{BASE_URL}/notifications/read-all",
+            headers = { "Authorization": f"Bearer {self.accessToken}"},
+            verify = False
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
+    def reportCreationForUser(self, userTarget):
+        response = requests.post(
+            f"{BASE_URL}/moderation/reports",
+            headers = { "Authorization": f"Bearer {self.accessToken}"},
+            json = { "targetType": userTarget.role, "targetUserId": userTarget.id, "reason": "spam and abusive content"},
+            verify = False,
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
+    def reportCreationForMessage(self, userTarget):
+        response = requests.post(
+            f"{BASE_URL}/moderation/reports",
+            headers = { "Authorization": f"Bearer {self.accessToken}"},
+            json = { "targetType": "MESSAGE", "targetMessageId": userTarget.message[0], "reason": "abusive content"},
+            verify = False,
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
+    def listReport(self):
+        response = requests.get(
+            f"{BASE_URL}/moderation/reports",
+            headers = { "Authorization": f"Bearer {self.accessToken}"},
+            verify = False,
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
+    def reviewReport(self, action, note):
+        response = requests.get(
+            f"{BASE_URL}/moderation/reports",
+            headers = { "Authorization": f"Bearer {self.accessToken}"},
+            json = {"action": {action}, "note": {note}},
+            verify = False,
+        )
+        
+        print(f"{self.username}: {response.json()}\n")
 
     def getMe(self):
         response = requests.get(

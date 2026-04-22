@@ -5,6 +5,17 @@ import { PrismaService } from '../prisma/prisma.service';
 export class ChatService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async getOtherParticipantIds(conversationId: string, currentUserId: string) {
+    const participants = await this.prisma.conversationParticipant.findMany({
+      where: { conversationId },
+      select: { userId: true },
+    });
+
+    return participants
+      .map((p) => p.userId)
+      .filter((id) => id !== currentUserId);
+  }
+
   private async ensureLiveSender(userId: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
 

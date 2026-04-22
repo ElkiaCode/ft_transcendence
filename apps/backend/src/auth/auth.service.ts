@@ -142,6 +142,11 @@ export class AuthService {
         user: {
           include: {
             profile: true,
+            oauthAccounts: {
+              select: {
+                provider: true,
+              },
+            },
           },
         },
       },
@@ -301,7 +306,6 @@ export class AuthService {
     };
 
     const session = await this.createSession(user.id, payload);
-
     return {
       accessToken: session.accessToken,
       refreshToken: session.refreshToken,
@@ -334,12 +338,18 @@ export class AuthService {
   }
 
   private toPublicUser(user: any) {
+    const authProviders = [
+      ...(user.passwordHash ? ['LOCAL'] : []),
+      ...((user.oauthAccounts ?? []).map((account: any) => account.provider)),
+    ];
+
     return {
       id: user.id,
       email: user.email,
       username: user.username,
       globalRole: user.globalRole,
       preferredLanguage: user.preferredLanguage,
+      authProviders: [...new Set(authProviders)],
       profile: user.profile
         ? {
             displayName: user.profile.displayName,

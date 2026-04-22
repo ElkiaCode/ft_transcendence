@@ -1,5 +1,6 @@
 from users import *
 from database import *
+import time
 
 def testUnit():
     guillaume   = User("guillaume.roustan1@gmail.com", "laGuigue06", "pass1234")
@@ -25,28 +26,40 @@ def testUnit():
     print("clement se login\n")
     clement.login()
 
-    #print("guillaume cree un channel de discution direct entre lui et yann\n")
-    #guillaume.createOrGetDirectConversation(yann)
-    #print("guillaume cree un channel de discution direct avec clement\n")
-    #guillaume.createOrGetDirectConversation(clement)
+    print("Guillaume cree une converrsation avec yann\n")
+    guillaume.createOrGetDirectConversation(yann)
 
-    #print("guillaume regarde toute ces conversation actives\n")
-    #guillaume.getMyConversation()
+    print("Guillaume regarde toute ces conversation\n")
+    guillaume.getMyConversation()
 
-    #print("guillaume envoie un message a yann\n")
-    #guillaume.sendMessageConversation("test")
-#
-    #print("guillaume regarde tout les message de toute ces conversations\n")
-    #guillaume.getMessageConversation()
+    print("guillaume envoie un message a la conversation entre lui et yann\n")
+    guillaume.sendMessageConversation("salut yann!")
+
+    print("Guillaume regarde de ses message de ses conversation\n")
+    guillaume.getMessageConversation()
+
+    print("guillaume report yann\n")
+    guillaume.reportCreationForUser(yann)
+
+    print("guillaume regarde tous les report mais n'a pas les droit\n")
+    guillaume.listReport()
+
+    print("guillaume promote to admin\n")
+    guillaume.promoteAdmin()
+
+    check_user_by_email(guillaume.email)
+
+    print("guillaume regarde les report avec les droit necessaire\n")
+    guillaume.listReport()
+
+    #print("guillaume efface toute ses donnees\n")
+    #guillaume.eraseDataPassword()
+    print("yann efface toute ses donnees\n")
+    yann.eraseDataPassword()
+    print("clement efface toute ses donnees\n")
+    clement.eraseDataPassword()
 
     full_database_audit()
-
-    #print("guillaume erase his data\n")
-    #guillaume.eraseDataPassword()
-    #print("yann erase his data\n")
-    #yann.eraseDataPassword()
-    print("clement erase his data\n")
-    clement.eraseDataPassword()
 
     if (os.path.exists(guillaume.cookies)):
         os.remove(guillaume.cookies)

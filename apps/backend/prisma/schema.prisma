@@ -42,6 +42,31 @@ enum MessageType {
   SYSTEM
 }
 
+enum NotificationType {
+  MESSAGE
+  MODERATION
+  SYSTEM
+}
+
+enum ReportStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  DISMISSED
+}
+
+enum ReportTargetType {
+  USER
+  MESSAGE
+}
+
+enum ModerationActionType {
+  WARN
+  BAN
+  UNBAN
+  DISMISS_REPORT
+}
+
 model User {
   id                String       @id @default(cuid())
   email             String       @unique
@@ -61,12 +86,17 @@ model User {
 
   friendshipsSent     Friendship[] @relation("FriendshipRequester")
   friendshipsReceived Friendship[] @relation("FriendshipAddressee")
-
-  blocksInitiated Block[] @relation("Blocker")
-  blocksReceived  Block[] @relation("Blocked")
+  blocksInitiated     Block[]      @relation("Blocker")
+  blocksReceived      Block[]      @relation("Blocked")
 
   conversationMemberships ConversationParticipant[]
   messagesSent             Message[]
+
+  notifications   Notification[]
+  reportsCreated  Report[]             @relation("ReportCreator")
+  reportsReceived Report[]             @relation("ReportTargetUser")
+  moderationActs  ModerationAction[]   @relation("ModeratorActions")
+  moderationReceived ModerationAction[] @relation("ModerationTargetUser")
 }
 
 model Profile {
@@ -172,6 +202,59 @@ model Message {
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender       User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
 
+  reports Report[] @relation("ReportTargetMessage")
+
   @@index([conversationId, createdAt])
   @@index([senderId])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+}
+
+model Report {
+  id              String           @id @default(cuid())
+  creatorId       String
+  targetType      ReportTargetType
+  targetUserId    String?
+  targetMessageId String?
+  reason          String
+  status          ReportStatus     @default(OPEN)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  creator       User     @relation("ReportCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  targetUser    User?    @relation("ReportTargetUser", fields: [targetUserId], references: [id], onDelete: SetNull)
+  targetMessage Message? @relation("ReportTargetMessage", fields: [targetMessageId], references: [id], onDelete: SetNull)
+
+  actions ModerationAction[]
+
+  @@index([status, createdAt])
+  @@index([creatorId])
+}
+
+model ModerationAction {
+  id           String               @id @default(cuid())
+  reportId     String?
+  moderatorId  String
+  targetUserId String?
+  action       ModerationActionType
+  note         String?
+  createdAt    DateTime             @default(now())
+
+  report     Report? @relation(fields: [reportId], references: [id], onDelete: SetNull)
+  moderator  User    @relation("ModeratorActions", fields: [moderatorId], references: [id], onDelete: Cascade)
+  targetUser User?   @relation("ModerationTargetUser", fields: [targetUserId], references: [id], onDelete: SetNull)
+
+  @@index([moderatorId, createdAt])
 }

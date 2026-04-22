@@ -182,11 +182,84 @@ export async function apiLoginWith42(code: string) {
   const data = await res.json();
 
   if (!res.ok) {
-    throw new Error(data.message || 'Error during 42 login');
+    throw new Error(data.message || 'Connection error');
   }
 
   useAuthStore.getState().setAccessToken(data.accessToken);
   useAuthStore.getState().setUser(data.user);
 
   return data.user;
+}
+
+export async function getUser() {
+  try {
+    const res = await fetch(`${API_URL}/users/me`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'authorization': `Bearer ${useAuthStore.getState().accessToken}`,
+      },
+    });
+
+    if (!res.ok) {
+      console.error("Erreur HTTP:", res.status);
+      return null;
+    }
+
+    const data = await res.json();
+    return data;
+
+  } catch (error) {
+    console.error("Erreur fetch:", error);
+    return null;
+  }
+}
+
+export async function apiGetMe() {
+  const token = localStorage.getItem('token');
+
+  const res = await fetch(`${API_URL}/users/me`, {
+    credentials: 'include',
+    headers: {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function apiUpdateProfile(displayName?: string, bio?: string) {
+  const token = useAuthStore.getState().accessToken;
+  const res = await fetch(`${API_URL}/users/update/profile`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ displayName, bio }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Error');
+  return data;
+}
+
+// TODO: add apiUpdateAvatar, apiUpdatePassword, apiDeleteAccount, etc.
+
+export async function apiUpdateAvatar(avatarFile: File) {
+  const token = useAuthStore.getState().accessToken;
+  const formData = new FormData();
+  formData.append('file', avatarFile);
+
+  const res = await fetch(`${API_URL}/users/update/avatar`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: {
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Error updating avatar');
+  return data;
 }

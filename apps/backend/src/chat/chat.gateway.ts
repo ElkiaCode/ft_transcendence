@@ -89,6 +89,10 @@ export class ChatGateway implements OnGatewayConnection {
     this.server.to(`conversation:${conversationId}`).emit('chat.message.created', message);
   }
 
+  async emitNotificationCreated(userId: string, notification: unknown) {
+    this.server.to(`user:${userId}`).emit('notification.created', notification);
+  }
+
   @SubscribeMessage('chat.joinConversation')
   async joinConversation(
     @ConnectedSocket() client: Socket,
@@ -147,4 +151,12 @@ export class ChatGateway implements OnGatewayConnection {
       messageId: message.id,
     };
   }
+
+  @SubscribeMessage('user.joinOwnRoom')
+  async joinOwnRoom(@ConnectedSocket() client: Socket) {
+    const socketUser = await this.getLiveSocketUserOrThrow(client);
+    await client.join(`user:${socketUser.sub}`);
+    return { ok: true };
+  }
+
 }
