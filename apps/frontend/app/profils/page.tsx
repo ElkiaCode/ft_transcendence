@@ -1,6 +1,6 @@
 "use client";
 
-import { getUser, apiUpdateProfile, apiUpdateAvatar, apiEraseMyData } from "@/lib/api/auth";
+import { getUser, apiUpdateProfile, apiUpdateAvatar } from "@/lib/api/auth";
 import { useAuthStore } from "@/store/authStore";
 import { useEffect, useState, useMemo } from "react";
 
@@ -49,45 +49,6 @@ function EditModal({ user, onClose, onSave }: { user: any, onClose: () => void, 
   );
 }
 
-function ConfirmDeleteModal({ onClose }: { onClose: () => void }) {
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-
-  const handleDelete = async () => {
-    setError('');
-    try {
-      await apiEraseMyData(password);
-      useAuthStore.getState().clear();
-      window.location.href = '/';
-    } catch (err: any) {
-      setError(err.message);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50" onClick={onClose}>
-      <div className="bg-white p-6 rounded w-96" onClick={e => e.stopPropagation()}>
-        <h2 className="text-xl text-black font-bold mb-2">Delete account</h2>
-        <p className="text-gray-500 text-sm mb-4">This action is irreversible. Enter your password to confirm.</p>
-        {error && <p className="text-red-500 text-sm mb-2">{error}</p>}
-        <input
-          className="border text-black w-full p-2 mt-2 rounded"
-          placeholder="Password"
-          type="password"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-        />
-        <button
-          onClick={handleDelete}
-          className="mt-4 w-full bg-red-500 text-white p-2 cursor-pointer rounded hover:bg-red-600 transition"
-        >
-          Delete my account
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function HelloWorldBackground() {
   const items = useMemo(() =>
     Array.from({ length: 50 }).map((_, i) => ({
@@ -124,7 +85,6 @@ function HelloWorldBackground() {
 function Section() {
   const [user, setUser] = useState<any>(null);
   const [showEdit, setShowEdit] = useState(false);
-  const [showDelete, setShowDelete] = useState(false);
   const setStoreUser = useAuthStore((s) => s.setUser);
   const [copied, setCopied] = useState(false);
 
@@ -232,13 +192,6 @@ function Section() {
             </>
           )}
         </button>
-
-        <button
-          onClick={() => setShowDelete(true)}
-          className="text-red-500 border border-red-500 px-6 py-2 rounded cursor-pointer font-bold hover:bg-red-500 hover:text-white transition"
-        >
-          Delete account
-        </button>
       </div>
 
       {showEdit && (
@@ -255,10 +208,6 @@ function Section() {
             }))
           }
         />
-      )}
-
-      {showDelete && (
-        <ConfirmDeleteModal onClose={() => setShowDelete(false)} />
       )}
     </section>
   );

@@ -243,7 +243,7 @@ export async function apiUpdateProfile(displayName?: string, bio?: string) {
   return data;
 }
 
-// TODO: apiUpdatePassword, apiDeleteAccount, etc.
+// TODO: apiUpdatePassword
 
 export async function apiUpdateAvatar(avatarFile: File) {
   const token = useAuthStore.getState().accessToken;
@@ -271,20 +271,4 @@ export async function apiGetUserByUsername(username: string) {
   });
   if (!res.ok) return null;
   return res.json();
-}
-
-export async function apiEraseMyData(currentPassword: string) {
-  const token = useAuthStore.getState().accessToken;
-  const res = await fetch(`${API_URL}/users/me/erase-data`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify({ currentPassword }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Error deleting account');
-  return data;
 }
