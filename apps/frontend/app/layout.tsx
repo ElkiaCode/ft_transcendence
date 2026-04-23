@@ -25,7 +25,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <body className={`${geistSans.variable} ${geistMono.variable} h-screen flex flex-col`}>
         <IsAuth>
           <Header />
-        <main className="flex-1 overflow-hidden">{children}</main>
+        <main className="flex-1">{children}</main>
         </IsAuth>
       </body>
     </html>
