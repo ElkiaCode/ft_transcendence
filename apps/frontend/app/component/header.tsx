@@ -179,7 +179,7 @@ function LoginModal({ onClose }: { onClose: () => void }) {
           onChange={e => setEmail(e.target.value)}/>
         <input
           className="border text-black w-full p-2 mt-2"
-          placeholder="password"
+          placeholder="Password"
           type="password"
           value={password}
           onChange={e => setPassword(e.target.value)}/>
