@@ -94,7 +94,7 @@ function Section() {
               <div className="w-10 h-10 bg-blue-500 rounded-full flex-shrink-0 overflow-hidden">
                 {user.profile?.avatarUrl
                   ? <img src={user.profile.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
-                  : <span className="text-white text-sm font-medium">{user.username.charAt(0).toUpperCase()}</span>
+                  : <span className="text-white text-sm font-bold">{user.username.charAt(0).toUpperCase()}</span>
                 }
               </div>
               <div>
