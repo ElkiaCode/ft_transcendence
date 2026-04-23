@@ -180,8 +180,6 @@ function Section() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const isLocalUser = user?.hasPassword;
-
   return (
     <section className="flex-1 flex items-center flex-col w-full gap-8 py-12 relative z-10">
 
@@ -259,15 +257,12 @@ function Section() {
             </>
           )}
         </button>
-
-        {isLocalUser && (
           <button
             onClick={() => setShowPassword(true)}
             className="border text-white px-6 py-2 rounded cursor-pointer font-bold hover:bg-white/10 transition BorderColorS"
           >
             Change password
           </button>
-        )}
       </div>
 
       {showEdit && (

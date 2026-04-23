@@ -76,7 +76,7 @@ export class UsersService {
           : null,
       }));
     }
-    
+
     async updateProfile(userId: string, dto: UpdateProfileDto) {
         const user = await this.prisma.user.findUnique({
           where: { id: userId },
@@ -204,7 +204,6 @@ export class UsersService {
         preferredLanguage: user.preferredLanguage,
         isActive: user.isActive,
         isBanned: user.isBanned,
-        hasPassword: !!user.passwordHash,
         profile: user.profile
           ? {
               displayName: user.profile.displayName,
@@ -276,27 +275,27 @@ export class UsersService {
         };
       });
     }
-    
-      async updatePassword(userId: string, dto: UpdatePasswordDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
 
-    if (!user) throw new NotFoundException('User not found');
-    if (!user.passwordHash) throw new BadRequestException('Cannot change password for OAuth accounts');
+	async updatePassword(userId: string, dto: UpdatePasswordDto) {
+		const user = await this.prisma.user.findUnique({
+		where: { id: userId },
+		});
 
-    const passwordOk = await bcrypt.compare(dto.currentPassword, user.passwordHash);
-    if (!passwordOk) throw new BadRequestException('Invalid current password');
+		if (!user) throw new NotFoundException('User not found');
+		if (!user.passwordHash) throw new BadRequestException('Cannot change password for OAuth accounts');
 
-    const newHash = await bcrypt.hash(dto.newPassword, 12);
+		const passwordOk = await bcrypt.compare(dto.currentPassword, user.passwordHash);
+		if (!passwordOk) throw new BadRequestException('Invalid current password');
 
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { passwordHash: newHash },
-    });
+		const newHash = await bcrypt.hash(dto.newPassword, 12);
 
-    return { success: true, message: 'Password updated successfully' };
-  }
+		await this.prisma.user.update({
+		where: { id: userId },
+		data: { passwordHash: newHash },
+		});
+
+		return { success: true, message: 'Password updated successfully' };
+	}
 
       async getUserByUsername(username: string) {
     const user = await this.prisma.user.findUnique({
