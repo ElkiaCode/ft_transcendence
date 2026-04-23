@@ -49,7 +49,7 @@ function EditModal({ user, onClose, onSave }: { user: any, onClose: () => void, 
   );
 }
 
-function MatrixBackground() {
+function HelloWorldBackground() {
 	const items = useMemo(() =>
 	Array.from({ length: 50 }).map((_, i) => ({
 	left: `${(i % 8) * 13}%`,
@@ -62,9 +62,8 @@ function MatrixBackground() {
       {items.map((item, i) => (
         <div
           key={i}
-          className="absolute text-xs font-mono whitespace-nowrap"
+          className="absolute text-xs font-mono whitespace-nowrap TextColorS"
           style={{
-            color: '#00BABC',
             opacity: 0.5,
             left: item.left,
             top: item.top,
@@ -111,16 +110,7 @@ function Section() {
 
   const handleCopyLink = async () => {
     const url = `${window.location.origin}/profils/${user?.username}`;
-    try {
-      await navigator.clipboard.writeText(url);
-    } catch {
-      const input = document.createElement('input');
-      input.value = url;
-      document.body.appendChild(input);
-      input.select();
-      document.execCommand('copy');
-      document.body.removeChild(input);
-    }
+    await navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -167,7 +157,7 @@ function Section() {
           {user?.profile?.displayName ?? user?.username ?? "..."}
         </h2>
         {user?.profile?.bio && (
-          <p className="text-center max-w-md" style={{ color: '#00BABC' }}>
+          <p className="text-center max-w-md TextColorS">
             {user.profile.bio}
           </p>
         )}
@@ -177,16 +167,14 @@ function Section() {
       <div className="flex gap-3">
         <button
           onClick={() => setShowEdit(true)}
-          className="text-black px-6 py-2 rounded cursor-pointer font-bold hover:opacity-80 transition"
-          style={{ backgroundColor: '#00BABC' }}
+          className="text-black px-6 py-2 rounded cursor-pointer font-bold hover:opacity-80 transition ColorsS"
         >
           Edit profile
         </button>
 
         <button
           onClick={handleCopyLink}
-          className="flex items-center gap-2 border text-white px-6 py-2 rounded cursor-pointer transition hover:bg-white/10"
-          style={{ borderColor: '#00BABC' }}
+          className="flex items-center gap-2 border text-white px-6 py-2 rounded cursor-pointer transition hover:bg-white/10 BorderColorS"
         >
           {copied ? (
             <>
@@ -228,7 +216,7 @@ function Section() {
 export default function Home() {
   return (
     <main className="min-h-screen flex flex-col relative overflow-hidden bg-black">
-      <MatrixBackground />
+      <HelloWorldBackground />
       <Section />
     </main>
   );

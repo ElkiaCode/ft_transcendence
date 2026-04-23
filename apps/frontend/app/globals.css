@@ -29,3 +29,15 @@ body {
 .ColorsS {
  background-color: #00babc;
 }
+
+.TextColorS { 
+  color: #00BABC; 
+}
+
+.BorderColorS {
+  border-color: #00BABC;
+}
+
+.BackgroundColorS {
+  background-color: #00BABC;
+}

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Patch, UploadedFile, UseInterceptors, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Patch, UploadedFile, UseInterceptors, Query, Param } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -58,6 +58,12 @@ export class UsersController {
     @Body() dto: EraseMyDataDto,
   ) {
     return this.usersService.eraseMyData(user.sub, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':username')
+  getUserByUsername(@Param('username') username: string) {
+    return this.usersService.getUserByUsername(username);
   }
 }
 

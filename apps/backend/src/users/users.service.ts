@@ -274,5 +274,24 @@ export class UsersService {
         };
       });
     }
+
+      async getUserByUsername(username: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { username },
+      include: { profile: true },
+    });
+
+    if (!user) throw new NotFoundException('User not found');
+
+    return {
+      id: user.id,
+      username: user.username,
+      profile: user.profile ? {
+        displayName: user.profile.displayName,
+        bio: user.profile.bio,
+        avatarUrl: user.profile.avatarUrl,
+      } : null,
+    };
+  }
 }
 
