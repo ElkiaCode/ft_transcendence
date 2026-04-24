@@ -34,3 +34,6 @@ infra/nginx/certs/*.key
 # temp files
 *.swp
 *.swo
+
+# data/postgres_data
+data/postgres_data

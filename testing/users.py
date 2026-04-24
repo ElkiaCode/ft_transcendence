@@ -21,6 +21,7 @@ class User:
         self.message = []
         self.notification = []
 
+
     def register(self):
         response = requests.post(
             f"{BASE_URL}/auth/register",
@@ -38,6 +39,9 @@ class User:
             self.role = response.json()['user']['globalRole']
         
         print(f"{self.username}: {response.json()}\n")
+
+        return response
+
 
     def login(self):
         session = requests.Session()
@@ -63,6 +67,9 @@ class User:
         session.cookies.save(ignore_discard=True, ignore_expires=True)
         print(f"{self.username}: {response.json()}\n")
 
+        return response
+
+
     def logout(self):
         session = requests.Session()
         session.cookies = MozillaCookieJar(self.cookies)
@@ -77,6 +84,9 @@ class User:
 
         session.cookies.save(ignore_discard=True, ignore_expires=True)
         print(f"{self.username}: {response.json()}\n")
+
+        return response
+
 
     def refreshCookie(self):
         session = requests.Session()
@@ -95,6 +105,9 @@ class User:
 
         session.cookies.save(ignore_discard=True, ignore_expires=True)
         print(f"{self.username}: {response.json()}\n")
+
+        return response
+
 
     def promoteAdmin(self):
         safe_email = self.email.replace("'", "''")
@@ -122,6 +135,9 @@ class User:
         else:
             print(f"{self.username}: success: false\n")
             print("stdout:", result.stdout)
+        
+        return result
+
 
     def eraseDataPassword(self):
         response = requests.post(
@@ -133,6 +149,8 @@ class User:
 
         print(f"{self.username}: {response.json()}\n")
 
+        return response
+
 
     def banUser(self, userToBan):
         response = requests.post(
@@ -143,6 +161,9 @@ class User:
 
         print(f"{self.username}: {response.json()}\n")
 
+        return response
+
+
     def unbanUser(self, userToUnban):
         response = requests.post(
             f"{BASE_URL}/admin/users/{userToUnban.id}/unban",
@@ -151,6 +172,34 @@ class User:
         )
 
         print(f"{self.username}: {response.json()}\n")
+
+        return response
+
+
+    def promoteUserToModerator(self, userToPromote):
+        response = requests.post(
+            f"{BASE_URL}/admin/users/{userToPromote.id}/promote",
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            verify = False
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
+        return response
+
+
+    def unPromoteModeratorToUser(self, moderatorToUnpromote):
+        response = requests.post(
+            f"{BASE_URL}/admin/users/{moderatorToUnpromote.id}/unpromote",
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            verify = False
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
+        return response
+
+
 
     def sendFriendRequest(self, toSend):
         response = requests.post(
@@ -161,6 +210,9 @@ class User:
 
         print(f"{self.username}: {response.json()}\n")
 
+        return response
+
+
     def acceptFriend(self, userAccepted):
         response = requests.post(
             f"{BASE_URL}/relationships/users/{userAccepted.id}/friend-accept",
@@ -169,6 +221,9 @@ class User:
         )
 
         print(f"{self.username}: {response.json()}\n")
+
+        return response
+
 
     def removeFriend(self, toRemove):
         response = requests.delete(
@@ -179,6 +234,9 @@ class User:
 
         print(f"{self.username}: {response.json()}\n")
 
+        return response
+
+
     def blockUser(self, toBlock):
         response = requests.post(
             f"{BASE_URL}/relationships/users/{toBlock.id}/block",
@@ -187,6 +245,9 @@ class User:
         )
 
         print(f"{self.username}: {response.json()}\n")
+
+        return response
+
 
     def unblockUser(self, toUnblock):
         response = requests.delete(
@@ -197,6 +258,9 @@ class User:
 
         print(f"{self.username}: {response.json()}\n")
 
+        return response
+
+
     def searchUser(self, userToSearch):
         response = requests.get(
             f"{BASE_URL}/users/search?q={userToSearch.username}",
@@ -205,6 +269,9 @@ class User:
         )
 
         print(f"{self.username}: {response.json()}\n")
+
+        return response
+
 
     def getMyFriends(self):
         response = requests.get(
@@ -215,6 +282,9 @@ class User:
 
         print(f"{self.username}: {response.json()}\n")
 
+        return response
+
+
     def getIncomingRequest(self):
         response = requests.get(
             f"{BASE_URL}/relationships/requests/incoming",
@@ -223,6 +293,9 @@ class User:
         )
 
         print(f"{self.username}: {response.json()}\n")
+
+        return response
+
 
     def getOutcomingRequest(self):
         response = requests.get(
@@ -233,6 +306,9 @@ class User:
 
         print(f"{self.username}: {response.json()}\n")
 
+        return response
+
+
     def updateProfile(self, profile):
         response = requests.patch(
             f"{BASE_URL}/users/update/profile",
@@ -242,6 +318,9 @@ class User:
         )
 
         print(f"{self.username}: {response.json()}\n")
+
+        return response
+
 
     def upload_avatar(self, filepath):
         with open(filepath, "rb") as f:
@@ -254,6 +333,9 @@ class User:
 
         print(f"{self.username}: {response.json()}\n")
 
+        return response
+
+
     def createOrGetDirectConversation(self, secondUser):
         response = requests.post(
             f"{BASE_URL}/chat/direct/{secondUser.id}",
@@ -265,6 +347,9 @@ class User:
 
         print(f"{self.username}: {response.json()}\n")
 
+        return response
+
+
     def getMyConversation(self):
         response = requests.get(
             f"{BASE_URL}/chat/conversations",
@@ -273,6 +358,9 @@ class User:
         )
 
         print(f"{self.username}: {response.json()}\n")
+
+        return response
+
 
     def getMessageConversation(self):
         for i in range(len(self.conversation)) :
@@ -283,6 +371,8 @@ class User:
             )
 
             print(f"{self.username}: {response.json()}\n")
+
+        return response
 
     def sendMessageConversation(self, message: str):
         for i in range(len(self.conversation)) :
@@ -295,6 +385,8 @@ class User:
 
             print(f"{self.username}: {response.json()}\n")
         self.message.append(message)
+
+        return response
         
     def getMyNotifications(self):
         response = requests.get(
@@ -304,6 +396,8 @@ class User:
         )
 
         print(f"{self.username}: {response.json()}\n")
+
+        return response
     
     def markOneNotificationsAsRead(self):
         response = requests.patch(
@@ -314,6 +408,8 @@ class User:
 
         print(f"{self.username}: {response.json()}\n")
 
+        return response
+
     def markAllNotificationsAsRead(self):
         response = requests.patch(
             f"{BASE_URL}/notifications/read-all",
@@ -322,6 +418,8 @@ class User:
         )
 
         print(f"{self.username}: {response.json()}\n")
+
+        return response
 
     def reportCreationForUser(self, userTarget):
         response = requests.post(
@@ -333,6 +431,9 @@ class User:
 
         print(f"{self.username}: {response.json()}\n")
 
+        return response
+
+
     def reportCreationForMessage(self, userTarget):
         response = requests.post(
             f"{BASE_URL}/moderation/reports",
@@ -343,6 +444,9 @@ class User:
 
         print(f"{self.username}: {response.json()}\n")
 
+        return response
+
+
     def listReport(self):
         response = requests.get(
             f"{BASE_URL}/moderation/reports",
@@ -351,6 +455,9 @@ class User:
         )
 
         print(f"{self.username}: {response.json()}\n")
+
+        return response
+
 
     def reviewReport(self, action, note):
         response = requests.get(
@@ -362,6 +469,9 @@ class User:
         
         print(f"{self.username}: {response.json()}\n")
 
+        return response
+
+
     def getMe(self):
         response = requests.get(
             f"{BASE_URL}/users/me",
@@ -370,3 +480,5 @@ class User:
         )
 
         print(f"{self.username}: {response.json()}\n")
+
+        return response
