@@ -246,9 +246,6 @@ export async function apiUpdateProfile(displayName?: string, bio?: string) {
   if (!res.ok) throw new Error(data.message || 'Error');
   return data;
 }
-
-// TODO: add apiUpdateAvatar, apiUpdatePassword, apiDeleteAccount, etc.
-
 export async function apiUpdateAvatar(avatarFile: File) {
   const token = useAuthStore.getState().accessToken;
   const formData = new FormData();
@@ -264,5 +261,31 @@ export async function apiUpdateAvatar(avatarFile: File) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || 'Error updating avatar');
+  return data;
+}
+
+export async function apiGetUserByUsername(username: string) {
+  const token = useAuthStore.getState().accessToken;
+  const res = await fetch(`${API_URL}/users/${username}`, {
+    credentials: 'include',
+    headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function apiUpdatePassword(currentPassword: string, newPassword: string) {
+  const token = useAuthStore.getState().accessToken;
+  const res = await fetch(`${API_URL}/users/update/password`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Error updating password');
   return data;
 }

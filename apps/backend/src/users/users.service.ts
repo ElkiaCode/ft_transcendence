@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { EraseMyDataDto } from 'src/auth/dto/erase-my-data.dto';
 import * as bcrypt from 'bcrypt';
 import { UpdateProfileDto } from './dto/dto';
+import { UpdatePasswordDto } from './dto/update-password.dto';
 
 @Injectable()
 export class UsersService {
@@ -75,7 +76,7 @@ export class UsersService {
           : null,
       }));
     }
-    
+
     async updateProfile(userId: string, dto: UpdateProfileDto) {
         const user = await this.prisma.user.findUnique({
           where: { id: userId },
@@ -274,5 +275,45 @@ export class UsersService {
         };
       });
     }
+
+	async updatePassword(userId: string, dto: UpdatePasswordDto) {
+		const user = await this.prisma.user.findUnique({
+		where: { id: userId },
+		});
+
+		if (!user) throw new NotFoundException('User not found');
+		if (!user.passwordHash) throw new BadRequestException('Cannot change password for OAuth accounts');
+
+		const passwordOk = await bcrypt.compare(dto.currentPassword, user.passwordHash);
+		if (!passwordOk) throw new BadRequestException('Invalid current password');
+
+		const newHash = await bcrypt.hash(dto.newPassword, 12);
+
+		await this.prisma.user.update({
+		where: { id: userId },
+		data: { passwordHash: newHash },
+		});
+
+		return { success: true, message: 'Password updated successfully' };
+	}
+
+      async getUserByUsername(username: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { username },
+      include: { profile: true },
+    });
+
+    if (!user) throw new NotFoundException('User not found');
+
+    return {
+      id: user.id,
+      username: user.username,
+      profile: user.profile ? {
+        displayName: user.profile.displayName,
+        bio: user.profile.bio,
+        avatarUrl: user.profile.avatarUrl,
+      } : null,
+    };
+  }
 }
 
