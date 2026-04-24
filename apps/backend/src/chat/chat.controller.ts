@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Patch, UseGuards } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { ChatGateway } from './chat.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -6,6 +6,9 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/types/jwt-payload.type';
 import { SendMessageDto } from './dto/send-message.dto';
+import { CreateGroupConversationDto } from './dto/create-group-conversation.dto';
+import { InviteUsersDto } from './dto/invite-users.dto';
+import { RenameConversationDto } from './dto/rename-conversation.dto';
 
 @Controller('chat')
 @UseGuards(JwtAuthGuard)
@@ -22,6 +25,49 @@ export class ChatController {
     @Param('userId') targetUserId: string,
   ) {
     return this.chatService.createOrGetDirectConversation(user.sub, targetUserId);
+  }
+
+  @Post('group')
+  createGroupeConversation(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: CreateGroupConversationDto,
+  ) {
+    return this.chatService.createGroupeConversation(user.sub, dto);
+  }
+
+  @Post('conversation/:conversationId/invite')
+  inviteUsers(
+    @CurrentUser() user: JwtPayload,
+    @Param('conversationId') conversationId: string,
+    @Body() dto: InviteUsersDto,
+  ) {
+    return this.chatService.inviteUsers(user.sub, conversationId, dto);
+  }
+
+  @Post('conversation/:conversationId/remove-user/:userId')
+  removeUserFromGroup(
+    @CurrentUser() user: JwtPayload,
+    @Param('conversationId') conversationId: string,
+    @Param('userId') userId: string
+  ) {
+    return this.chatService.removeUserFromGroup(user.sub, conversationId, userId);
+  }
+
+  @Post('conversation/:conversationId/leave')
+  leaveConversation(
+    @CurrentUser() user: JwtPayload,
+    @Param('conversationId') conversationId: string
+  ) {
+    return this.chatService.leaveConversation(user.sub, conversationId);
+  }
+
+  @Patch('conversation/:conversationId/rename')
+  renameConversation(
+    @CurrentUser() user: JwtPayload,
+    @Param('conversationId') conversationId: string,
+    @Body() dto: RenameConversationDto
+  ) {
+    return this.chatService.renameConversation(user.sub, conversationId, dto.title);
   }
 
   @Get('conversations')

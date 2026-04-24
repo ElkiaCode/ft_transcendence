@@ -17,7 +17,6 @@ class User:
         self.id = ''
         self.accessToken = ''
         self.role = ''
-        self.conversation = []
         self.message = []
         self.notification = []
 
@@ -350,6 +349,63 @@ class User:
 
         return response
 
+    def createGroupRoom(self, title, users_ids):
+        response = requests.post(
+            f"{BASE_URL}/chat/group",
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            json = { "title": title, "userIds": users_ids },
+            verify = False,
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
+        return response
+    
+    def inviteUserToGroup(self, conversation_id,  user_ids):
+        response = requests.post(
+            f"{BASE_URL}/chat/conversation/{conversation_id}/invite",
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            json = { "userIds": user_ids },
+            verify = False,
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
+        return response
+
+    def removeUserToGroup(self, conversation_id, user_id):
+        response = requests.post(
+            f"{BASE_URL}/chat/conversation/{conversation_id}/remove-user/{user_id}",
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            verify = False
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
+        return response
+
+    def leaveConversation(self, conversation_id):
+        response = requests.post(
+            f"{BASE_URL}/chat/conversation/{conversation_id}/leave",
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            verify = False,
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
+        return response
+
+    def renameConversation(self, conversation_id, new_name):
+        response = requests.patch(
+            f"{BASE_URL}/chat/conversation/{conversation_id}/rename",
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            json = { "title": new_name },
+            verify = False,
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
+        return response
 
     def getMyConversation(self):
         response = requests.get(

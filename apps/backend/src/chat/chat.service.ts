@@ -1,9 +1,119 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { InviteUsersDto } from './dto/invite-users.dto';
+import { CreateGroupConversationDto } from './dto/create-group-conversation.dto';
 
 @Injectable()
 export class ChatService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private async ensureGroupConversationExists(conversationId: string) {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: {
+        participants: true,
+      },
+    });
+
+    if (!conversation) {
+      throw new NotFoundException('conversation not found');
+    }
+
+    if (conversation.type !== 'GROUP') {
+      throw new BadRequestException('this action is only allowed for group conversations');
+    }
+
+    return conversation;
+  }
+
+  private async ensureGroupManagementPermission(
+    actorUserId: string,
+    conversationId: string,
+  ) {
+    const membership = await this.prisma.conversationParticipant.findUnique({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId: actorUserId,
+        },
+      },
+      include: {
+        conversation: true,
+      },
+    });
+
+    if (!membership) {
+      throw new ForbiddenException('you are not a participant of this conversation');
+    }
+
+    if (membership.conversation.type !== 'GROUP') {
+      throw new BadRequestException('this action is only allowed for group conversations');
+    }
+
+    if (membership.role !== 'OWNER' && membership.role !== 'ADMIN') {
+      throw new ForbiddenException('only room owner or admin can do this');
+    }
+
+    return membership;
+  }
+
+  async ensureUsersCanBeAdded(actorUserId: string, targetUserIds: string[]) {
+    const users = await this.prisma.user.findMany({
+      where: {id: { in: targetUserIds } },
+      select: {
+        id: true,
+        username: true,
+        isActive: true,
+        isBanned: true,
+      }
+    });
+
+    if (users.length !== targetUserIds.length) {
+      throw new BadRequestException('One or more selected users does not exist');
+    }
+
+    for (const user of users) {
+      if (!user.isActive || user.isBanned) {
+        throw new BadRequestException(`user ${user.username} cannot be added to the conversation`);
+      }
+
+      const block = await this.prisma.block.findFirst({
+        where: {
+          OR: [
+            { blockerId: actorUserId, blockedId: user.id },
+            { blockerId: user.id, blockedId: actorUserId },
+          ],
+        },
+      });
+
+      if (block) {
+        throw new ForbiddenException(`cannot add ${user.username} because one of you has blocked the other`);
+      }
+    }
+
+    return users;
+  }
+
+  async ensureCanInviteToConversation(actorUserId: string, conversationId: string) {
+    const menbership = await this.prisma.conversationParticipant.findUnique({
+      where: { conversationId_userId: { conversationId, userId: actorUserId} },
+      include: { conversation: true }
+    });
+
+    if (!menbership) {
+      throw new ForbiddenException('You are not a participant of this conversation');
+    }
+
+    if (menbership.conversation.type !== 'GROUP') {
+      throw new BadRequestException('You can only invite users to a group conversation');
+    }
+
+    /*if (menbership.role !== 'OWNER' && menbership.role !== 'ADMIN') {
+      throw new ForbiddenException('only room owner or admin can invite users');
+    }*/
+
+    return menbership;
+  }
 
   async getOtherParticipantIds(conversationId: string, currentUserId: string) {
     const participants = await this.prisma.conversationParticipant.findMany({
@@ -100,6 +210,11 @@ export class ChatService {
     return membership;
   }
 
+  private normalizeTargetUserIds(rawUserIds: string[], actorUserId: string) {
+    return [...new Set(rawUserIds.map((id) => id.trim()))]
+      .filter((id) => id.length > 0 && id !== actorUserId);
+  }
+
   async createOrGetDirectConversation(actorUserId: string, targetUserId: string) {
     await this.ensureCanDirectMessage(actorUserId, targetUserId);
 
@@ -150,6 +265,269 @@ export class ChatService {
         },
       },
     });
+  }
+
+  async createGroupeConversation(actorUserId: string, dto: CreateGroupConversationDto) {
+    const targetUserIds = this.normalizeTargetUserIds(dto.userIds, actorUserId);
+
+    if (targetUserIds.length < 2) {
+      throw new BadRequestException('a group conversation must contain at least 2 other users');
+    }
+
+    await this.ensureLiveSender(actorUserId);
+    await this.ensureUsersCanBeAdded(actorUserId, targetUserIds);
+
+    const conversation = await this.prisma.conversation.create({
+      data: {
+        type: 'GROUP',
+        title: dto.title?.trim() || null,
+        participants: {
+          create: [
+            {
+              userId: actorUserId,
+              role: 'OWNER'
+            },
+            ...targetUserIds.map((userId) => ({
+              userId,
+              role: 'MEMBER' as const,
+            })),
+          ],
+        },
+      },
+      include: {
+        participants: {
+          include: {
+            user: {
+              include: {
+                profile: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return {
+      message: 'group conversation created',
+      conversation,
+    };
+  }
+
+  async inviteUsers(actorUserId: string, conversationId: string, dto: InviteUsersDto) {
+    await this.ensureLiveSender(actorUserId);
+    await this.ensureCanInviteToConversation(actorUserId, conversationId);
+
+    const normalizedUserIds = this.normalizeTargetUserIds(dto.userIds, actorUserId);
+
+    if (normalizedUserIds.length === 0) {
+      throw new BadRequestException('no valid users to invite');
+    }
+
+    await this.ensureUsersCanBeAdded(actorUserId, normalizedUserIds);
+
+    const existingParticipants = await this.prisma.conversationParticipant.findMany({
+      where: {
+        conversationId,
+        userId: { in: normalizedUserIds },
+      },
+      select: {
+        userId: true,
+      },
+    });
+
+    const existingUserIds = new Set(existingParticipants.map((p) => p.userId));
+
+    const newUserIds = normalizedUserIds.filter((id) => !existingUserIds.has(id));
+
+    if (newUserIds.length === 0) {
+      return {
+        message: 'all selected users are already in the conversation',
+        invitedCount: 0,
+      };
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.conversationParticipant.createMany({
+        data: newUserIds.map((userId) => ({
+          conversationId,
+          userId,
+          role: 'MEMBER',
+        })),
+      }),
+      this.prisma.conversation.update({
+        where: { id: conversationId },
+        data: { updatedAt: new Date() },
+      }),
+    ]);
+
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+      include: {
+        participants: {
+          include: {
+            user: {
+              include: {
+                profile: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return {
+      message: 'users invited successfully',
+      invitedCount: newUserIds.length,
+      conversation,
+    };
+  }
+
+  async removeUserFromGroup(actorUserId: string, conversationId: string, targetUserId: string) {
+    await this.ensureLiveSender(actorUserId);
+    const actorMenbership = await this.ensureGroupManagementPermission(actorUserId, conversationId);
+
+    if (actorUserId === targetUserId) {
+      throw new BadRequestException('To quit the group click on the leave option');
+    }
+
+    const targetMenbership = await this.prisma.conversationParticipant.findUnique({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId: targetUserId,
+        }
+      }
+    });
+
+    if (!targetMenbership) {
+      throw new NotFoundException('target user is not in this conversation');
+    }
+
+    if (targetMenbership.role === 'OWNER' && actorMenbership.role !== 'OWNER') {
+      throw new ForbiddenException('only the room owner can remove another user');
+    }
+
+    const remainingParticipantsCount = await this.prisma.conversationParticipant.count({
+      where: { conversationId }
+    });
+
+    if (remainingParticipantsCount <= 1) {
+      throw new BadRequestException('cannot remove the last participant');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.conversationParticipant.delete({
+        where: {
+          conversationId_userId: {
+            conversationId,
+            userId: targetUserId
+          }
+        }
+      }),
+      this.prisma.conversation.update({
+        where: { id: conversationId },
+        data: {updatedAt: new Date() },
+      })
+    ]);
+
+    return {
+      message: 'user removed from group',
+      removedUserId: targetUserId
+    }
+  }
+
+  async leaveConversation(userId: string, conversationId: string) {
+    await this.ensureLiveSender(userId);
+
+    const membership = await this.prisma.conversationParticipant.findUnique({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId
+        }
+      },
+      include: {
+        conversation: true,
+      }
+    });
+
+    if (!membership) {
+      throw new ForbiddenException('You are not a participant of this conversation');
+    }
+
+    if (membership.conversation.type !== 'GROUP') {
+      throw new BadRequestException('leave is only supported for group conversation');
+    }
+
+    const participants = await this.prisma.conversationParticipant.findMany({
+      where: { conversationId },
+      orderBy: { joinedAt: 'asc' }
+    });
+
+    if (participants.length <= 1) {
+      throw new BadRequestException('Cannot leave the last participant');
+    }
+
+    const otherParticipants = participants.filter((p) => p.userId !== userId);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.conversationParticipant.delete({
+        where: {
+          conversationId_userId: {
+            conversationId,
+            userId
+          }
+        }
+      });
+
+      if (membership.role === 'OWNER') {
+        const nextOwner = otherParticipants[0];
+
+        await tx.conversationParticipant.update({
+          where: {
+            conversationId_userId: {
+              conversationId,
+              userId: nextOwner.userId
+            }
+          },
+          data: { role: 'OWNER' }
+        });
+      }
+
+      await tx.conversation.update({
+        where: { id: conversationId },
+        data: { updatedAt: new Date() }
+      });
+    });
+
+    return {
+      message: 'left conversation successfully',
+      conversationId
+    };
+  }
+
+  async renameConversation(actorUserId: string, conversationId: string, title: string) {
+    await this.ensureLiveSender(actorUserId);
+    await this.ensureGroupManagementPermission(actorUserId, conversationId);
+
+    const trimmedTitle = title.trim();
+
+    if (!trimmedTitle) {
+      throw new BadRequestException('conversation title cannot be empty');
+    }
+
+    const conversation = await this.prisma.conversation.update({
+      where: { id: conversationId },
+      data: {
+        title: trimmedTitle,
+        updatedAt: new Date()
+      }
+    });
+
+    return {
+      message: 'conversation renamed successfully',
+      conversation
+    }
   }
 
   async listMyConversations(userId: string) {
