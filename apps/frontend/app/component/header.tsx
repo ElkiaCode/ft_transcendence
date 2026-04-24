@@ -7,11 +7,53 @@ import Link from "next/link";
 import { use, useEffect, useState } from "react";
 import isAuth from "./isAuth";
 import "../globals.css";
+import { apiNotify } from "@/lib/api/notify";
 
 // Redirection vers 42
 // Apres login on est rediriger sur le front en recevant un champs "code"
 // On envoie ce code au backend pour obtenir un access token
 // Ca permet au back de get les infos du user et de le connecter
+
+function Notify() {
+  const [res, setRes] = useState("");
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const user = useAuthStore((s) => s.user);
+
+  useEffect(() => {
+    if (openMenuId !== 'friends' || !user) return;
+    loadNotifications();
+  }, [openMenuId, user]);
+
+  const loadNotifications = async () => {
+    try {
+      const data = await apiNotify("Hello, this is a notification!");
+      setRes(data.message || "No notifications");
+    } catch (err: any) {
+      setRes(err.message || "Error loading notifications");
+    }
+  };
+
+  useEffect(() => {
+    if (!user) setRes("");
+  }, [user]);
+
+  return (
+    <div className="relative flex items-center gap-4 ml-4">
+      {user ? (
+        <button
+          className="bg-blue-500 text-white px-6 py-2 rounded-full hover:bg-green-500 transition cursor-pointer"
+          onClick={() => setOpenMenuId(openMenuId === 'N' ? null : 'N')}>
+          Notifications
+        </button>
+      ) : null}
+      {openMenuId === 'N' && (
+        <div className="absolute top-full mt-2 w-128 bg-white border border-gray-200 rounded shadow-lg z-10 left-0 p-2 flex flex-col gap-2 text-sm text-gray-700">
+          <div className="px-4 py-3 text-sm text-gray-600">{res}</div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function FriendInterface({ user }: { user: any }) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -252,6 +294,7 @@ function RegisterModal({ onClose }: { onClose: () => void }) {
 export default function Header() {
   const [showLogin, setShowLogin] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
+  const [res, setRes] = useState("");
 
   const logout = useAuthStore((s) => s.logout);
   const user = useAuthStore((s) => s.user);
@@ -270,18 +313,12 @@ export default function Header() {
             Transcendence
           </Link>
           <FriendInterface user={user} />
+          <Notify />
         </nav>
-
-        {/* RIGHT SIDE */}
         <div className="ml-auto flex items-center gap-4">
-
           {user ? (
             <div className="flex items-center justify-between bg-white px-4 py-2 rounded-full shadow-md border">
-
-              {/* LEFT SIDE */}
               <Link href="/profils" className="flex items-center gap-3">
-
-                {/* avatar */}
                 <div className="w-10 h-10 ColorsS rounded-full flex items-center justify-center overflow-hidden">
                   {user?.profile?.avatarUrl ? (
                     <img
@@ -295,8 +332,6 @@ export default function Header() {
                     </span>
                   )}
                 </div>
-
-                {/* user info */}
                 <div className="flex flex-col">
                   <span className="text-xs text-gray-500">
                     {user?.provider === '42' ? 'Connected with 42' : 'Connected'}
@@ -304,14 +339,9 @@ export default function Header() {
                   <span className="text-sm font-bold">{user.username}</span>
                 </div>
 
-                {/* status dot */}
                 <div className="w-2 h-2 ColorsS rounded-full animate-pulse" />
               </Link>
-
-              {/* vertical separator */}
               <div className="w-px h-8 bg-gray-200 mx-4" />
-
-              {/* RIGHT SIDE */}
               <button
                 onClick={handleLogout}
                 className="text-xs text-gray-500 hover:text-red-500 hover:underline transition-colors"
@@ -320,7 +350,6 @@ export default function Header() {
                   logout
                 </Link>
               </button>
-
             </div>
           ) : (
             <div className="flex flex-col gap-1">
@@ -339,10 +368,8 @@ export default function Header() {
               </button>
             </div>
           )}
-
         </div>
       </header>
-
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
       {showRegister && <RegisterModal onClose={() => setShowRegister(false)} />}
     </>

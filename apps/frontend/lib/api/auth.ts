@@ -224,8 +224,11 @@ export async function apiGetMe() {
       ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     },
   });
+  const data = await res.json();
   if (!res.ok) return null;
-  return res.json();
+  useAuthStore.getState().setUser(data);
+  useAuthStore.getState().setAccessToken(data.accessToken);
+  return data;
 }
 
 export async function apiUpdateProfile(displayName?: string, bio?: string) {

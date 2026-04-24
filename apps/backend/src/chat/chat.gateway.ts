@@ -145,6 +145,12 @@ export class ChatGateway implements OnGatewayConnection {
     );
 
     await this.emitMessageCreated(body.conversationId, message);
+    /*await this.emitNotificationCreated(body.conversationId, {
+      id: message.id,
+      type: 'message',
+      content: `New message from ${socketUser.username}`,
+      link: `/chat/${body.conversationId}`,
+    });*/
 
     return {
       ok: true,
