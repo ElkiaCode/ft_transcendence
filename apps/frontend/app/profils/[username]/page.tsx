@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { apiGetUserByUsername } from "@/lib/api/auth";
+import { useAuthStore } from "@/store/authStore";
 
 function HelloWorldBackground() {
   const items = useMemo(() =>
@@ -41,15 +42,25 @@ function Section() {
   const { username } = useParams<{ username: string }>();
   const [user, setUser] = useState<any>(null);
   const [notFound, setNotFound] = useState(false);
+  const currentUser = useAuthStore((state) => state.user);
 
   useEffect(() => {
     async function loadUser() {
+      if (!currentUser) return;
       const data = await apiGetUserByUsername(username);
       if (!data) setNotFound(true);
       else setUser(data);
     }
     loadUser();
   }, [username]);
+
+  if (!currentUser) {
+    return (
+      <section className="flex-1 flex items-center justify-center relative z-10">
+        <p className="text-white text-xl">You must be logged in to view this profile.</p>
+      </section>
+    );
+  }
 
   if (notFound) {
     return (
