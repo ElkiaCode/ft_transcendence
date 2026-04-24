@@ -9,7 +9,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 BASE_URL = 'https://localhost/api'
 
 class User:
-    def __init__(self, email, username, password):
+    def __init__(self, email: str, username: str, password: str):
         self.email = email
         self.username = username
         self.cookies = f"cookie_{username}.txt"
@@ -128,15 +128,16 @@ class User:
         if result.returncode != 0:
             print(f"{self.username}: success: false")
             print("stderr:", result.stderr)
-            return
+            return False
 
         if "UPDATE 1" in result.stdout:
             print(f"{self.username}: success: true\n")
         else:
             print(f"{self.username}: success: false\n")
             print("stdout:", result.stdout)
+            return False
         
-        return result
+        return True
 
 
     def eraseDataPassword(self):
@@ -322,7 +323,7 @@ class User:
         return response
 
 
-    def upload_avatar(self, filepath):
+    def upload_avatar(self, filepath: str):
         with open(filepath, "rb") as f:
             response = requests.patch(
             f"{BASE_URL}/users/update/avatar",
@@ -372,9 +373,11 @@ class User:
 
             print(f"{self.username}: {response.json()}\n")
 
-        return response
+        return len(self.conversation)
+
 
     def sendMessageConversation(self, message: str):
+        
         for i in range(len(self.conversation)) :
             response = requests.post(
                 f"{BASE_URL}/chat/conversations/{self.conversation[i]}/messages",
@@ -384,9 +387,11 @@ class User:
             )
 
             print(f"{self.username}: {response.json()}\n")
-        self.message.append(message)
+        if len(self.conversation) != 0:     #added a condition to avoid a difference
+            self.message.append(message)    #between database and python list
+            
+        return message
 
-        return response
         
     def getMyNotifications(self):
         response = requests.get(
@@ -421,11 +426,11 @@ class User:
 
         return response
 
-    def reportCreationForUser(self, userTarget):
+    def reportCreationForUser(self, userTarget, reason: str):
         response = requests.post(
             f"{BASE_URL}/moderation/reports",
             headers = { "Authorization": f"Bearer {self.accessToken}"},
-            json = { "targetType": userTarget.role, "targetUserId": userTarget.id, "reason": "spam and abusive content"},
+            json = { "targetType": userTarget.role, "targetUserId": userTarget.id, "reason": reason},
             verify = False,
         )
 
@@ -459,7 +464,7 @@ class User:
         return response
 
 
-    def reviewReport(self, action, note):
+    def reviewReport(self, action: str, note: str):
         response = requests.get(
             f"{BASE_URL}/moderation/reports",
             headers = { "Authorization": f"Bearer {self.accessToken}"},
