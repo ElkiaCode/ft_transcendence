@@ -41,13 +41,13 @@ function Notify() {
     <div className="relative flex items-center gap-4 ml-4">
       {user ? (
         <button
-          className="bg-blue-500 text-white px-6 py-2 rounded-full hover:bg-green-500 transition cursor-pointer"
+          className="bg-green-500 text-white px-6 py-2 rounded-full hover:bg-pink-500 transition cursor-pointer"
           onClick={() => setOpenMenuId(openMenuId === 'N' ? null : 'N')}>
-          Notifications
+          <img src="/notif.png" alt="42" width={24} height={24} />
         </button>
       ) : null}
       {openMenuId === 'N' && (
-        <div className="absolute top-full mt-2 w-128 bg-white border border-gray-200 rounded shadow-lg z-10 left-0 p-2 flex flex-col gap-2 text-sm text-gray-700">
+        <div className="absolute top-full left-0 mt-2 w-96 bg-white text-black rounded shadow-lg text-sm text-gray-700 -translate-x-40 z-10 p-2">
           <div className="px-4 py-3 text-sm text-gray-600">{res}</div>
         </div>
       )}
@@ -129,7 +129,7 @@ function FriendInterface({ user }: { user: any }) {
                         <button
                           onClick={handleDecline(friend.id)}
                           className="w-6 h-6 rounded-full flex items-center justify-center text-white font-bold cursor-pointer">
-                            <img src="/remove.svg" alt="42" width={24} height={24} />
+                            <img src="/remove.png" alt="42" width={24} height={24} />
                         </button>
                       </div>
                     </div>
@@ -207,7 +207,7 @@ function LoginModal({ onClose }: { onClose: () => void }) {
           className="w-full border border-gray-300 flex items-center justify-center gap-3 p-2 rounded hover:bg-gray-50 cursor-pointer"
         >
           <span className="text-black text-sm font-medium">Continue with</span>
-          <img src="/42_Logo.svg" alt="42" width={24} height={24} />
+          <img src="/42_Logo.png" alt="42" width={24} height={24} />
         </button>
         <div className="flex items-center gap-3 my-4">
           <div className="flex-1 h-px bg-gray-200" />
@@ -313,9 +313,9 @@ export default function Header() {
             Transcendence
           </Link>
           <FriendInterface user={user} />
-          <Notify />
         </nav>
         <div className="ml-auto flex items-center gap-4">
+          <Notify />
           {user ? (
             <div className="flex items-center justify-between bg-white px-4 py-2 rounded-full shadow-md border">
               <Link href="/profils" className="flex items-center gap-3">

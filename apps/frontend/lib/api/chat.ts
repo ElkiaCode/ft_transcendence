@@ -62,3 +62,24 @@ export async function apiSendMessage(conversationId: string, content: string) {
 
   return res.json();
 }
+
+export async function apiReportMessage(messageId: string , userId: string, reason: string) {
+  const token = useAuthStore.getState().accessToken;
+  const res = await fetch(`${API_URL}/moderation/reports`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      targetType: 'MESSAGE',
+      targetMessageId: messageId,
+      targetUserId: userId,
+      reason,
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || "Failed to report message");
+
+  return data;
+}

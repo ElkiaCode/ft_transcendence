@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { addFriendRequest, apiSearchUsers, blockUser, unblockUser } from "@/lib/api/auth";
-import { apiGetConversations, apiGetMessages, createOrGetDirectConversation } from "@/lib/api/chat";
+import { apiGetConversations, apiGetMessages, apiReportMessage, createOrGetDirectConversation } from "@/lib/api/chat";
 import { useAuthStore } from "@/store/authStore";
 import { Socket } from "socket.io-client";
 import { getChatSocket, resetChatSocket } from "@/lib/socket/chat-socket";
@@ -23,6 +23,42 @@ interface Conversation {
   avatarUrl?: string | null;
   lastMessage?: string | null;
   unreadCount?: number;
+}
+
+function ReportModal({
+  onSubmit,
+  onClose,
+}: {
+  onSubmit: (reason: string) => void;
+  onClose: () => void;
+}) {
+  const [reason, setReason] = useState("");
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+      <div className="bg-white rounded-xl p-6 w-96 flex flex-col gap-4 shadow-xl">
+        <h2 className="text-lg font-bold text-gray-900">Report message</h2>
+        <textarea
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="Describe the reason (5 to 1000 characters)..."
+          className="border border-gray-300 rounded-lg p-3 text-sm text-black resize-none h-32 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+        <div className="flex gap-2 justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-full text-black hover:bg-gray-100 transition cursor-pointer">
+            Cancel
+          </button>
+          <button
+            onClick={() => onSubmit(reason)}
+            disabled={reason.trim().length < 5}
+            className="px-4 py-2 rounded-full bg-red-500 text-white hover:bg-red-600 cursor-pointer transition disabled:opacity-40 disabled:cursor-not-allowed">
+            Report
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function SidebarSearch({
@@ -165,6 +201,7 @@ function ChatPanel({
   bottomRef,
   onInputChange,
   onSend,
+  onReport,
 }: {
   selectedConv: Conversation | null;
   messages: any[];
@@ -173,6 +210,7 @@ function ChatPanel({
   bottomRef: React.RefObject<HTMLDivElement | null>;
   onInputChange: (value: string) => void;
   onSend: () => void;
+  onReport: (messageId: string, userId: string) => void;
 }) {
   return (
     <div className="flex-1 flex flex-col h-full">
@@ -186,8 +224,19 @@ function ChatPanel({
                   {!isMe && (
                     <span className="text-xs text-gray-500 mb-1 ml-1">{msg.sender.username}</span>
                   )}
-                  <div className={`px-3 py-2 rounded-lg text-sm ${isMe ? "bg-blue-500 text-white self-end" : "bg-gray-300 text-black"}`}>
-                    {msg.content}
+                  <div className="flex items-end gap-1">
+                    <div className={`px-3 py-2 rounded-lg text-sm ${isMe ? "bg-blue-500 text-white self-end" : "bg-gray-300 text-black"}`}>
+                      {msg.content}
+                    </div>
+                    {!isMe && (
+                      <button
+                        onClick={() => onReport(msg.id , msg.sender.id)}
+                        className="text-gray-400 hover:text-red-500 text-xs transition mb-1"
+                        title="Report message"
+                      >
+                        ⚑
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -229,6 +278,7 @@ function Section() {
   const [selectedConv, setSelectedConv] = useState<Conversation | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const [menu, setMenu] = useState<{ user: SearchUser; x: number; y: number } | null>(null);
+  const [reportModal, setReportModal] = useState<{ messageId: string, userId: string } | null>(null);
 
   useEffect(() => {
     const handleClick = () => setMenu(null);
@@ -374,6 +424,15 @@ useEffect(() => {
   };
 }, [selectedConv]);
 
+const handleReport = async (messageId: string, userId: string, reason: string) => {
+  try {
+    await apiReportMessage(messageId, userId, reason);
+    setReportModal(null);
+  } catch (err) {
+    console.error("Failed to report:", err);
+  }
+};
+
   return (
     <section className="flex flex-1 h-full relative">
       <SidebarSearch
@@ -398,6 +457,12 @@ useEffect(() => {
           onUnblock={(id) => { unblockUser(id); setMenu(null); }}
         />
       )}
+      {reportModal && (
+        <ReportModal
+          onSubmit={(reason) => handleReport(reportModal.messageId, reportModal.userId, reason)}
+          onClose={() => setReportModal(null)}
+        />
+      )}
       <ChatPanel
         selectedConv={selectedConv}
         messages={messages}
@@ -406,6 +471,7 @@ useEffect(() => {
         bottomRef={bottomRef}
         onInputChange={setMessageInput}
         onSend={handleSend}
+        onReport={(messageId, userId) => setReportModal({ messageId, userId })}
       />
     </section>
   );

@@ -34,6 +34,7 @@ def test_unit():
     print("toto is registering into the app:\n")
     toto.register()
 
+
     print("guillaume se login\n")
     guillaume.login()
     print("yann se login\n")
@@ -43,72 +44,76 @@ def test_unit():
     print("toto se login\n")
     toto.login()  
 
-    print("guillaume regarde les report avec les droit necessaire\n")
-    guillaume.listReport()
+    clement.promoteAdmin()
 
-    print("Guillaume as admin promotes toto as moderator\n")
-    guillaume.promoteUserToModerator(toto)
+    full_database_audit()
 
-    print("Guillaume cree une conversation avec yann\n")
-    guillaume.createOrGetDirectConversation(yann)
+    # print("guillaume regarde les report avec les droit necessaire\n")
+    # guillaume.listReport()
 
-    print("Guillaume regarde toute ces conversation\n")
-    guillaume.getMyConversation()
+    # print("Guillaume as admin promotes toto as moderator\n")
+    # guillaume.promoteUserToModerator(toto)
 
-    print("guillaume envoie un message a la conversation entre lui et yann\n")
-    guillaume.sendMessageConversation("salut yann!")
+    # print("Guillaume cree une conversation avec yann\n")
+    # guillaume.createOrGetDirectConversation(yann)
 
-    print("Guillaume regarde de ses message de ses conversation\n")
-    guillaume.getMessageConversation()
+    # print("Guillaume regarde toute ces conversation\n")
+    # guillaume.getMyConversation()
 
-    print("guillaume report yann\n")
-    guillaume.reportCreationForUser(yann)
+    # print("guillaume envoie un message a la conversation entre lui et yann\n")
+    # guillaume.sendMessageConversation("salut yann!")
 
-    print("guillaume regarde tous les report mais n'a pas les droit\n")
-    guillaume.listReport()
+    # print("Guillaume regarde de ses message de ses conversation\n")
+    # guillaume.getMessageConversation()
 
-    print("guillaume promoted to admin\n")
-    guillaume.promoteAdmin()
-    guillaume.refreshCookie()
+    # print("guillaume report yann\n")
+    # guillaume.reportCreationForUser(yann)
+
+    # print("guillaume regarde tous les report mais n'a pas les droit\n")
+    # guillaume.listReport()
+
+    # print("guillaume promoted to admin\n")
+    # guillaume.promoteAdmin()
+    # guillaume.refreshCookie()
     
-    print("guillaume regarde les report avec les droit necessaire\n")
-    guillaume.listReport()
+    # print("guillaume regarde les report avec les droit necessaire\n")
+    # guillaume.listReport()
 
-    print("Guillaume as admin promotes toto as moderator\n")
-    guillaume.promoteUserToModerator(toto)
-    toto.refreshCookie()
+    # print("Guillaume as admin promotes toto as moderator\n")
+    # guillaume.promoteUserToModerator(toto)
+    # toto.refreshCookie()
 
-    print("Toto(moderator) bans Clement(toto.refreshCookie()user)\n")
-    toto.banUser(clement)
+    # print("Toto(moderator) bans Clement(toto.refreshCookie()user)\n")
+    # toto.banUser(clement)
 
-    print("Guillaume as admin tries to promote clement(user, banned) as moderator\n")
-    guillaume.promoteUserToModerator(clement)
+    # print("Guillaume as admin tries to promote clement(user, banned) as moderator\n")
+    # guillaume.promoteUserToModerator(clement)
 
-    print("toto (moderator) tries to promote clement(user, banned) to moderator\n")
-    toto.promoteUserToModerator(clement)  
+    # print("toto (moderator) tries to promote clement(user, banned) to moderator\n")
+    # toto.promoteUserToModerator(clement)  
 
-    print("Guillaume as admin tries to unpromote clement(user, banned) to user\n")
-    guillaume.unPromoteModeratorToUser(clement)
+    # print("Guillaume as admin tries to unpromote clement(user, banned) to user\n")
+    # guillaume.unPromoteModeratorToUser(clement)
 
-    print("Clement (user, banned) tries to promote yann as moderator\n")
-    clement.promoteUserToModerator(yann)
+    # print("Clement (user, banned) tries to promote yann as moderator\n")
+    # clement.promoteUserToModerator(yann)
 
-    print("yann(user) tries to unban clement(user, banned)\n")
-    yann.unbanUser(clement)
+    # print("yann(user) tries to unban clement(user, banned)\n")
+    # yann.unbanUser(clement)
 
-    print("toto(moderator) unbans clement(user, banned)\n")
-    toto.unbanUser(clement)
+    # print("toto(moderator) unbans clement(user, banned)\n")
+    # toto.unbanUser(clement)
     
-    print("Guillaume as admin unpromotes toto(moderator) to user\n")
-    guillaume.unPromoteModeratorToUser(toto)
-    toto.refreshCookie()  
+    # print("Guillaume as admin unpromotes toto(moderator) to user\n")
+    # guillaume.unPromoteModeratorToUser(toto)
+    # toto.refreshCookie()  
 
     print("guillaume efface toutes ses donnees\n")
     guillaume.eraseDataPassword()
     print("yann efface toutes ses donnees\n")
     yann.eraseDataPassword()
-    print("clement efface toutes ses donnees\n")
-    clement.eraseDataPassword()
+    #print("clement efface toutes ses donnees\n")
+    #clement.eraseDataPassword()
     print("toto efface toutes ses donnees\n")
     toto.eraseDataPassword()
 
@@ -121,5 +126,5 @@ def test_unit():
     if (os.path.exists(toto.cookies)):
         os.remove(toto.cookies)
 
-# test_unit()
+test_unit()
 
