@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Patch, UploadedFile, UseInterceptors, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Patch, UploadedFile, UseInterceptors, Query, Param } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -6,6 +6,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/types/jwt-payload.type';
 import { EraseMyDataDto } from 'src/auth/dto/erase-my-data.dto';
 import { UpdateProfileDto } from './dto/dto';
+import { UpdatePasswordDto } from './dto/update-password.dto';
 
 @Controller('users')
 export class UsersController {
@@ -59,5 +60,22 @@ export class UsersController {
   ) {
     return this.usersService.eraseMyData(user.sub, dto);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('update/password')
+  async updatePassword(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: UpdatePasswordDto,
+  ) {
+    return this.usersService.updatePassword(user.sub, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':username')
+  getUserByUsername(@Param('username') username: string) {
+    return this.usersService.getUserByUsername(username);
+  }
 }
+
+
 
