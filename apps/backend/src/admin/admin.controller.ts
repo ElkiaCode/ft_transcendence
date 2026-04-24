@@ -28,4 +28,22 @@ export class AdminController {
   ) {
     return this.adminService.unbanUser(id, actor.sub);
   }
+
+  @Post('users/:id/promote')
+  @Roles('ADMIN')
+  promoteUserToModerator(
+    @Param('id') id: string,
+    @CurrentUser() actor: JwtPayload,
+  ) {
+    return this.adminService.promoteUserToModerator(id, actor.sub);
+  }
+
+  @Post('users/:id/unpromote')
+  @Roles('ADMIN')
+  unpromoteModeratorToUser(
+    @Param('id') id: string,
+    @CurrentUser() actor: JwtPayload,
+  ) {
+    return this.adminService.unpromoteModeratorToUser(id, actor.sub);
+  }
 }

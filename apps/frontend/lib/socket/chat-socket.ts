@@ -2,7 +2,7 @@ import { io, Socket } from 'socket.io-client';
 
 let socket: Socket | null = null;
 
-export function getChatSocket(accessToken: string) {
+export function getChatSocket(accessToken: string | null): Socket {
   if (!socket) {
     socket = io('https://localhost/chat', {
       auth: {

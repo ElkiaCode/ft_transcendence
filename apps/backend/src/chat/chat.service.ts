@@ -153,33 +153,60 @@ export class ChatService {
   }
 
   async listMyConversations(userId: string) {
-    return this.prisma.conversation.findMany({
-      where: {
-        participants: {
-          some: { userId },
-        },
+  const conversations = await this.prisma.conversation.findMany({
+    where: {
+      participants: {
+        some: { userId },
       },
-      include: {
-        participants: {
-          include: {
-            user: {
-              include: { profile: true },
-            },
-          },
-        },
-        messages: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          include: {
-            sender: {
-              include: { profile: true },
-            },
+    },
+    include: {
+      participants: {
+        include: {
+          user: {
+            include: { profile: true },
           },
         },
       },
-      orderBy: { updatedAt: 'desc' },
-    });
-  }
+      messages: {
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+        include: {
+          sender: {
+            include: { profile: true },
+          },
+        },
+      },
+    },
+    orderBy: { updatedAt: 'desc' },
+  });
+
+  return conversations.map((conv) => {
+    const otherUser = conv.participants.find(
+      (p) => p.userId !== userId
+    )?.user;
+
+    const lastMessage = conv.messages[0];
+
+    return {
+      id: conv.id,
+      type: conv.type === 'DIRECT' ? 'dm' : 'group',
+
+      name:
+        conv.type === 'DIRECT'
+          ? otherUser?.username
+          : 'Group chat',
+
+      avatarUrl:
+        conv.type === 'DIRECT'
+          ? otherUser?.profile?.avatarUrl ?? null
+          : null,
+
+      lastMessage: lastMessage?.content ?? null,
+
+      unreadCount: 0,
+    };
+  });
+}
 
   async listMessages(userId: string, conversationId: string) {
     await this.ensureConversationMembership(userId, conversationId);

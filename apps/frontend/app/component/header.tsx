@@ -179,7 +179,7 @@ function LoginModal({ onClose }: { onClose: () => void }) {
           onChange={e => setEmail(e.target.value)}/>
         <input
           className="border text-black w-full p-2 mt-2"
-          placeholder="password"
+          placeholder="Password"
           type="password"
           value={password}
           onChange={e => setPassword(e.target.value)}/>
@@ -266,9 +266,14 @@ export default function Header() {
       <header className="bg-gray-200 text-black p-4 flex items-center">
         
         <nav className="flex gap-12 font-bold mx-4">
-          <Link className="text-3xl font-bold" href="/">
-            Transcendence
-          </Link>
+          <div className="flex flex-col">
+            <Link className="text-3xl font-bold" href="/">
+              Transcendence
+            </Link>
+            <Link className="text-sm font-normal text-gray-500 hover:underline" href="/rgpd">
+              Privacy Policy
+            </Link>
+          </div>
           <FriendInterface user={user} />
         </nav>
 
