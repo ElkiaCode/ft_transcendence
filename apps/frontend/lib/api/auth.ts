@@ -286,3 +286,20 @@ export async function apiUpdatePassword(currentPassword: string, newPassword: st
   if (!res.ok) throw new Error(data.message || 'Error updating password');
   return data;
 }
+
+export async function apiPromoteUser(userId: string) {
+  const token = useAuthStore.getState().accessToken;
+
+  const res = await fetch(`${API_URL}/admin/users/${userId}/promote`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || "Error promoting user");
+  return data;
+}
