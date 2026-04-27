@@ -5,6 +5,8 @@ import { CreateGroupConversationDto } from './dto/create-group-conversation.dto'
 
 @Injectable()
 export class ChatService {
+  private readonly positiveReactionPointValue = 5;
+
   constructor(private readonly prisma: PrismaService) {}
 
   private async ensureGroupConversationExists(conversationId: string) {
@@ -195,7 +197,7 @@ export class ChatService {
     return { actor, target };
   }
 
-  private async ensureConversationMembership(userId: string, conversationId: string) {
+  async ensureConversationMembership(userId: string, conversationId: string) {
     const membership = await this.prisma.conversationParticipant.findFirst({
       where: {
         conversationId,
@@ -595,10 +597,370 @@ export class ChatService {
         sender: {
           include: { profile: true },
         },
+        reads: {
+          include: {
+            user: {
+              include: { profile: true },
+            },
+          },
+          orderBy: { readAt: 'asc' },
+        },
+        reactions: {
+          include: {
+            user: {
+              include: { profile: true },
+            },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
       },
       orderBy: { createdAt: 'asc' },
       take: 100,
     });
+  }
+
+  async listMembers(userId: string, conversationId: string) {
+    await this.ensureConversationMembership(userId, conversationId);
+
+    const participants = await this.prisma.conversationParticipant.findMany({
+      where: { conversationId },
+      include: {
+        user: {
+          include: { profile: true },
+        },
+      },
+      orderBy: { joinedAt: 'asc' },
+    });
+
+    return participants.map((participant) => ({
+      id: participant.id,
+      userId: participant.userId,
+      role: participant.role,
+      joinedAt: participant.joinedAt,
+      user: {
+        id: participant.user.id,
+        username: participant.user.username,
+        displayName:
+          participant.user.profile?.displayName ?? participant.user.username,
+        avatarUrl: participant.user.profile?.avatarUrl ?? null,
+      },
+    }));
+  }
+
+  async editMessage(
+    userId: string,
+    conversationId: string,
+    messageId: string,
+    content: string,
+  ) {
+    await this.ensureLiveSender(userId);
+    await this.ensureConversationMembership(userId, conversationId);
+
+    const message = await this.prisma.message.findUnique({
+      where: { id: messageId },
+    });
+
+    if (!message || message.conversationId !== conversationId) {
+      throw new NotFoundException('message not found');
+    }
+
+    if (message.senderId !== userId) {
+      throw new ForbiddenException('you can only edit your own messages');
+    }
+
+    if (message.deletedAt) {
+      throw new BadRequestException('deleted messages cannot be edited');
+    }
+
+    await this.ensureLastMessage(conversationId, messageId, 'edit');
+
+    const trimmed = content.trim();
+
+    if (!trimmed) {
+      throw new BadRequestException('message content is empty');
+    }
+
+    return this.prisma.message.update({
+      where: { id: messageId },
+      data: {
+        content: trimmed,
+        isEdited: true,
+      },
+      include: {
+        sender: {
+          include: { profile: true },
+        },
+        reads: {
+          include: {
+            user: {
+              include: { profile: true },
+            },
+          },
+        },
+        reactions: {
+          include: {
+            user: {
+              include: { profile: true },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  async deleteMessage(userId: string, conversationId: string, messageId: string) {
+    await this.ensureLiveSender(userId);
+    await this.ensureConversationMembership(userId, conversationId);
+
+    const message = await this.prisma.message.findUnique({
+      where: { id: messageId },
+    });
+
+    if (!message || message.conversationId !== conversationId) {
+      throw new NotFoundException('message not found');
+    }
+
+    if (message.senderId !== userId) {
+      throw new ForbiddenException('you can only delete your own messages');
+    }
+
+    if (message.deletedAt) {
+      throw new BadRequestException('message already deleted');
+    }
+
+    await this.ensureLastMessage(conversationId, messageId, 'delete');
+
+    return this.prisma.message.update({
+      where: { id: messageId },
+      data: {
+        content: null,
+        deletedAt: new Date(),
+      },
+      include: {
+        sender: {
+          include: { profile: true },
+        },
+        reads: {
+          include: {
+            user: {
+              include: { profile: true },
+            },
+          },
+        },
+        reactions: {
+          include: {
+            user: {
+              include: { profile: true },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  async addMessageReaction(
+    userId: string,
+    conversationId: string,
+    messageId: string,
+    type: 'THUMBS_UP' | 'HEART',
+  ) {
+    await this.ensureLiveSender(userId);
+    await this.ensureConversationMembership(userId, conversationId);
+
+    const message = await this.prisma.message.findUnique({
+      where: { id: messageId },
+      include: {
+        sender: {
+          select: {
+            id: true,
+            username: true,
+            penaltyPoints: true,
+            globalRole: true,
+            isActive: true,
+            isBanned: true,
+          },
+        },
+      },
+    });
+
+    if (!message || message.conversationId !== conversationId) {
+      throw new NotFoundException('message not found');
+    }
+
+    if (message.deletedAt) {
+      throw new BadRequestException('cannot react to a deleted message');
+    }
+
+    if (message.senderId === userId) {
+      throw new BadRequestException('you cannot react to your own message');
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const existingReaction = await tx.messageReaction.findUnique({
+        where: {
+          messageId_userId_type: {
+            messageId,
+            userId,
+            type,
+          },
+        },
+      });
+
+      if (existingReaction) {
+        return {
+          reaction: existingReaction,
+          pointsAwarded: 0,
+          sender: message.sender,
+          senderPromoted: false,
+        };
+      }
+
+      const reaction = await tx.messageReaction.create({
+        data: {
+          messageId,
+          userId,
+          type,
+        },
+      });
+
+      const updatedSender = await tx.user.update({
+        where: { id: message.senderId },
+        data: {
+          penaltyPoints: {
+            increment: this.positiveReactionPointValue,
+          },
+        },
+        select: {
+          id: true,
+          username: true,
+          penaltyPoints: true,
+          globalRole: true,
+          isActive: true,
+          isBanned: true,
+        },
+      });
+
+      let senderPromoted = false;
+      let sender = updatedSender;
+
+      if (
+        updatedSender.penaltyPoints >= 500 &&
+        updatedSender.globalRole === 'USER' &&
+        updatedSender.isActive &&
+        !updatedSender.isBanned
+      ) {
+        sender = await tx.user.update({
+          where: { id: updatedSender.id },
+          data: { globalRole: 'MODERATOR' },
+          select: {
+            id: true,
+            username: true,
+            penaltyPoints: true,
+            globalRole: true,
+            isActive: true,
+            isBanned: true,
+          },
+        });
+        senderPromoted = true;
+      }
+
+      return {
+        reaction,
+        pointsAwarded: this.positiveReactionPointValue,
+        sender,
+        senderPromoted,
+      };
+    });
+
+    return {
+      ...result,
+      messageId,
+      conversationId,
+    };
+  }
+
+  private async ensureLastMessage(
+    conversationId: string,
+    messageId: string,
+    action: 'edit' | 'delete',
+  ) {
+    const lastMessage = await this.prisma.message.findFirst({
+      where: {
+        conversationId,
+        deletedAt: null,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!lastMessage || lastMessage.id !== messageId) {
+      const verb = action === 'edit' ? 'edited' : 'deleted';
+      throw new BadRequestException(`only the last message can be ${verb}`);
+    }
+  }
+
+  async markConversationRead(
+    userId: string,
+    conversationId: string,
+    messageId?: string,
+  ) {
+    await this.ensureLiveSender(userId);
+    await this.ensureConversationMembership(userId, conversationId);
+
+    let createdBeforeOrAt: Date | undefined;
+
+    if (messageId) {
+      const message = await this.prisma.message.findUnique({
+        where: { id: messageId },
+        select: {
+          conversationId: true,
+          createdAt: true,
+        },
+      });
+
+      if (!message || message.conversationId !== conversationId) {
+        throw new NotFoundException('message not found');
+      }
+
+      createdBeforeOrAt = message.createdAt;
+    }
+
+    const messages = await this.prisma.message.findMany({
+      where: {
+        conversationId,
+        senderId: { not: userId },
+        deletedAt: null,
+        ...(createdBeforeOrAt && {
+          createdAt: { lte: createdBeforeOrAt },
+        }),
+      },
+      select: { id: true },
+      take: 500,
+    });
+
+    if (messages.length === 0) {
+      return {
+        conversationId,
+        readCount: 0,
+      };
+    }
+
+    const result = await this.prisma.messageRead.createMany({
+      data: messages.map((message) => ({
+        messageId: message.id,
+        userId,
+      })),
+      skipDuplicates: true,
+    });
+
+    return {
+      conversationId,
+      readCount: result.count,
+    };
   }
 
   async sendMessage(userId: string, conversationId: string, content: string) {

@@ -1,15 +1,39 @@
 import { io, Socket } from 'socket.io-client';
+import { apiRefresh } from '@/lib/api/auth';
+import { useAuthStore } from '@/store/authStore';
 
 let socket: Socket | null = null;
+let isRefreshingSocketToken = false;
+
+const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL ?? 'https://localhost';
 
 export function getChatSocket(accessToken: string | null): Socket {
   if (!socket) {
-    socket = io('https://localhost/chat', {
+    socket = io(`${SOCKET_URL}/chat`, {
       auth: {
         token: accessToken,
       },
       withCredentials: true,
     });
+
+    socket.on('connect_error', async () => {
+      if (isRefreshingSocketToken) return;
+
+      isRefreshingSocketToken = true;
+      try {
+        await apiRefresh();
+        const freshToken = useAuthStore.getState().accessToken;
+
+        if (freshToken && socket) {
+          socket.auth = { token: freshToken };
+          socket.connect();
+        }
+      } finally {
+        isRefreshingSocketToken = false;
+      }
+    });
+  } else {
+    socket.auth = { token: accessToken };
   }
 
   return socket;

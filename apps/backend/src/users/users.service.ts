@@ -236,13 +236,13 @@ export class UsersService {
         if (!passwordOk) {
           throw new BadRequestException('invalid credentials');
         }
-
-        await this.prisma.user.delete({
-          where: { id: userId}
-        });
-
-        return {success: true, message: 'Your account have been erased'};
       }
+
+      await this.prisma.user.delete({
+        where: { id: userId}
+      });
+
+      return {success: true, message: 'Your account have been erased'};
     }
 
     async getMyFriends(userId: string) {
