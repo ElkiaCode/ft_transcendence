@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { addFriendRequest, apiSearchUsers, blockUser, unblockUser } from "@/lib/api/auth";
-import { apiGetConversations, apiGetMessages, createOrGetDirectConversation } from "@/lib/api/chat";
+import { apiAddMessageReaction, apiGetConversations, apiGetMessages, createOrGetDirectConversation } from "@/lib/api/chat";
 import { useAuthStore } from "@/store/authStore";
 import { Socket } from "socket.io-client";
 import { getChatSocket, resetChatSocket } from "@/lib/socket/chat-socket";
@@ -24,6 +24,13 @@ interface Conversation {
   lastMessage?: string | null;
   unreadCount?: number;
 }
+
+type ReactionType = 'THUMBS_UP' | 'HEART';
+
+const reactionIcons: Record<ReactionType, string> = {
+  THUMBS_UP: '/reaction-thumbs-up.svg',
+  HEART: '/reaction-heart.svg',
+};
 
 function SidebarSearch({
   searchQuery,
@@ -162,57 +169,123 @@ function ChatPanel({
   messages,
   messageInput,
   currentUserId,
+  typingUsers,
+  onlineCount,
   bottomRef,
   onInputChange,
   onSend,
+  onEditMessage,
+  onDeleteMessage,
+  onReact,
 }: {
   selectedConv: Conversation | null;
   messages: any[];
   messageInput: string;
   currentUserId: string | undefined;
+  typingUsers: string[];
+  onlineCount: number;
   bottomRef: React.RefObject<HTMLDivElement | null>;
   onInputChange: (value: string) => void;
   onSend: () => void;
+  onEditMessage: (message: any) => void;
+  onDeleteMessage: (message: any) => void;
+  onReact: (message: any, type: ReactionType) => void;
 }) {
   return (
     <div className="flex-1 flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
-        {selectedConv ? (
-          messages.map((msg) => {
-            const isMe = msg.sender.id === currentUserId;
-            return (
-              <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-                <div className="flex flex-col max-w-xs">
-                  {!isMe && (
-                    <span className="text-xs text-gray-500 mb-1 ml-1">{msg.sender.username}</span>
-                  )}
-                  <div className={`px-3 py-2 rounded-lg text-sm ${isMe ? "bg-blue-500 text-white self-end" : "bg-gray-300 text-black"}`}>
-                    {msg.content}
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        ) : (
+      {selectedConv && (
+        <div className="border-b border-gray-200 bg-white px-4 py-2 text-xs text-gray-500">
+          {onlineCount} online
+        </div>
+      )}
+	      <div className="flex-1 overflow-y-auto p-4 space-y-2">
+	        {selectedConv ? (
+            (() => {
+              const lastEditableMessage = [...messages]
+                .reverse()
+                .find((message) => !message.deletedAt);
+
+              return messages.map((msg) => {
+		            const isMe = msg.sender.id === currentUserId;
+		            const isDeleted = Boolean(msg.deletedAt);
+                const canEditOrDelete =
+                  isMe && !isDeleted && lastEditableMessage?.id === msg.id;
+                const reactionCounts = (msg.reactions ?? []).reduce(
+                  (counts: Record<ReactionType, number>, reaction: { type: ReactionType }) => {
+                    counts[reaction.type] = (counts[reaction.type] ?? 0) + 1;
+                    return counts;
+                  },
+                  { THUMBS_UP: 0, HEART: 0 },
+                );
+		            return (
+	              <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
+	                <div className="flex flex-col max-w-xs">
+	                  {!isMe && (
+	                    <span className="text-xs text-gray-500 mb-1 ml-1">{msg.sender.username}</span>
+	                  )}
+	                  <div className={`px-3 py-2 rounded-lg text-sm ${isMe ? "bg-blue-500 text-white self-end" : "bg-gray-300 text-black"} ${isDeleted ? "italic opacity-70" : ""}`}>
+	                    {isDeleted ? "Message deleted" : msg.content}
+	                  </div>
+                    <div className={`mt-1 flex gap-2 text-[11px] text-gray-500 ${isMe ? "justify-end" : "justify-start"}`}>
+                      {msg.isEdited && !isDeleted && <span>edited</span>}
+	                      {canEditOrDelete && (
+	                        <>
+	                          <button onClick={() => onEditMessage(msg)} className="hover:underline">Edit</button>
+                          <button onClick={() => onDeleteMessage(msg)} className="hover:underline">Delete</button>
+                        </>
+                      )}
+	                      {isMe && msg.reads?.length > 0 && <span>seen by {msg.reads.length}</span>}
+	                    </div>
+                    {!isDeleted && (
+                      <div className={`mt-1 flex items-center gap-1 ${isMe ? "justify-end" : "justify-start"}`}>
+                        {(Object.keys(reactionIcons) as ReactionType[]).map((type) => (
+                          <button
+                            key={type}
+                            onClick={() => onReact(msg, type)}
+                            disabled={isMe}
+                            title={type === 'HEART' ? 'Heart' : 'Thumbs up'}
+                            className={`flex h-6 items-center gap-1 rounded-full border border-gray-200 bg-white px-2 text-[11px] shadow-sm transition ${
+                              isMe ? "cursor-not-allowed opacity-60" : "hover:bg-gray-100"
+                            }`}
+                          >
+                            <img src={reactionIcons[type]} alt="" className="h-3.5 w-3.5" />
+                            {reactionCounts[type] > 0 && <span>{reactionCounts[type]}</span>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+		                </div>
+			              </div>
+		            );
+		          });
+            })()
+	        ) : (
           <div className="text-gray-500 text-center mt-10">Select a conversation</div>
         )}
-        <div ref={bottomRef} />
-      </div>
-      {selectedConv && (
-        <div className="border-t border-gray-300 p-4 flex gap-2 items-center bg-white">
-          <input
-            value={messageInput}
-            onChange={(e) => onInputChange(e.target.value)}
+	        <div ref={bottomRef} />
+	      </div>
+	      {selectedConv && (
+	        <div className="border-t border-gray-300 p-4 flex flex-col gap-2 bg-white">
+          {typingUsers.length > 0 && (
+            <p className="text-xs text-gray-500 px-4">
+              {typingUsers.join(", ")} {typingUsers.length === 1 ? "is" : "are"} typing...
+            </p>
+          )}
+          <div className="flex gap-2 items-center">
+	          <input
+	            value={messageInput}
+	            onChange={(e) => onInputChange(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onSend(); } }}
             type="text"
             placeholder="Enter a message..."
             className="flex-1 border border-gray-300 text-black rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          <button onClick={onSend} className="bg-pink-500 text-white px-6 py-2 rounded-full hover:bg-green-500 cursor-pointer transition">
-            Send
-          </button>
-        </div>
-      )}
+	          <button onClick={onSend} className="bg-pink-500 text-white px-6 py-2 rounded-full hover:bg-green-500 cursor-pointer transition">
+	            Send
+	          </button>
+          </div>
+	        </div>
+	      )}
     </div>
   );
 }
@@ -229,6 +302,9 @@ function Section() {
   const [selectedConv, setSelectedConv] = useState<Conversation | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const [menu, setMenu] = useState<{ user: SearchUser; x: number; y: number } | null>(null);
+  const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
+  const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
+  const isTypingRef = useRef(false);
 
   useEffect(() => {
     const handleClick = () => setMenu(null);
@@ -251,13 +327,20 @@ function Section() {
 
   useEffect(() => {
     if (!selectedConv) return;
-    const fetchMessages = async () => {
-      try {
-        const data = await apiGetMessages(selectedConv.id);
-        setMessages(data);
-      } catch (err) {
-        console.error(err);
-        setMessages([]);
+	    const fetchMessages = async () => {
+	      try {
+	        const data = await apiGetMessages(selectedConv.id);
+	        setMessages(data);
+          const lastMessage = data[data.length - 1];
+          if (lastMessage && socketRef.current) {
+            socketRef.current.emit('chat.markRead', {
+              conversationId: selectedConv.id,
+              messageId: lastMessage.id,
+            });
+          }
+	      } catch (err) {
+	        console.error(err);
+	        setMessages([]);
       }
     };
     fetchMessages();
@@ -307,15 +390,100 @@ function Section() {
     }
   };
 
-  const handleSend = async () => {
-    if (!messageInput.trim() || !selectedConv || !socketRef.current) return;
+	  const handleSend = async () => {
+	    if (!messageInput.trim() || !selectedConv || !socketRef.current) return;
 
-    socketRef.current.emit('chat.sendMessage', {
+	    socketRef.current.emit('chat.sendMessage', {
+	      conversationId: selectedConv.id,
+	      content: messageInput,
+	    });
+
+      socketRef.current.emit('chat.typing.stop', {
+        conversationId: selectedConv.id,
+      });
+      isTypingRef.current = false;
+
+	    setMessageInput("");
+	  };
+
+  const handleInputChange = (value: string) => {
+    setMessageInput(value);
+
+    if (!selectedConv || !socketRef.current) return;
+
+    const hasText = value.trim().length > 0;
+
+    if (hasText && !isTypingRef.current) {
+      socketRef.current.emit('chat.typing.start', {
+        conversationId: selectedConv.id,
+      });
+      isTypingRef.current = true;
+    }
+
+    if (!hasText && isTypingRef.current) {
+      socketRef.current.emit('chat.typing.stop', {
+        conversationId: selectedConv.id,
+      });
+      isTypingRef.current = false;
+    }
+  };
+
+  const handleEditMessage = (message: any) => {
+    if (!selectedConv || !socketRef.current) return;
+
+    const nextContent = window.prompt("Edit message", message.content ?? "");
+    if (!nextContent?.trim()) return;
+
+    socketRef.current.emit('chat.editMessage', {
       conversationId: selectedConv.id,
-      content: messageInput,
+      messageId: message.id,
+      content: nextContent,
     });
+  };
 
-    setMessageInput("");
+  const handleDeleteMessage = (message: any) => {
+    if (!selectedConv || !socketRef.current) return;
+    if (!window.confirm("Delete this message?")) return;
+
+    socketRef.current.emit('chat.deleteMessage', {
+      conversationId: selectedConv.id,
+      messageId: message.id,
+    });
+  };
+
+  const handleReact = async (message: any, type: ReactionType) => {
+    if (!selectedConv || message.sender.id === user?.id || message.deletedAt) return;
+
+    try {
+      const result = await apiAddMessageReaction(selectedConv.id, message.id, type);
+
+      setMessages((prev) =>
+        prev.map((item) => {
+          if (item.id !== message.id) return item;
+
+          const reactions = item.reactions ?? [];
+          const alreadyExists = reactions.some(
+            (reaction: any) =>
+              reaction.userId === user?.id && reaction.type === result.reaction.type,
+          );
+
+          if (alreadyExists) return item;
+
+          return {
+            ...item,
+            reactions: [
+              ...reactions,
+              {
+                ...result.reaction,
+                userId: user?.id,
+              },
+            ],
+          };
+        }),
+      );
+    } catch (err) {
+      console.error("Failed to react:", err);
+    }
   };
 
 useEffect(() => {
@@ -342,6 +510,79 @@ useEffect(() => {
     });
   });
 
+  socket.on('chat.message.updated', (msg) => {
+    setMessages((prev) => prev.map((item) => item.id === msg.id ? msg : item));
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === msg.conversationId
+          ? { ...c, lastMessage: msg.content }
+          : c
+      )
+    );
+  });
+
+  socket.on('chat.message.deleted', (msg) => {
+    setMessages((prev) => prev.map((item) => item.id === msg.id ? msg : item));
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === msg.conversationId
+          ? { ...c, lastMessage: "Message deleted" }
+          : c
+      )
+    );
+  });
+
+  socket.on('chat.conversation.read', (payload) => {
+    if (payload?.userId === user.id) return;
+
+    setMessages((prev) =>
+      prev.map((msg) => {
+        if (msg.sender.id !== user.id || msg.deletedAt) return msg;
+        if (payload?.messageId && msg.id !== payload.messageId) return msg;
+
+        const reads = msg.reads ?? [];
+        if (reads.some((read: any) => read.userId === payload.userId)) return msg;
+
+        return {
+          ...msg,
+          reads: [
+            ...reads,
+            {
+              userId: payload.userId,
+              readAt: new Date().toISOString(),
+            },
+          ],
+        };
+      })
+    );
+  });
+
+  socket.on('chat.typing', (payload) => {
+    if (!payload?.userId || payload.userId === user.id) return;
+
+    setTypingUsers((prev) => {
+      const next = { ...prev };
+      if (payload.isTyping) next[payload.userId] = payload.username ?? "Someone";
+      else delete next[payload.userId];
+      return next;
+    });
+  });
+
+  socket.on('presence.changed', (payload) => {
+    if (!payload?.userId) return;
+
+    setOnlineUserIds((prev) => {
+      const next = new Set(prev);
+      if (payload.isOnline) next.add(payload.userId);
+      else next.delete(payload.userId);
+      return next;
+    });
+  });
+
+  socket.emit('presence.list', {}, (payload: { onlineUserIds?: string[] }) => {
+    setOnlineUserIds(new Set(payload?.onlineUserIds ?? []));
+  });
+
   socket.on('chat.conversation.created', (conv) => {
     setConversations((prev) => {
       const exists = prev.find((c) => c.id === conv.id);
@@ -352,6 +593,11 @@ useEffect(() => {
 
   return () => {
     socket.off('chat.message.created');
+    socket.off('chat.message.updated');
+    socket.off('chat.message.deleted');
+    socket.off('chat.conversation.read');
+    socket.off('chat.typing');
+    socket.off('presence.changed');
     socket.off('chat.conversation.created');
   };
 }, [user]);
@@ -367,9 +613,12 @@ useEffect(() => {
   const socket = socketRef.current;
   if (!socket || !selectedConv) return;
 
+  setTypingUsers({});
   socket.emit('chat.joinConversation', { conversationId: selectedConv.id });
 
   return () => {
+    socket.emit('chat.typing.stop', { conversationId: selectedConv.id });
+    isTypingRef.current = false;
     socket.emit('chat.leaveConversation', { conversationId: selectedConv.id });
   };
 }, [selectedConv]);
@@ -400,13 +649,18 @@ useEffect(() => {
       )}
       <ChatPanel
         selectedConv={selectedConv}
-        messages={messages}
-        messageInput={messageInput}
-        currentUserId={user?.id}
-        bottomRef={bottomRef}
-        onInputChange={setMessageInput}
-        onSend={handleSend}
-      />
+	        messages={messages}
+	        messageInput={messageInput}
+	        currentUserId={user?.id}
+          typingUsers={Object.values(typingUsers)}
+          onlineCount={onlineUserIds.size}
+	        bottomRef={bottomRef}
+	        onInputChange={handleInputChange}
+          onSend={handleSend}
+          onEditMessage={handleEditMessage}
+          onDeleteMessage={handleDeleteMessage}
+          onReact={handleReact}
+	      />
     </section>
   );
 }

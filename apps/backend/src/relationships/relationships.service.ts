@@ -190,7 +190,7 @@ export class RelationshipsService {
     });
 
     return request.map((request) => ({
-      FriendshiptId: request.id,
+      friendshipId: request.id,
       createdAt: request.createdAt,
       user: {
         id: request.requester.id,
@@ -222,7 +222,7 @@ export class RelationshipsService {
         id: request.addressee.id,
         username: request.addressee.username,
         displayName: request.addressee.profile?.displayName ?? request.addressee.username,
-        avatarUtl: request.addressee.profile?.avatarUrl ?? null
+        avatarUrl: request.addressee.profile?.avatarUrl ?? null
       }
     }))
   }

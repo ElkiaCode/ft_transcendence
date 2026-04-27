@@ -7,6 +7,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/types/jwt-payload.type';
 import { CreateReportDto } from './dto/create-report.dto';
 import { ReviewReportDto } from './dto/review-report.dto';
+import { AdjustPenaltyPointsDto } from './dto/adjust-penalty-points.dto';
 
 @Controller('moderation')
 @UseGuards(JwtAuthGuard)
@@ -46,6 +47,23 @@ export class ModerationController {
       user.sub,
       reportId,
       dto.action,
+      dto.note,
+      dto.penaltyPointsToSubtract,
+    );
+  }
+
+  @Post('users/:id/points')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN', 'MODERATOR')
+  adjustPenaltyPoints(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') targetUserId: string,
+    @Body() dto: AdjustPenaltyPointsDto,
+  ) {
+    return this.moderationService.adjustPenaltyPoints(
+      user.sub,
+      targetUserId,
+      dto.points,
       dto.note,
     );
   }
