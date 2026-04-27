@@ -343,8 +343,10 @@ class User:
             headers = { "Authorization": f"Bearer {self.accessToken}" },
             verify = False
         )
-        self.conversation.append(response.json()['id'])
-        secondUser.conversation.append(response.json()['id'])
+
+        if (response.status_code == 200 or response.status_code == 201):
+            self.conversation.append(response.json()['id'])
+            secondUser.conversation.append(response.json()['id'])
 
         print(f"{self.username}: {response.json()}\n")
 
@@ -357,7 +359,7 @@ class User:
             headers = { "Authorization": f"Bearer {self.accessToken}" },
             verify = False
         )
-
+    
         print(f"{self.username}: {response.json()}\n")
 
         return response
@@ -370,8 +372,6 @@ class User:
                 headers = { "Authorization": f"Bearer {self.accessToken}" },
                 verify = False
             )
-
-            print(f"{self.username}: {response.json()}\n")
 
         return len(self.conversation)
 

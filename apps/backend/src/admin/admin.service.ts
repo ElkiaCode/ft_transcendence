@@ -107,7 +107,7 @@ export class AdminService {
         }
 
         if (promoteUser.globalRole !== 'USER') {
-            throw new BadRequestException("his Role is not USER");
+            throw new BadRequestException("promotee is not USER");
         }
 
         if (promoteUser.isBanned === true) {
@@ -154,11 +154,11 @@ export class AdminService {
         }
 
         if (unpromoteModerator.globalRole !== 'MODERATOR') {
-            throw new BadRequestException("his Role is not MODERATOR");
+            throw new BadRequestException("promotee is not MODERATOR");
         }
 
         if (unpromoteModerator.isBanned === true) {
-            throw new BadRequestException("user is banned");
+            throw new BadRequestException("moderator is banned");
         }
 
         const updateUser = await this.prisma.user.update({
