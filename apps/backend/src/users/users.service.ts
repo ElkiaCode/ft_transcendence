@@ -77,6 +77,46 @@ export class UsersService {
       }));
     }
 
+    async getTopPositivePointUsers() {
+      const users = await this.prisma.user.findMany({
+        where: {
+          penaltyPoints: { gt: 0 },
+          isActive: true,
+          isBanned: false,
+        },
+        select: {
+          id: true,
+          username: true,
+          globalRole: true,
+          penaltyPoints: true,
+          profile: {
+            select: {
+              displayName: true,
+              avatarUrl: true,
+            },
+          },
+        },
+        orderBy: [
+          { penaltyPoints: 'desc' },
+          { username: 'asc' },
+        ],
+        take: 10,
+      });
+
+      return users.map((user) => ({
+        id: user.id,
+        username: user.username,
+        globalRole: user.globalRole,
+        penaltyPoints: user.penaltyPoints,
+        profile: user.profile
+          ? {
+              displayName: user.profile.displayName,
+              avatarUrl: user.profile.avatarUrl,
+            }
+          : null,
+      }));
+    }
+
     async updateProfile(userId: string, dto: UpdateProfileDto) {
         const user = await this.prisma.user.findUnique({
           where: { id: userId },
@@ -316,4 +356,3 @@ export class UsersService {
     };
   }
 }
-
