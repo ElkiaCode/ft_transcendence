@@ -34,6 +34,12 @@ export class UsersController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('top-positive-points')
+  getTopPositivePointUsers() {
+    return this.usersService.getTopPositivePointUsers();
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Patch('update/profile')
   async updateProfile(
     @CurrentUser() user: JwtPayload,
@@ -76,6 +82,5 @@ export class UsersController {
     return this.usersService.getUserByUsername(username);
   }
 }
-
 
 
