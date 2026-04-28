@@ -9,7 +9,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 BASE_URL = 'https://localhost/api'
 
 class User:
-    def __init__(self, email, username, password):
+    def __init__(self, email: str, username: str, password: str):
         self.email = email
         self.username = username
         self.cookies = f"cookie_{username}.txt"
@@ -17,7 +17,6 @@ class User:
         self.id = ''
         self.accessToken = ''
         self.role = ''
-        self.conversation = []
         self.message = []
         self.notification = []
 
@@ -128,15 +127,16 @@ class User:
         if result.returncode != 0:
             print(f"{self.username}: success: false")
             print("stderr:", result.stderr)
-            return
+            return False
 
         if "UPDATE 1" in result.stdout:
             print(f"{self.username}: success: true\n")
         else:
             print(f"{self.username}: success: false\n")
             print("stdout:", result.stdout)
+            return False
         
-        return result
+        return True
 
 
     def eraseDataPassword(self):
@@ -322,7 +322,7 @@ class User:
         return response
 
 
-    def upload_avatar(self, filepath):
+    def upload_avatar(self, filepath: str):
         with open(filepath, "rb") as f:
             response = requests.patch(
             f"{BASE_URL}/users/update/avatar",
@@ -349,6 +349,63 @@ class User:
 
         return response
 
+    def createGroupRoom(self, title, users_ids):
+        response = requests.post(
+            f"{BASE_URL}/chat/group",
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            json = { "title": title, "userIds": users_ids },
+            verify = False,
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
+        return response
+    
+    def inviteUserToGroup(self, conversation_id,  user_ids):
+        response = requests.post(
+            f"{BASE_URL}/chat/conversation/{conversation_id}/invite",
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            json = { "userIds": user_ids },
+            verify = False,
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
+        return response
+
+    def removeUserToGroup(self, conversation_id, user_id):
+        response = requests.post(
+            f"{BASE_URL}/chat/conversation/{conversation_id}/remove-user/{user_id}",
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            verify = False
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
+        return response
+
+    def leaveConversation(self, conversation_id):
+        response = requests.post(
+            f"{BASE_URL}/chat/conversation/{conversation_id}/leave",
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            verify = False,
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
+        return response
+
+    def renameConversation(self, conversation_id, new_name):
+        response = requests.patch(
+            f"{BASE_URL}/chat/conversation/{conversation_id}/rename",
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            json = { "title": new_name },
+            verify = False,
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
+        return response
 
     def getMyConversation(self):
         response = requests.get(
@@ -372,21 +429,24 @@ class User:
 
             print(f"{self.username}: {response.json()}\n")
 
-        return response
+        return len(self.conversation)
 
-    def sendMessageConversation(self, message: str):
-        for i in range(len(self.conversation)) :
+
+    def sendMessageConversation(self, conversationId: str, message: str):
             response = requests.post(
-                f"{BASE_URL}/chat/conversations/{self.conversation[i]}/messages",
+                f"{BASE_URL}/chat/conversations/{conversationId}/messages",
                 headers = { "Authorization": f"Bearer {self.accessToken}" },
                 data = { "content": f"{message}" },
                 verify = False,
             )
 
             print(f"{self.username}: {response.json()}\n")
-        self.message.append(message)
 
-        return response
+            #if len(self.conversation) != 0:     #added a condition to avoid a difference
+            #    self.message.append(message)    #between database and python list
+            
+            return message
+
         
     def getMyNotifications(self):
         response = requests.get(
@@ -421,11 +481,11 @@ class User:
 
         return response
 
-    def reportCreationForUser(self, userTarget):
+    def reportCreationForUser(self, userTarget, reason: str):
         response = requests.post(
             f"{BASE_URL}/moderation/reports",
             headers = { "Authorization": f"Bearer {self.accessToken}"},
-            json = { "targetType": userTarget.role, "targetUserId": userTarget.id, "reason": "spam and abusive content"},
+            json = { "targetType": userTarget.role, "targetUserId": userTarget.id, "reason": reason},
             verify = False,
         )
 
@@ -459,11 +519,11 @@ class User:
         return response
 
 
-    def reviewReport(self, action, note):
-        response = requests.get(
-            f"{BASE_URL}/moderation/reports",
+    def reviewReport(self, reportId: str, action: str, note: str, penaltyPoint: int):
+        response = requests.patch(
+            f"{BASE_URL}/moderation/reports/{reportId}/review",
             headers = { "Authorization": f"Bearer {self.accessToken}"},
-            json = {"action": {action}, "note": {note}},
+            data = {"action": {action}, "note": {note}, "penaltyPointsToSubtract": {penaltyPoint}},
             verify = False,
         )
         
@@ -471,6 +531,17 @@ class User:
 
         return response
 
+    def adjustPoint(self, targetUser, note: str, penenaltyPoint: int):
+        response = requests.post(
+            f"{BASE_URL}/moderation/users/{targetUser.id}/points",
+            headers = { "Authorization": f"Bearer {self.accessToken}"},
+            data = {"points": penenaltyPoint, "note": note},
+            verify = False
+        )
+
+        print(f"{self.username}: {response.json()}\n")
+
+        return response
 
     def getMe(self):
         response = requests.get(
