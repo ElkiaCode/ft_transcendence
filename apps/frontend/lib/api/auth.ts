@@ -286,6 +286,26 @@ export async function apiUpdatePassword(currentPassword: string, newPassword: st
     body: JSON.stringify({ currentPassword, newPassword }),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Error updating password');
+  if (!res.ok) {
+    throw new Error(data.message || 'Error updating password');
+  }
+  return data;
+ }
+    
+export async function apiEraseMyData(currentPassword: string) {
+  const token = useAuthStore.getState().accessToken;
+  const res = await fetch(`${API_URL}/users/me/erase-data`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ currentPassword }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.message || 'Error deleting account');
+  }
   return data;
 }
