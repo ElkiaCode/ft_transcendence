@@ -6,6 +6,7 @@
 # dependencies
 node_modules/
 apps/*/node_modules/
+dist/
 
 # build outputs
 apps/web/.next/
@@ -37,3 +38,9 @@ infra/nginx/certs/*.key
 
 # data/postgres_data
 data/postgres_data
+
+# Python
+__pytestcache__/
+.pytest_cache/
+testing/.pytest_cache/
+*.pyc

@@ -20,13 +20,17 @@ export class AdminService {
             throw new NotFoundException('User to ban does not exist');
         }
 
+        if (isTargetUserExist.isBanned) {
+            throw new BadRequestException('User already banned');
+        }
+
         const [updateUser] = await this.prisma.$transaction([this.prisma.user.update({
             where: { id : targetUserId },
             data : { isBanned: true, isActive: false },
             include : { profile: true },
             }),
             this.prisma.refreshToken.updateMany({
-            where: { id : targetUserId, revokedAt: null },
+            where: { userId : targetUserId, revokedAt: null },
             data: { revokedAt: new Date() },
             }),
         ]);
