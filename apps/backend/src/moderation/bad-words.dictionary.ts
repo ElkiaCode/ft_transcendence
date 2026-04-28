@@ -73,8 +73,6 @@ export const BAD_WORD_RULES: BadWordRule[] = [
   { value: 'catin', severity: 200, category: "harassment"},
   { value: 'fiotte', severity: 200, category: "harassment"},
   { value: 'baise', severity: 50, category: 'insult'},
-  { value: 'suicide', severity: 350, category: 'harassment'},
-  { value: 'suicider', severity: 350, category: 'harassment'},
   { value: 'ntm', severity: 50 , category: 'insult'},
   { value: 'ftg', severity: 50, category: 'insult'},
   { value: 'pd', severity: 50, category: 'insult'},
