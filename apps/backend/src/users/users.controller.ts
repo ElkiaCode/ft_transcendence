@@ -20,7 +20,7 @@ export class UsersController {
 
   @UseGuards(JwtAuthGuard)
   @Get('friends')
-  getAcceptedFriends(@CurrentUser() user: JwtPayload) { 
+  getAcceptedFriends(@CurrentUser() user: JwtPayload) {
     return this.usersService.getMyFriends(user.sub)
   }
 
@@ -38,6 +38,12 @@ export class UsersController {
   getTopPositivePointUsers() {
     return this.usersService.getTopPositivePointUsers();
   }
+
+  @UseGuards(JwtAuthGuard)
+ @Get('me/points')
+ getMyPoints(@CurrentUser() user: JwtPayload) {
+  return this.usersService.getMyPoints(user.sub);
+} 
 
   @UseGuards(JwtAuthGuard)
   @Patch('update/profile')

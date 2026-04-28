@@ -288,7 +288,7 @@ export async function apiUpdatePassword(currentPassword: string, newPassword: st
   }
   return data;
  }
-    
+
 export async function apiEraseMyData(currentPassword: string) {
   const token = useAuthStore.getState().accessToken;
   const res = await fetch(`${API_URL}/users/me/erase-data`, {
@@ -322,4 +322,14 @@ export async function apiPromoteUser(userId: string) {
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || "Error promoting user");
   return data;
+}
+
+export async function apiGetMyPoints() {
+  const token = useAuthStore.getState().accessToken;
+  const res = await fetch(`${API_URL}/users/me/points`, {
+    credentials: 'include',
+    headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+  });
+  if (!res.ok) return null;
+  return res.json();
 }

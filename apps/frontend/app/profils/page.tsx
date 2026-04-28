@@ -1,6 +1,6 @@
 "use client";
 
-import { getUser, apiUpdateProfile, apiUpdateAvatar, apiUpdatePassword } from "@/lib/api/auth";
+import { getUser, apiUpdateProfile, apiUpdateAvatar, apiUpdatePassword, apiGetMyPoints } from "@/lib/api/auth";
 import { useAuthStore } from "@/store/authStore";
 import { useEffect, useState, useMemo } from "react";
 
@@ -152,11 +152,14 @@ function Section() {
   const [showPassword, setShowPassword] = useState(false);
   const setStoreUser = useAuthStore((s) => s.setUser);
   const [copied, setCopied] = useState(false);
+  const [points, setPoints] = useState<number | null>(null);
 
   useEffect(() => {
     async function loadUser() {
       const userData = await getUser();
       if (userData) setUser(userData);
+      const pointsData = await apiGetMyPoints();
+      if (pointsData) setPoints(pointsData.penaltyPoints);
     }
     loadUser();
   }, []);
@@ -182,6 +185,14 @@ function Section() {
 
   return (
     <section className="flex-1 flex items-center flex-col w-full gap-8 py-12 relative z-10">
+
+       {/* POINTS BADGE */}
+       {points !== null && (
+		<div className="absolute top-8 left-4 z-20 w-20 h-20 bg-white rounded-full flex flex-col items-center justify-center shadow-lg" style={{ border: '4px solid #00BABC' }}>
+		<span className="TextColorS text-xl font-bold">{points}</span>
+		<span className="TextColorS text-xs font-medium">points</span>
+		</div>
+      )}
 
       {/* AVATAR */}
       <div
@@ -264,6 +275,7 @@ function Section() {
             Change password
           </button>
       </div>
+
 
       {showEdit && (
         <EditModal
