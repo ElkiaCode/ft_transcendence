@@ -19,6 +19,7 @@ class User:
         self.role = ''
         self.message = []
         self.notification = []
+        self.conversation = []
 
 
     def register(self):
@@ -227,7 +228,7 @@ class User:
 
     def removeFriend(self, toRemove):
         response = requests.delete(
-            f"{BASE_URL}/relationships/users/{toRemove.id}/friend",
+            f"{BASE_URL}/relationships/users/{toRemove.id}/remove-friend",
             headers = { "Authorization": f"Bearer {self.accessToken}" },
             verify = False
         )
@@ -251,7 +252,7 @@ class User:
 
     def unblockUser(self, toUnblock):
         response = requests.delete(
-            f"{BASE_URL}/relationships/users/{toUnblock.id}/block",
+            f"{BASE_URL}/relationships/users/{toUnblock.id}/unblock",
             headers = { "Authorization": f"Bearer {self.accessToken}" },
             verify = False
         )
@@ -422,30 +423,34 @@ class User:
 
 
     def getMessageConversation(self):
-        for i in range(len(self.conversation)) :
-            response = requests.get(
-                f"{BASE_URL}/chat/conversations/{self.conversation[i]}/messages",
-                headers = { "Authorization": f"Bearer {self.accessToken}" },
-                verify = False
-            )
+        if (self.conversation):
+            for i in range(len(self.conversation)) :
+                response = requests.get(
+                    f"{BASE_URL}/chat/conversations/{self.conversation[i]}/messages",
+                    headers = { "Authorization": f"Bearer {self.accessToken}" },
+                    verify = False
+                )
 
-        return len(self.conversation)
+                print(f"{self.username}: {response.json()}\n")
+        
+            return len(self.conversation)
+        return 0
 
 
     def sendMessageConversation(self, conversationId: str, message: str):
-            response = requests.post(
-                f"{BASE_URL}/chat/conversations/{conversationId}/messages",
-                headers = { "Authorization": f"Bearer {self.accessToken}" },
-                data = { "content": f"{message}" },
-                verify = False,
-            )
+        response = requests.post(
+            f"{BASE_URL}/chat/conversations/{conversationId}/messages",
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            data = { "content": f"{message}" },
+            verify = False,
+        )
 
-            print(f"{self.username}: {response.json()}\n")
+        print(f"{self.username}: {response.json()}\n")
 
-            #if len(self.conversation) != 0:     #added a condition to avoid a difference
-            #    self.message.append(message)    #between database and python list
-            
-            return message
+        #if len(self.conversation) != 0:     #added a condition to avoid a difference
+        #    self.message.append(message)    #between database and python list
+        
+        return message
 
         
     def getMyNotifications(self):
