@@ -6,6 +6,7 @@ import { apiAddMessageReaction, apiGetConversations, apiGetMessages, createOrGet
 import { useAuthStore } from "@/store/authStore";
 import { Socket } from "socket.io-client";
 import { getChatSocket, resetChatSocket } from "@/lib/socket/chat-socket";
+import { apiPromoteUser } from "@/lib/api/auth";
 
 interface SearchUser {
   id: string;
@@ -138,16 +139,20 @@ function UserContextMenu({
   user,
   x,
   y,
+  isAdmin,
   onAddFriend,
   onBlock,
   onUnblock,
+  onPromote,
 }: {
   user: SearchUser;
   x: number;
   y: number;
+  isAdmin: boolean;
   onAddFriend: (userId: string) => void;
   onBlock: (userId: string) => void;
   onUnblock: (userId: string) => void;
+  onPromote: (userId: string) => void;
 }) {
   return (
     <div className="fixed z-50 w-40 bg-white shadow-lg rounded-lg" style={{ top: y, left: x }}>
@@ -160,6 +165,11 @@ function UserContextMenu({
       <button onClick={() => onUnblock(user.id)} className="block w-full text-blue-500 text-left px-4 py-2 hover:bg-gray-100">
         Unblock User
       </button>
+      {isAdmin && (
+        <button onClick={() => onPromote(user.id)} className="block w-full text-purple-500 text-left px-4 py-2 hover:bg-gray-100">
+          Promote to Moderator
+        </button>
+      )}
     </div>
   );
 }
@@ -295,6 +305,7 @@ function Section() {
   const socketRef = useRef<Socket | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const user = useAuthStore((state) => state.user);
+  console.log(user);
   const [messages, setMessages] = useState<any[]>([]);
   const [messageInput, setMessageInput] = useState("");
   const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
@@ -642,9 +653,11 @@ useEffect(() => {
           user={menu.user}
           x={menu.x}
           y={menu.y}
+          isAdmin={user?.globalRole === 'ADMIN'}
           onAddFriend={(id) => { addFriendRequest(id); setMenu(null); }}
           onBlock={(id) => { blockUser(id); setMenu(null); }}
           onUnblock={(id) => { unblockUser(id); setMenu(null); }}
+          onPromote={(id) => { console.log('promote', id); setMenu(null); }}
         />
       )}
       <ChatPanel
