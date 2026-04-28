@@ -78,29 +78,5 @@ export const BAD_WORD_RULES: BadWordRule[] = [
   { value: 'ntm', severity: 50 , category: 'insult'},
   { value: 'ftg', severity: 50, category: 'insult'},
   { value: 'pd', severity: 50, category: 'insult'},
-  { value: 'retarded', severity: 50, category: 'insult'},
-
- 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  
-
-
-
-
-
-
+  { value: 'petasse', severity: 50, category: 'insult'},
 ];
