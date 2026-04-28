@@ -218,8 +218,15 @@ function ChatPanel({
               return messages.map((msg) => {
 		            const isMe = msg.sender.id === currentUserId;
 		            const isDeleted = Boolean(msg.deletedAt);
+                const isSystemMessage = msg.type === 'SYSTEM';
+                const isAutomaticModerationMessage =
+                  isSystemMessage &&
+                  msg.content === 'message deleted by automatic moderation';
                 const canEditOrDelete =
-                  isMe && !isDeleted && lastEditableMessage?.id === msg.id;
+                  isMe &&
+                  !isDeleted &&
+                  !isSystemMessage &&
+                  lastEditableMessage?.id === msg.id;
                 const reactionCounts = (msg.reactions ?? []).reduce(
                   (counts: Record<ReactionType, number>, reaction: { type: ReactionType }) => {
                     counts[reaction.type] = (counts[reaction.type] ?? 0) + 1;
@@ -233,8 +240,8 @@ function ChatPanel({
 	                  {!isMe && (
 	                    <span className="text-xs text-gray-500 mb-1 ml-1">{msg.sender.username}</span>
 	                  )}
-	                  <div className={`px-3 py-2 rounded-lg text-sm ${isMe ? "bg-blue-500 text-white self-end" : "bg-gray-300 text-black"} ${isDeleted ? "italic opacity-70" : ""}`}>
-	                    {isDeleted ? "Message deleted" : msg.content}
+		                  <div className={`px-3 py-2 rounded-lg text-sm ${isMe ? "bg-blue-500 text-white self-end" : "bg-gray-300 text-black"} ${(isDeleted || isAutomaticModerationMessage) ? "italic opacity-70" : ""}`}>
+		                    {isDeleted ? "Message deleted" : msg.content}
 	                  </div>
                     <div className={`mt-1 flex gap-2 text-[11px] text-gray-500 ${isMe ? "justify-end" : "justify-start"}`}>
                       {msg.isEdited && !isDeleted && <span>edited</span>}
@@ -246,7 +253,7 @@ function ChatPanel({
                       )}
 	                      {isMe && msg.reads?.length > 0 && <span>seen by {msg.reads.length}</span>}
 	                    </div>
-                    {!isDeleted && (
+                    {!isDeleted && !isSystemMessage && (
                       <div className={`mt-1 flex items-center gap-1 ${isMe ? "justify-end" : "justify-start"}`}>
                         {(Object.keys(reactionIcons) as ReactionType[]).map((type) => (
                           <button
@@ -543,6 +550,26 @@ useEffect(() => {
     );
   });
 
+  socket.on('chat.moderation.warning', (warning) => {
+    if (warning?.isBanned) return;
+
+    const pointsLeft = warning?.pointsLeftBeforeBan ?? 0;
+    const penalty = warning?.penaltyPointsToSubtract ?? 0;
+    const message = warning?.message ?? 'Your message was flagged by automatic moderation.';
+    window.alert(
+      `${message} You lost ${penalty} points. You have ${pointsLeft} points left before being banned.`,
+    );
+  });
+
+  socket.on('chat.moderation.banned', (payload) => {
+    const reason = payload?.reason ?? 'harmful message';
+
+    window.alert(`Your account was banned by automatic moderation. Cause: ${reason}`);
+    useAuthStore.getState().clear();
+    resetChatSocket();
+    window.setTimeout(() => window.location.reload(), 100);
+  });
+
   socket.on('chat.conversation.read', (payload) => {
     if (payload?.userId === user.id) return;
 
@@ -606,6 +633,8 @@ useEffect(() => {
     socket.off('chat.message.created');
     socket.off('chat.message.updated');
     socket.off('chat.message.deleted');
+    socket.off('chat.moderation.warning');
+    socket.off('chat.moderation.banned');
     socket.off('chat.conversation.read');
     socket.off('chat.typing');
     socket.off('presence.changed');
