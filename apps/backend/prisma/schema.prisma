@@ -263,7 +263,7 @@ model Notification {
 
 model Report {
   id              String           @id @default(cuid())
-  creatorId       String
+  creatorId       String?
   targetType      ReportTargetType
   targetUserId    String?
   targetMessageId String?
@@ -272,7 +272,7 @@ model Report {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
-  creator       User     @relation("ReportCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  creator       User?    @relation("ReportCreator", fields: [creatorId], references: [id], onDelete: SetNull)
   targetUser    User?    @relation("ReportTargetUser", fields: [targetUserId], references: [id], onDelete: SetNull)
   targetMessage Message? @relation("ReportTargetMessage", fields: [targetMessageId], references: [id], onDelete: SetNull)
 
