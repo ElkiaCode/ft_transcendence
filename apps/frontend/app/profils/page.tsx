@@ -1,6 +1,6 @@
 "use client";
 
-import { getUser, apiUpdateProfile, apiUpdateAvatar, apiUpdatePassword, apiGetMyPoints } from "@/lib/api/auth";
+import { getUser, apiUpdateProfile, apiUpdateAvatar, apiUpdatePassword, apiGetMyPoints, apiGetTopUsers } from "@/lib/api/auth";
 import { useAuthStore } from "@/store/authStore";
 import { useEffect, useState, useMemo } from "react";
 
@@ -146,6 +146,20 @@ function HelloWorldBackground() {
   );
 }
 
+function getTrophy(i: number) {
+  if (i === 0) return '🥇';
+  if (i === 1) return '🥈';
+  if (i === 2) return '🥉';
+  return null;
+}
+
+function getRankColor(i: number) {
+  if (i === 0) return '#FFD700';
+  if (i === 1) return '#C0C0C0';
+  if (i === 2) return '#CD7F32';
+  return '#00BABC';
+}
+
 function Section() {
   const [user, setUser] = useState<any>(null);
   const [showEdit, setShowEdit] = useState(false);
@@ -153,6 +167,7 @@ function Section() {
   const setStoreUser = useAuthStore((s) => s.setUser);
   const [copied, setCopied] = useState(false);
   const [points, setPoints] = useState<number | null>(null);
+  const [topUsers, setTopUsers] = useState<any[]>([]);
 
   useEffect(() => {
     async function loadUser() {
@@ -160,6 +175,8 @@ function Section() {
       if (userData) setUser(userData);
       const pointsData = await apiGetMyPoints();
       if (pointsData) setPoints(pointsData.penaltyPoints);
+      const topData = await apiGetTopUsers();
+      if (topData) setTopUsers(topData);
     }
     loadUser();
   }, []);
@@ -186,12 +203,12 @@ function Section() {
   return (
     <section className="flex-1 flex items-center flex-col w-full gap-8 py-12 relative z-10">
 
-       {/* POINTS BADGE */}
-       {points !== null && (
-		<div className="absolute top-8 left-4 z-20 w-20 h-20 bg-white rounded-full flex flex-col items-center justify-center shadow-lg" style={{ border: '4px solid #00BABC' }}>
-		<span className="TextColorS text-xl font-bold">{points}</span>
-		<span className="TextColorS text-xs font-medium">points</span>
-		</div>
+      {/* POINTS BADGE */}
+      {points !== null && (
+        <div className="absolute top-8 left-4 z-20 w-20 h-20 bg-white rounded-full flex flex-col items-center justify-center shadow-lg" style={{ border: '4px solid #00BABC' }}>
+          <span className="TextColorS text-xl font-bold">{points}</span>
+          <span className="TextColorS text-xs font-medium">pts</span>
+        </div>
       )}
 
       {/* AVATAR */}
@@ -268,14 +285,52 @@ function Section() {
             </>
           )}
         </button>
-          <button
-            onClick={() => setShowPassword(true)}
-            className="border text-white px-6 py-2 rounded cursor-pointer font-bold hover:bg-white/10 transition BorderColorS"
-          >
-            Change password
-          </button>
+
+        <button
+          onClick={() => setShowPassword(true)}
+          className="border text-white px-6 py-2 rounded cursor-pointer font-bold hover:bg-white/10 transition BorderColorS"
+        >
+          Change password
+        </button>
       </div>
 
+      {/* LEADERBOARD */}
+      <div className="w-full max-w-md mt-4">
+        <h3 className="text-center font-bold mb-3 TextColorS text-lg">🏆 Top Users</h3>
+        <div className="rounded-lg overflow-hidden border-4 BorderColorS bg-white shadow-md">
+          {topUsers.length === 0 && (
+            <div className="px-4 py-6 text-center ColorsS">
+            <p className="text-white font-medium">No users yet</p>
+            </div>
+         )}
+          {topUsers.map((u, i) => (
+            <div
+              key={u.id}
+              className="flex items-center gap-3 px-4 py-3 border-b last:border-b-0"
+              style={{
+               backgroundColor: 'white',
+               border: '4px solid #00BABC',
+              }}
+            >
+              <span
+                className="font-bold w-6 h-6 flex items-center justify-center text-base"
+                style={{ color: getRankColor(i) }}
+              >
+                {getTrophy(i) ?? i + 1}
+              </span>
+              <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center ColorsS">
+                {u.profile?.avatarUrl ? (
+                  <img src={u.profile.avatarUrl} alt={u.username} className="w-full h-full object-cover bg-white" />
+                ) : (
+                  <span className="text-black text-xs font-bold">{u.username.charAt(0).toUpperCase()}</span>
+                )}
+              </div>
+              <span className="flex-1 text-sm font-medium" style={{ color: 'black' }}>{u.profile?.displayName ?? u.username}</span>
+              <span className="font-bold text-sm" style={{ color: 'black' }}>{u.penaltyPoints} pts</span>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {showEdit && (
         <EditModal

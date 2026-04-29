@@ -333,3 +333,13 @@ export async function apiGetMyPoints() {
   if (!res.ok) return null;
   return res.json();
 }
+
+export async function apiGetTopUsers() {
+  const token = useAuthStore.getState().accessToken;
+  const res = await fetch(`${API_URL}/users/top-positive-points`, {
+    credentials: 'include',
+    headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+  });
+  if (!res.ok) return [];
+  return res.json();
+}
