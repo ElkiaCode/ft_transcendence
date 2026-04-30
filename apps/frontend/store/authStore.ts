@@ -4,7 +4,7 @@ interface User {
   id: string;
   username: string;
   email: string;
-  globalRole: string;
+  globalRole?: 'USER' | 'MODERATOR' | 'ADMIN'; 
   provider?: 'local' | '42';
   profile: {
     displayName: string;
