@@ -230,6 +230,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     );
 
     await this.emitMessageCreated(body.conversationId, message);
+    /*await this.emitNotificationCreated(body.conversationId, {
+      id: message.id,
+      type: 'message',
+      content: `New message from ${socketUser.username}`,
+      link: `/chat/${body.conversationId}`,
+    });*/
 
     if ((message as any).banAnnouncementMessage) {
       await this.emitMessageCreated(

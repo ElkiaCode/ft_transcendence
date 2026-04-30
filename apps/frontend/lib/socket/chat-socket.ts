@@ -7,26 +7,32 @@ let isRefreshingSocketToken = false;
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL ?? 'https://localhost';
 
-export function getChatSocket(accessToken: string | null): Socket {
+export function getChatSocket(accessToken: string | null): Socket | null {
+  if (!accessToken) return null;
   if (!socket) {
     socket = io(`${SOCKET_URL}/chat`, {
       auth: {
         token: accessToken,
       },
       withCredentials: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
     });
-
     socket.on('connect_error', async () => {
       if (isRefreshingSocketToken) return;
 
       isRefreshingSocketToken = true;
       try {
-        await apiRefresh();
+        const user = await apiRefresh();
         const freshToken = useAuthStore.getState().accessToken;
 
         if (freshToken && socket) {
           socket.auth = { token: freshToken };
           socket.connect();
+        } else {
+          useAuthStore.getState().clear();
+          resetChatSocket();
         }
       } finally {
         isRefreshingSocketToken = false;
@@ -35,7 +41,6 @@ export function getChatSocket(accessToken: string | null): Socket {
   } else {
     socket.auth = { token: accessToken };
   }
-
   return socket;
 }
 

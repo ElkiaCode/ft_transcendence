@@ -1,4 +1,5 @@
 import { useAuthStore } from "@/store/authStore";
+import { fetchWithAuth } from "./fetchWithAuth";
 
 const API_URL = 'https://localhost/api';
 
@@ -53,20 +54,22 @@ export async function apiRefresh() {
 }
 
 export async function apiSearchUsers(query: string) {
-  const token = useAuthStore.getState().accessToken;
-  const res = await fetch(`${API_URL}/users/search?q=${encodeURIComponent(query)}`, {
+  const res = await fetchWithAuth(`${API_URL}/users/search?q=${encodeURIComponent(query)}`, {
     credentials: 'include',
-    headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    headers: {
+      'Content-Type': 'application/json',
+    },
   });
   if (!res.ok) return [];
   return res.json();
 }
 
 export async function apiGetMyFriends() {
-  const token = useAuthStore.getState().accessToken;
-  const res = await fetch(`${API_URL}/users/friends`, {
+  const res = await fetchWithAuth(`${API_URL}/users/friends`, {
     credentials: 'include',
-    headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    headers: {
+      'Content-Type': 'application/json',
+    },
   });
   if (!res.ok) {
     const data = await res.json().catch(() => null);
@@ -76,10 +79,11 @@ export async function apiGetMyFriends() {
 }
 
 export async function apiGetPendingFriendRequests() {
-  const token = useAuthStore.getState().accessToken;
-  const res = await fetch(`${API_URL}/relationships/requests/incoming`, {
+  const res = await fetchWithAuth(`${API_URL}/relationships/requests/incoming`, {
     credentials: 'include',
-    headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    headers: {
+      'Content-Type': 'application/json',
+    },
   });
   if (!res.ok) {
     const data = await res.json().catch(() => null);
@@ -89,13 +93,11 @@ export async function apiGetPendingFriendRequests() {
 }
 
 export async function addFriendRequest(userId: string) {
-  const token = useAuthStore.getState().accessToken;
-  const res = await fetch(`${API_URL}/relationships/users/${userId}/friend-request`, {
+  const res = await fetchWithAuth(`${API_URL}/relationships/users/${userId}/friend-request`, {
     method: 'POST',
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({ userId }),
   });
@@ -107,13 +109,11 @@ export async function addFriendRequest(userId: string) {
 }
 
 export async function blockUser(userId: string) {
-  const token = useAuthStore.getState().accessToken;
-  const res = await fetch(`${API_URL}/relationships/users/${userId}/block`, {
+  const res = await fetchWithAuth(`${API_URL}/relationships/users/${userId}/block`, {
     method: 'POST',
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({ userId }),
   });
@@ -125,12 +125,11 @@ export async function blockUser(userId: string) {
 }
 
 export async function unblockUser(userId: string) {
-  const token = useAuthStore.getState().accessToken;
-  const res = await fetch(`${API_URL}/relationships/users/${userId}/unblock`, {
+  const res = await fetchWithAuth(`${API_URL}/relationships/users/${userId}/unblock`, {
     method: 'DELETE',
     credentials: 'include',
     headers: {
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      'Content-Type': 'application/json',
     },
   });
   const data = await res.json();
@@ -141,13 +140,11 @@ export async function unblockUser(userId: string) {
 }
 
 export async function acceptFriendRequest(userId: string) {
-  const token = useAuthStore.getState().accessToken;
-  const res = await fetch(`${API_URL}/relationships/users/${userId}/friend-accept`, {
+  const res = await fetchWithAuth(`${API_URL}/relationships/users/${userId}/friend-accept`, {
     method: 'POST',
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({ userId }),
   });
@@ -158,12 +155,11 @@ export async function acceptFriendRequest(userId: string) {
 }
 
 export async function declineFriendRequest(userId: string) {
-  const token = useAuthStore.getState().accessToken;
-  const res = await fetch(`${API_URL}/relationships/users/${userId}/remove-friend`, {
+  const res = await fetchWithAuth(`${API_URL}/relationships/users/${userId}/remove-friend`, {
     method: 'DELETE',
     credentials: 'include',
     headers: {
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      'Content-Type': 'application/json',
     },
   });
   const data = await res.json();
@@ -191,51 +187,20 @@ export async function apiLoginWith42(code: string) {
   return data.user;
 }
 
-export async function getUser() {
-  try {
-    const res = await fetch(`${API_URL}/users/me`, {
-      method: 'GET',
-      credentials: 'include',
-      headers: {
-        'authorization': `Bearer ${useAuthStore.getState().accessToken}`,
-      },
-    });
-
-    if (!res.ok) {
-      console.error("Erreur HTTP:", res.status);
-      return null;
-    }
-
-    const data = await res.json();
-    return data;
-
-  } catch (error) {
-    console.error("Erreur fetch:", error);
-    return null;
-  }
-}
-
 export async function apiGetMe() {
-  const token = localStorage.getItem('token');
-
-  const res = await fetch(`${API_URL}/users/me`, {
-    credentials: 'include',
-    headers: {
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    },
-  });
+  const res = await fetchWithAuth(`${API_URL}/users/me`);
+  const data = await res.json();
   if (!res.ok) return null;
-  return res.json();
+  useAuthStore.getState().setUser(data);
+  return data;
 }
 
 export async function apiUpdateProfile(displayName?: string, bio?: string) {
-  const token = useAuthStore.getState().accessToken;
-  const res = await fetch(`${API_URL}/users/update/profile`, {
+  const res = await fetchWithAuth(`${API_URL}/users/update/profile`, {
     method: 'PATCH',
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({ displayName, bio }),
   });
@@ -244,16 +209,11 @@ export async function apiUpdateProfile(displayName?: string, bio?: string) {
   return data;
 }
 export async function apiUpdateAvatar(avatarFile: File) {
-  const token = useAuthStore.getState().accessToken;
   const formData = new FormData();
   formData.append('file', avatarFile);
-
-  const res = await fetch(`${API_URL}/users/update/avatar`, {
+  const res = await fetchWithAuth(`${API_URL}/users/update/avatar`, {
     method: 'PATCH',
     credentials: 'include',
-    headers: {
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    },
     body: formData,
   });
   const data = await res.json();
@@ -262,23 +222,22 @@ export async function apiUpdateAvatar(avatarFile: File) {
 }
 
 export async function apiGetUserByUsername(username: string) {
-  const token = useAuthStore.getState().accessToken;
-  const res = await fetch(`${API_URL}/users/${username}`, {
+  const res = await fetchWithAuth(`${API_URL}/users/${username}`, {
     credentials: 'include',
-    headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+    headers: {
+      'Content-Type': 'application/json',
+    },
   });
   if (!res.ok) return null;
   return res.json();
 }
 
 export async function apiUpdatePassword(currentPassword: string, newPassword: string) {
-  const token = useAuthStore.getState().accessToken;
-  const res = await fetch(`${API_URL}/users/update/password`, {
+  const res = await fetchWithAuth(`${API_URL}/users/update/password`, {
     method: 'PATCH',
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({ currentPassword, newPassword }),
   });
@@ -290,13 +249,11 @@ export async function apiUpdatePassword(currentPassword: string, newPassword: st
  }
 
 export async function apiEraseMyData(currentPassword: string) {
-  const token = useAuthStore.getState().accessToken;
-  const res = await fetch(`${API_URL}/users/me/erase-data`, {
+  const res = await fetchWithAuth(`${API_URL}/users/me/erase-data`, {
     method: 'POST',
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     },
     body: JSON.stringify({ currentPassword }),
   });
@@ -308,14 +265,11 @@ export async function apiEraseMyData(currentPassword: string) {
 }
 
 export async function apiPromoteUser(userId: string) {
-  const token = useAuthStore.getState().accessToken;
-
-  const res = await fetch(`${API_URL}/admin/users/${userId}/promote`, {
+  const res = await fetchWithAuth(`${API_URL}/admin/users/${userId}/promote`, {
     method: "POST",
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
   });
 
@@ -325,20 +279,16 @@ export async function apiPromoteUser(userId: string) {
 }
 
 export async function apiGetMyPoints() {
-  const token = useAuthStore.getState().accessToken;
-  const res = await fetch(`${API_URL}/users/me/points`, {
+  const res = await fetchWithAuth(`${API_URL}/users/me/points`, {
     credentials: 'include',
-    headers: token ? { 'Authorization': `Bearer ${token}` } : {},
   });
   if (!res.ok) return null;
   return res.json();
 }
 
 export async function apiGetTopUsers() {
-  const token = useAuthStore.getState().accessToken;
-  const res = await fetch(`${API_URL}/users/top-positive-points`, {
+  const res = await fetchWithAuth(`${API_URL}/users/top-positive-points`, {
     credentials: 'include',
-    headers: token ? { 'Authorization': `Bearer ${token}` } : {},
   });
   if (!res.ok) return [];
   return res.json();

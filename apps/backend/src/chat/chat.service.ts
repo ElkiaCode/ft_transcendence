@@ -583,7 +583,7 @@ export class ChatService {
       name:
         conv.type === 'DIRECT'
           ? otherUser?.username
-          : 'Group chat',
+          : conv.title ?? 'Group chat',
 
       avatarUrl:
         conv.type === 'DIRECT'

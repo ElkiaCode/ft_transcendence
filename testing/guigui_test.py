@@ -40,7 +40,6 @@ def test_unit():
 #
     #print("guillaume review the report\n")
     #guillaume.reviewReport(report_id, "WARN", "be carefull", 600)
-
     #print("guillaume donne des points a clement\n")
     #guillaume.adjustPoint(clement, "test", 100)
 
