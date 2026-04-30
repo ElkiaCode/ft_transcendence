@@ -161,14 +161,17 @@ function InviteMembersModal({
 function MembersModal({
   members,
   currentUserId,
+  currentUserRole,
   onRemove,
   onClose,
 }: {
   members: any[];
   currentUserId: string | undefined;
+  currentUserRole: string | undefined;
   onRemove: (userId: string) => void;
   onClose: () => void;
 }) {
+  const canRemove = currentUserRole === 'OWNER';
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
       <div className="bg-white rounded-xl p-6 w-96 flex flex-col gap-4 shadow-xl">
@@ -187,13 +190,13 @@ function MembersModal({
                 <p className="text-sm font-medium text-gray-900 truncate">{member.user.username}</p>
                 <p className="text-xs text-gray-400">{member.role}</p>
               </div>
-              {member.userId !== currentUserId && (
-                <button
-                  onClick={() => onRemove(member.userId)}
-                  className="text-red-400 hover:text-red-600 text-xs transition cursor-pointer"
-                >
-                  Remove
-                </button>
+              {canRemove && member.userId !== currentUserId && (
+                  <button
+                    onClick={() => onRemove(member.userId)}
+                    className="text-red-400 hover:text-red-600 text-xs transition cursor-pointer"
+                  >
+                    Remove
+                  </button>
               )}
             </div>
           ))}
@@ -810,62 +813,62 @@ function Section() {
   const [leaveModal, setLeaveModal] = useState(false);
 
   const handleOpenMembers = async () => {
-  if (!selectedConv) return;
-  try {
-    const data = await apiGetGroupMembers(selectedConv.id);
-    setMembers(data);
-    setMembersModal(true);
-    setGroupMenuOpen(false);
-  } catch (err) {
-    console.error("Failed to get members:", err);
-  }
-};
+    if (!selectedConv) return;
+    try {
+      const data = await apiGetGroupMembers(selectedConv.id);
+      setMembers(data);
+      setMembersModal(true);
+      setGroupMenuOpen(false);
+    } catch (err) {
+      console.error("Failed to get members:", err);
+    }
+  };
 
-const handleInviteSubmit = async (userIds: string[]) => {
-  if (!selectedConv) return;
-  try {
-    await apiInviteGroupMembers(selectedConv.id, userIds);
-    setInviteModal(false);
-  } catch (err) {
-    console.error("Failed to invite members:", err);
-  }
-};
+  const handleInviteSubmit = async (userIds: string[]) => {
+    if (!selectedConv) return;
+    try {
+      await apiInviteGroupMembers(selectedConv.id, userIds);
+      setInviteModal(false);
+    } catch (err) {
+      console.error("Failed to invite members:", err);
+    }
+  };
 
-const handleRemoveMember = async (userId: string) => {
-  if (!selectedConv) return;
-  try {
-    await apiRemoveGroupMember(selectedConv.id, userId);
-    setMembers((prev) => prev.filter((m) => m.userId !== userId));
-  } catch (err) {
-    console.error("Failed to remove member:", err);
-  }
-};
+  const handleRemoveMember = async (userId: string) => {
+    if (!selectedConv) return;
+    try {
+      await apiRemoveGroupMember(selectedConv.id, userId);
+      setMembers((prev) => prev.filter((m) => m.userId !== userId));
+    } catch (err) {
+      console.error("Failed to remove member:", err);
+    }
+  };
 
-const handleRenameSubmit = async (title: string) => {
-  if (!selectedConv) return;
-  try {
-    await apiRenameGroupConversation(selectedConv.id, title);
-    setConversations((prev) =>
-      prev.map((c) => c.id === selectedConv.id ? { ...c, name: title } : c)
-    );
-    setSelectedConv((prev) => prev ? { ...prev, name: title } : prev);
-    setRenameModal(false);
-  } catch (err) {
-    console.error("Failed to rename:", err);
-  }
-};
+  const handleRenameSubmit = async (title: string) => {
+    if (!selectedConv) return;
+    try {
+      await apiRenameGroupConversation(selectedConv.id, title);
+      setConversations((prev) =>
+        prev.map((c) => c.id === selectedConv.id ? { ...c, name: title } : c)
+      );
+      setSelectedConv((prev) => prev ? { ...prev, name: title } : prev);
+      setRenameModal(false);
+    } catch (err) {
+      console.error("Failed to rename:", err);
+    }
+  };
 
-const handleLeaveConfirm = async () => {
-  if (!selectedConv) return;
-  try {
-    await apiLeaveGroupConversation(selectedConv.id);
-    setConversations((prev) => prev.filter((c) => c.id !== selectedConv.id));
-    setSelectedConv(null);
-    setLeaveModal(false);
-  } catch (err) {
-    console.error("Failed to leave group:", err);
-  }
-};
+  const handleLeaveConfirm = async () => {
+    if (!selectedConv) return;
+    try {
+      await apiLeaveGroupConversation(selectedConv.id);
+      setConversations((prev) => prev.filter((c) => c.id !== selectedConv.id));
+      setSelectedConv(null);
+      setLeaveModal(false);
+    } catch (err) {
+      console.error("Failed to leave group:", err);
+    }
+  };
 
   const handleEditMessage = (message: any) => {
     setEditModal({ message });
@@ -877,7 +880,18 @@ const handleLeaveConfirm = async () => {
 
   const handleCreateGroup = async (title: string, userIds: string[]) => {
     try {
-      const conv = await apiCreateGroupConversation(title, userIds);
+      const res = await apiCreateGroupConversation(title, userIds);
+      const raw = res.conversation;
+
+      const conv: Conversation = {
+        id: raw.id,
+        type: 'group',
+        name: raw.title ?? 'Group chat',
+        avatarUrl: null,
+        lastMessage: null,
+        unreadCount: 0,
+      };
+
       setConversations((prev) => [conv, ...prev]);
       setSelectedConv(conv);
       setGroupModal(false);
@@ -1067,6 +1081,7 @@ useEffect(() => {
 
   const token = useAuthStore.getState().accessToken;
   const socket = getChatSocket(token);
+  if (!socket) return;
   socketRef.current = socket;
 
   socket.on('chat.message.created', (msg) => {
@@ -1301,6 +1316,7 @@ const handleReport = async (messageId: string, userId: string, reason: string) =
         <MembersModal
           members={members}
           currentUserId={user?.id}
+          currentUserRole={members.find((m) => m.userId === user?.id)?.role}
           onRemove={handleRemoveMember}
           onClose={() => setMembersModal(false)}
         />

@@ -1,6 +1,6 @@
 "use client";
 
-import { getUser, apiUpdateProfile, apiUpdateAvatar, apiUpdatePassword } from "@/lib/api/auth";
+import { apiUpdateProfile, apiUpdateAvatar, apiUpdatePassword, apiGetMe } from "@/lib/api/auth";
 import { useAuthStore } from "@/store/authStore";
 import { useEffect, useState, useMemo } from "react";
 
@@ -155,7 +155,7 @@ function Section() {
 
   useEffect(() => {
     async function loadUser() {
-      const userData = await getUser();
+      const userData = await apiGetMe();
       if (userData) setUser(userData);
     }
     loadUser();
@@ -165,7 +165,7 @@ function Section() {
     if (!file) return;
     try {
       const updatedUser = await apiUpdateAvatar(file);
-      const fresh = await getUser();
+      const fresh = await apiGetMe();
       setUser(fresh);
       setStoreUser(fresh);
     } catch (err) {
