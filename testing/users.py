@@ -38,7 +38,10 @@ class User:
             self.id = response.json()['user']['id']
             self.role = response.json()['user']['globalRole']
         
-        print(f"{self.username}: {response.json()}\n")
+        # print(f"{self.username}: {response.json()}\n")
+        # To this (temporarily):
+        print(f"STATUS: {response.status_code}")
+        print(f"RESPONSE BODY: {response.text}") # This will show the real error
 
         return response
 

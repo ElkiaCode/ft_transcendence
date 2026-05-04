@@ -1,5 +1,0 @@
-# Netscape HTTP Cookie File
-# http://curl.haxx.se/rfc/cookie_spec.html
-# This is a generated file!  Do not edit.
-
-localhost.local	FALSE	/	TRUE	1777991914	__Host-refreshToken	cs-cVsh6moPjR7Ad1JFgLrZ05EVUqaRLWSAqOfCAEQ6ct3rOpvkSZr-EA58cISxq

@@ -184,10 +184,10 @@ def test_unit1():
     # assert res_banFail.status_code == 401, "401 expected as admin cannot ban somebody already banned"
 
     print("Guillaume(admin) unbans Clement(user, banned)\n")
-    res_unbanSuccess = guillaume.banUser(clement)
+    res_unbanSuccess = guillaume.unbanUser(clement)
     data = res_unbanSuccess.json()
     assert "user" in data, "user missing"
-    assert data['user']['isBanned'] == True, "Clement should be banned!"
+    assert data['user']['isBanned'] == False, "Clement should be unbanned!"
 
     print("patsy(moderator) looks at the reports\n")
     res_listReportSuccess = patsy.listReport()
@@ -333,6 +333,9 @@ def test_unit2():
     patsy        = User("patsy@gmail.com", "HyperPatsy", "pass1234")
     remy        = User("remy@gmail.com", "OutstandingRemy", "pass1234")
 
+    users_id = []
+    conversation_idNbNb = ""
+
     print(f"Registering...\n")
     guillaume.register()
     yann.register()
@@ -464,8 +467,7 @@ def test_unit2():
 
     print("renames conversation")
     res_renameConv = yann.renameConversation(conversation_id, "SuperConversation")
-    data = res_renameConv.json()
-    assert data['hello'] == True 
+    assert res_renameConv.status_code == 400, "Should be a bad request: renaming is only allowed for group conversations"
 
     print("remy(user) removes yann(user) as friend\n")
     res_removeFriend = remy.removeFriend(yann)
@@ -477,13 +479,34 @@ def test_unit2():
     data = res_blockUser.json()
     assert data['block']['blockedId'] == yannRequesterId, "yann should be blocked"
 
+    users_id.append(yann.login().json()['user']['id'])
+    users_id.append(clement.login().json()['user']['id'])
     # full_database_audit()
+    print("guillaume creates a group with yann and clement\n")
+    res_creationGroup = guillaume.createGroupRoom("groupe de guigui", users_id)
+    conversation_idNb = res_creationGroup.json()['conversation']['id']
+    data = res_creationGroup.json()
+    # Check the role of the first participant
+    guillaume_entry = data['conversation']['participants'][0]
+    assert guillaume_entry["role"] == "OWNER", f"Expected OWNER, got {guillaume_entry['role']}"
+    # Check the role of the first member
+    yann_entry = data['conversation']['participants'][1]
+    assert yann_entry['role'] == "MEMBER", f"Expected MEMBER, got {yann_entry['role']}"
 
-    print("renames conversation")
-    res_renameConv = yann.renameConversation(conversation_id, "SuperConversation")
-    data = res_renameConv.json()
-    assert data['hello'] == True 
-    
+    print("guillaume sends a message into the group\n")
+    guillaume.sendMessageConversation(conversation_idNb, "salut c'est guillaume")
+
+
+    print('guillaume report clement\n')
+    report_id = guillaume.reportCreationForUser(clement, "spam group").json()['id']
+
+
+    print("guillaume review the report\n")
+    guillaume.reviewReport(report_id, "WARN", "be carefull", 600)
+    print("guillaume donne des points a clement\n")
+    guillaume.adjustPoint(clement, "test", 100)
+
+
     guillaume.eraseDataPassword()
     yann.eraseDataPassword()
     clement.eraseDataPassword()
