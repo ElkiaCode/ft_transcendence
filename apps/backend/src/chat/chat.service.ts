@@ -2,12 +2,17 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { PrismaService } from '../prisma/prisma.service';
 import { InviteUsersDto } from './dto/invite-users.dto';
 import { CreateGroupConversationDto } from './dto/create-group-conversation.dto';
+import { AutoModerationService } from '../moderation/auto-moderation.service';
 
 @Injectable()
 export class ChatService {
   private readonly positiveReactionPointValue = 5;
+  private readonly automaticModerationPlaceholder = 'message deleted by automatic moderation';
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly autoModerationService: AutoModerationService,
+  ) {}
 
   private async ensureGroupConversationExists(conversationId: string) {
     const conversation = await this.prisma.conversation.findUnique({
@@ -215,6 +220,10 @@ export class ChatService {
   private normalizeTargetUserIds(rawUserIds: string[], actorUserId: string) {
     return [...new Set(rawUserIds.map((id) => id.trim()))]
       .filter((id) => id.length > 0 && id !== actorUserId);
+  }
+
+  private buildAutomaticBanReason(categories: string[]) {
+    return categories.length > 0 ? categories.join(', ') : 'harmful message';
   }
 
   async createOrGetDirectConversation(actorUserId: string, targetUserId: string) {
@@ -574,7 +583,7 @@ export class ChatService {
       name:
         conv.type === 'DIRECT'
           ? otherUser?.username
-          : 'Group chat',
+          : conv.title ?? 'Group chat',
 
       avatarUrl:
         conv.type === 'DIRECT'
@@ -964,13 +973,78 @@ export class ChatService {
   }
 
   async sendMessage(userId: string, conversationId: string, content: string) {
-    await this.ensureLiveSender(userId);
+    const sender = await this.ensureLiveSender(userId);
     await this.ensureConversationMembership(userId, conversationId);
 
     const trimmed = content.trim();
 
     if (!trimmed) {
       throw new BadRequestException('message content is empty');
+    }
+
+    const moderationResult = await this.autoModerationService.analyze(trimmed);
+
+    if (moderationResult.action === 'BLOCK') {
+      const message = await this.prisma.message.create({
+        data: {
+          conversationId,
+          senderId: userId,
+          content: this.automaticModerationPlaceholder,
+          type: 'SYSTEM',
+        },
+        include: {
+          sender: {
+            include: { profile: true },
+          },
+          reads: true,
+          reactions: true,
+        },
+      });
+
+      const moderation = await this.autoModerationService.applyBlockedMessage(
+        userId,
+        trimmed,
+        moderationResult,
+        message.id,
+      );
+      const banReason = this.buildAutomaticBanReason(moderationResult.categories);
+      const banAnnouncementMessage = moderation.penalty.isBanned
+        ? await this.prisma.message.create({
+            data: {
+              conversationId,
+              senderId: userId,
+              content: `automatic moderation ${sender.username} is now bann cause: ${banReason}`,
+              type: 'SYSTEM',
+            },
+            include: {
+              sender: {
+                include: { profile: true },
+              },
+              reads: true,
+              reactions: true,
+            },
+          })
+        : null;
+
+      await this.prisma.conversation.update({
+        where: { id: conversationId },
+        data: { updatedAt: new Date() },
+      });
+
+      return {
+        ...message,
+        moderationWarning: {
+          message: 'Your message was deleted by automatic moderation.',
+          severity: moderationResult.severity,
+          penaltyPointsToSubtract: moderationResult.penaltyPointsToSubtract,
+          penaltyPoints: moderation.penalty.penaltyPoints,
+          pointsLeftBeforeBan: moderation.penalty.pointsLeftBeforeBan,
+          isBanned: moderation.penalty.isBanned,
+          banReason,
+          categories: moderationResult.categories,
+        },
+        banAnnouncementMessage,
+      };
     }
 
     const message = await this.prisma.message.create({
@@ -986,6 +1060,56 @@ export class ChatService {
         },
       },
     });
+
+    if (moderationResult.action === 'REPORT') {
+      const moderation = await this.autoModerationService.applyFlaggedMessage(
+        userId,
+        message.id,
+        trimmed,
+        moderationResult,
+      );
+
+      if (moderation) {
+        const banReason = this.buildAutomaticBanReason(moderationResult.categories);
+        const banAnnouncementMessage = moderation.penalty.isBanned
+          ? await this.prisma.message.create({
+              data: {
+                conversationId,
+                senderId: userId,
+                content: `automatic moderation ${sender.username} is now bann cause: ${banReason}`,
+                type: 'SYSTEM',
+              },
+              include: {
+                sender: {
+                  include: { profile: true },
+                },
+                reads: true,
+                reactions: true,
+              },
+            })
+          : null;
+
+        await this.prisma.conversation.update({
+          where: { id: conversationId },
+          data: { updatedAt: new Date() },
+        });
+
+        return {
+          ...message,
+          moderationWarning: {
+            message: 'Your message was flagged by automatic moderation.',
+            severity: moderationResult.severity,
+            penaltyPointsToSubtract: moderationResult.penaltyPointsToSubtract,
+            penaltyPoints: moderation.penalty.penaltyPoints,
+            pointsLeftBeforeBan: moderation.penalty.pointsLeftBeforeBan,
+            isBanned: moderation.penalty.isBanned,
+            banReason,
+            categories: moderationResult.categories,
+          },
+          banAnnouncementMessage,
+        };
+      }
+    }
 
     await this.prisma.conversation.update({
       where: { id: conversationId },

@@ -164,6 +164,16 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(`user:${userId}`).emit('notification.created', notification);
   }
 
+  async emitModerationWarning(userId: string, warning: unknown) {
+    this.server.to(`user:${userId}`).emit('chat.moderation.warning', warning);
+  }
+
+  async emitModerationBanAndDisconnect(userId: string, payload: unknown) {
+    this.server.to(`user:${userId}`).emit('chat.moderation.banned', payload);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    this.server.in(`user:${userId}`).disconnectSockets(true);
+  }
+
   @SubscribeMessage('chat.joinConversation')
   async joinConversation(
     @ConnectedSocket() client: Socket,
@@ -220,16 +230,45 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     );
 
     await this.emitMessageCreated(body.conversationId, message);
+    /*await this.emitNotificationCreated(body.conversationId, {
+      id: message.id,
+      type: 'message',
+      content: `New message from ${socketUser.username}`,
+      link: `/chat/${body.conversationId}`,
+    });*/
+
+    if ((message as any).banAnnouncementMessage) {
+      await this.emitMessageCreated(
+        body.conversationId,
+        (message as any).banAnnouncementMessage,
+      );
+    }
+
+    if ((message as any).moderationWarning) {
+      await this.emitModerationWarning(
+        socketUser.sub,
+        (message as any).moderationWarning,
+      );
+
+      if ((message as any).moderationWarning.isBanned) {
+        await this.emitModerationBanAndDisconnect(socketUser.sub, {
+          message: 'Your account was banned by automatic moderation.',
+          reason: (message as any).moderationWarning.banReason ?? 'harmful message',
+          penaltyPoints: (message as any).moderationWarning.penaltyPoints,
+        });
+      }
+    }
 
     const recipientIds = await this.chatService.getOtherParticipantIds(
       body.conversationId,
       socketUser.sub,
     );
 
+    const messageContent = message.content ?? 'New message';
     const preview =
-      body.content.trim().length > 80
-        ? `${body.content.trim().slice(0, 80)}...`
-        : body.content.trim();
+      messageContent.trim().length > 80
+        ? `${messageContent.trim().slice(0, 80)}...`
+        : messageContent.trim();
 
     const notifications = await this.notificationsService.createForMany(
       recipientIds,

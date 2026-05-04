@@ -286,6 +286,9 @@ def test_unit1():
     print("patsy erases all his data\n")
     patsy.eraseDataPassword()
 
+    print("patsy erases all his data\n")
+    patsy.eraseDataPassword()
+
     if (os.path.exists(guillaume.cookies)):
         os.remove(guillaume.cookies)
     if (os.path.exists(yann.cookies)):
@@ -498,7 +501,7 @@ def test_unit2():
     if (os.path.exists(remy.cookies)):
         os.remove(remy.cookies)
 
-#test_unit1()
+test_unit1()
 test_unit2()
 
 

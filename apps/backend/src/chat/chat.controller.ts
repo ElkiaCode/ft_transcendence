@@ -130,15 +130,38 @@ export class ChatController {
 
     await this.chatGateway.emitMessageCreated(conversationId, message);
 
+    if ((message as any).banAnnouncementMessage) {
+      await this.chatGateway.emitMessageCreated(
+        conversationId,
+        (message as any).banAnnouncementMessage,
+      );
+    }
+
+    if ((message as any).moderationWarning) {
+      await this.chatGateway.emitModerationWarning(
+        user.sub,
+        (message as any).moderationWarning,
+      );
+
+      if ((message as any).moderationWarning.isBanned) {
+        await this.chatGateway.emitModerationBanAndDisconnect(user.sub, {
+          message: 'Your account was banned by automatic moderation.',
+          reason: (message as any).moderationWarning.banReason ?? 'harmful message',
+          penaltyPoints: (message as any).moderationWarning.penaltyPoints,
+        });
+      }
+    }
+
     const recipientIds = await this.chatService.getOtherParticipantIds(
       conversationId,
       user.sub,
     );
 
+    const messageContent = message.content ?? 'New message';
     const preview =
-      dto.content.trim().length > 80
-        ? `${dto.content.trim().slice(0, 80)}…`
-        : dto.content.trim();
+      messageContent.trim().length > 80
+        ? `${messageContent.trim().slice(0, 80)}…`
+        : messageContent.trim();
 
     const notifications = await this.notificationsService.createForMany(
       recipientIds,
