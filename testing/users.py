@@ -453,7 +453,7 @@ class User:
         #if len(self.conversation) != 0:     #added a condition to avoid a difference
         #    self.message.append(message)    #between database and python list
         
-        return message
+        return response
 
         
     def getMyNotifications(self):

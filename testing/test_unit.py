@@ -101,7 +101,8 @@ def test_unit1():
 
     print("guillaume(user, not banned) sends a message to Yann\n")
     res_sendMessage = guillaume.sendMessageConversation(conversation_id, "salut yann!")
-    assert res_sendMessage == "salut yann!", "Message not sent correctly"
+    data = res_sendMessage.json()
+    assert data['content'] == "salut yann!", "Message not sent correctly"
 
     print("Guillaume(user, not banned) looks at his messages\n")
     res_nb = guillaume.getMessageConversation()
@@ -496,14 +497,26 @@ def test_unit2():
     print("guillaume sends a message into the group\n")
     res_sendMessage = guillaume.sendMessageConversation(conversation_idNb, "salut c'est guillaume")
     data = res_sendMessage.json()
-    assert data.['content'] == "guillaume sends a message into the group\n", "Message not sent correctly"
+    assert data['content'] == "salut c'est guillaume", "Message not sent correctly"
 
-    print('guillaume report clement\n')
-    report_id = guillaume.reportCreationForUser(clement, "spam group").json()['id']
+    print('yann(user) sends a report on clement\n')
+    res_report = yann.reportCreationForUser(clement, "spam group").json()
+    report_id1 = res_report['id']
+    assert res_report['targetType'] == "USER", "anybody should be able to send a report on an user"
 
+    print('guillaume(admin) sends a report on clement\n')
+    res_report = guillaume.reportCreationForUser(clement, "spam group").json()
+    report_id2 = res_report['id']
+    assert res_report['targetType'] == "USER", "anybody should be able to send a report on an user"
+
+    print('yann(user) sends a report on guillaume\n')
+    res_report = yann.reportCreationForUser(guillaume, "spam group").json()
+    assert res_report['targetType'] == "ADMIN", "anybody should be able to send a report on an user"
 
     print("guillaume review the report\n")
-    guillaume.reviewReport(report_id, "WARN", "be carefull", 600)
+    guillaume.reviewReport(report_id1, "WARN", "be carefull", 600)
+    guillaume.reviewReport(report_id2, "WARN2", "be carefull2 ", 606)
+
     print("guillaume donne des points a clement\n")
     guillaume.adjustPoint(clement, "test", 100)
 
