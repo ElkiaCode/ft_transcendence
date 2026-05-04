@@ -494,8 +494,9 @@ def test_unit2():
     assert yann_entry['role'] == "MEMBER", f"Expected MEMBER, got {yann_entry['role']}"
 
     print("guillaume sends a message into the group\n")
-    guillaume.sendMessageConversation(conversation_idNb, "salut c'est guillaume")
-
+    res_sendMessage = guillaume.sendMessageConversation(conversation_idNb, "salut c'est guillaume")
+    data = res_sendMessage.json()
+    assert data.['content'] == "guillaume sends a message into the group\n", "Message not sent correctly"
 
     print('guillaume report clement\n')
     report_id = guillaume.reportCreationForUser(clement, "spam group").json()['id']
