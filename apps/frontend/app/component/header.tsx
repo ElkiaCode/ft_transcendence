@@ -289,6 +289,7 @@ function RegisterModal({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState('');
   const [accepted, setAccepted] = useState(false);
   const setUser = useAuthStore((s) => s.setUser);
+  const [acceptedModeration, setAcceptedModeration] = useState(false);
 
   const handleRegister = async () => {
     setError('');
@@ -348,9 +349,26 @@ return (
           {" "}— respectful behaviour only.
         </label>
       </div>
+
+      <div className="flex items-start gap-2 mt-3">
+        <input
+          type="checkbox"
+          id="moderation"
+          checked={acceptedModeration}
+          onChange={(e) => setAcceptedModeration(e.target.checked)}
+          className="cursor-pointer mt-0.5"
+        />
+        <label htmlFor="moderation" className="text-sm text-gray-600">
+          I agree to the{" "}
+          <a href="/moderation" target="_blank" className="text-blue-500 underline hover:text-blue-700">
+            moderation rules
+          </a>
+          {" "}of the platform.
+        </label>
+      </div>
       <button
         onClick={handleRegister}
-        disabled={!accepted || !username || !email || !password || !confirmPassword}
+        disabled={!accepted || !acceptedModeration || !username || !email || !password || !confirmPassword}
         className="mt-4 w-full bg-black text-white p-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
       >
         Confirm
@@ -382,9 +400,11 @@ export default function Header() {
             <Link className="text-3xl font-bold" href="/">
               Transcendence
             </Link>
-            <Link className="text-sm font-normal text-gray-500 hover:underline" href="/rgpd">
-              Privacy Policy
-            </Link>
+            {user && (
+              <Link className="text-sm font-normal text-gray-500 hover:underline" href="/rgpd">
+                Privacy Policy
+              </Link>
+            )}
           </div>
           <FriendInterface user={user} />
         </nav>
