@@ -157,6 +157,13 @@ def test_unit():
     assert "user" in data, "toto as moderator should be able to unban clement"
     assert data['user']['isBanned'] == False
 
+    # Crée un user admin
+    patsy = User("patsy@test.com", "patsy", "pass1234")
+    patsy.register()
+    patsy.login()
+    patsy.promoteAdmin()
+    patsy.refreshCookie()  
+
     print("Guillaume as admin unpromotes toto(moderator) to user\n")
     res_unpromoteModSuccess = guillaume.unPromoteModeratorToUser(toto)
     data = res_unpromoteModSuccess.json()
@@ -185,6 +192,9 @@ def test_unit():
     print("toto erases all his data\n")
     toto.eraseDataPassword()
 
+    print("patsy erases all his data\n")
+    patsy.eraseDataPassword()
+
     if (os.path.exists(guillaume.cookies)):
         os.remove(guillaume.cookies)
     if (os.path.exists(yann.cookies)):
@@ -193,6 +203,8 @@ def test_unit():
         os.remove(clement.cookies)
     if (os.path.exists(toto.cookies)):
         os.remove(toto.cookies)
+    if (os.path.exists(patsy.cookies)):
+        os.remove(patsy.cookies)
 
 test_unit()
 

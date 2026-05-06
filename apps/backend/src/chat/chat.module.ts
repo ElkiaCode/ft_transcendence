@@ -4,11 +4,12 @@ import { ChatController } from './chat.controller';
 import { ChatGateway } from './chat.gateway';
 import { ChatService } from './chat.service';
 import { NotificationsModule } from 'src/notifications/notifications.module';
+import { AutoModerationService } from '../moderation/auto-moderation.service';
 
 @Module({
   imports: [AuthModule, NotificationsModule],
   controllers: [ChatController],
-  providers: [ChatService, ChatGateway],
+  providers: [ChatService, ChatGateway, AutoModerationService],
   exports: [ChatService, ChatGateway],
 })
 export class ChatModule {}

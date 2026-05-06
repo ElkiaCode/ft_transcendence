@@ -7,11 +7,100 @@ import Link from "next/link";
 import { use, useEffect, useState } from "react";
 import isAuth from "./isAuth";
 import "../globals.css";
+import { apiNotify, apiNotifyAsRead, apiNotifyAllAsRead } from "@/lib/api/notify";
 
-// Redirection vers 42
-// Apres login on est rediriger sur le front en recevant un champs "code"
-// On envoie ce code au backend pour obtenir un access token
-// Ca permet au back de get les infos du user et de le connecter
+function Notify() {
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const user = useAuthStore((s) => s.user);
+
+  useEffect(() => {
+    if (openMenuId !== 'N' || !user) return;
+    loadNotifications();
+  }, [openMenuId, user]);
+
+ const loadNotifications = async () => {
+    try {
+      const data = await apiNotify();
+      setNotifications(data);
+    } catch (err: any) {
+      console.error(err);
+      setNotifications([]);
+    }
+  };
+
+  const handleMarkAsRead = (notificationId: string) => async () => {
+    try {
+      await apiNotifyAsRead(notificationId);
+      setNotifications((prev) =>
+        prev.map((notif) =>
+          notif.id === notificationId ? { ...notif, isRead: true } : notif
+        )
+      );
+    } catch (err: any) {
+      console.error(err);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await apiNotifyAllAsRead();
+      setNotifications((prev) => prev.map((notif) => ({ ...notif, isRead: true })));
+    } catch (err: any) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    if (!user) setNotifications([]);
+  }, [user]);
+
+  return (
+    <div className="relative flex items-center gap-4 ml-4">
+      {user ? (
+        <button
+          className="bg-green-500 text-white px-6 py-2 rounded-full hover:bg-pink-500 transition cursor-pointer"
+          onClick={() => setOpenMenuId(openMenuId === 'N' ? null : 'N')}>
+          <img src="/notif.png" alt="42" width={24} height={24} />
+        </button>
+      ) : null}
+      {openMenuId === 'N' && (
+        <div className="absolute top-full mt-2 w-80 bg-white border border-gray-200 rounded shadow-lg z-10 right-0 p-2 flex flex-col gap-2 text-sm text-gray-700">
+          <div className="max-h-60 overflow-y-auto">
+            {notifications.length === 0 ? (
+              <div className="px-4 py-3 text-sm text-gray-600">
+                No notifications
+              </div>
+            ) : (
+              notifications.map((notif) => (
+                <div
+                  key={notif.id}
+                  className={`px-4 py-3 text-sm border-b ${
+                    notif.isRead ? "text-gray-500" : "text-black cursor-pointer font-bold"
+                  }`}
+                  onClick={handleMarkAsRead(notif.id)}
+                >
+                  <div>{notif.title}</div>
+                  {notif.body && (
+                    <div className="text-xs text-gray-500 break-words">{notif.body}</div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+          <div className="px-4 py-2 text-xs text-gray-500 border-t border-gray-200">
+            <button
+              onClick={handleMarkAllAsRead}
+              className="text-blue-500 hover:text-blue-700 cursor-pointer"
+            >
+              Read all notifications
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function FriendInterface({ user }: { user: any }) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -87,7 +176,7 @@ function FriendInterface({ user }: { user: any }) {
                         <button
                           onClick={handleDecline(friend.id)}
                           className="w-6 h-6 rounded-full flex items-center justify-center text-white font-bold cursor-pointer">
-                            <img src="/remove.svg" alt="42" width={24} height={24} />
+                            <img src="/remove.png" alt="42" width={24} height={24} />
                         </button>
                       </div>
                     </div>
@@ -165,7 +254,7 @@ function LoginModal({ onClose }: { onClose: () => void }) {
           className="w-full border border-gray-300 flex items-center justify-center gap-3 p-2 rounded hover:bg-gray-50 cursor-pointer"
         >
           <span className="text-black text-sm font-medium">Continue with</span>
-          <img src="/42_Logo.svg" alt="42" width={24} height={24} />
+          <img src="/42_Logo.png" alt="42" width={24} height={24} />
         </button>
         <div className="flex items-center gap-3 my-4">
           <div className="flex-1 h-px bg-gray-200" />
@@ -274,6 +363,7 @@ return (
 export default function Header() {
   const [showLogin, setShowLogin] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
+  const [res, setRes] = useState("");
 
   const logout = useAuthStore((s) => s.logout);
   const user = useAuthStore((s) => s.user);
@@ -298,17 +388,11 @@ export default function Header() {
           </div>
           <FriendInterface user={user} />
         </nav>
-
-        {/* RIGHT SIDE */}
         <div className="ml-auto flex items-center gap-4">
-
+          <Notify />
           {user ? (
             <div className="flex items-center justify-between bg-white px-4 py-2 rounded-full shadow-md border">
-
-              {/* LEFT SIDE */}
               <Link href="/profils" className="flex items-center gap-3">
-
-                {/* avatar */}
                 <div className="w-10 h-10 ColorsS rounded-full flex items-center justify-center overflow-hidden">
                   {user?.profile?.avatarUrl ? (
                     <img
@@ -322,8 +406,6 @@ export default function Header() {
                     </span>
                   )}
                 </div>
-
-                {/* user info */}
                 <div className="flex flex-col">
                   <span className="text-xs text-gray-500">
                     {user?.provider === '42' ? 'Connected with 42' : 'Connected'}
@@ -331,14 +413,9 @@ export default function Header() {
                   <span className="text-sm font-bold">{user.username}</span>
                 </div>
 
-                {/* status dot */}
                 <div className="w-2 h-2 ColorsS rounded-full animate-pulse" />
               </Link>
-
-              {/* vertical separator */}
               <div className="w-px h-8 bg-gray-200 mx-4" />
-
-              {/* RIGHT SIDE */}
               <button
                 onClick={handleLogout}
                 className="text-xs text-gray-500 hover:text-red-500 hover:underline transition-colors"
@@ -347,7 +424,6 @@ export default function Header() {
                   logout
                 </Link>
               </button>
-
             </div>
           ) : (
             <div className="flex flex-col gap-1">
@@ -366,10 +442,8 @@ export default function Header() {
               </button>
             </div>
           )}
-
         </div>
       </header>
-
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
       {showRegister && <RegisterModal onClose={() => setShowRegister(false)} />}
     </>
