@@ -105,13 +105,17 @@ export async function apiAddMessageReaction(
   return data;
 }
 
-export async function apiReportMessage(conversationId: string, messageId: string, reason: string) {
-  const res = await fetchWithAuth(`${API_URL}/chat/conversations/${conversationId}/messages/${messageId}/report`, {
+export async function apiReportMessage(messageId: string,conversationId: string,reason: string) {
+  const res = await fetchWithAuth(`${API_URL}/moderation/reports`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ reason }),
+    body: JSON.stringify({
+      targetType: 'MESSAGE',
+      targetMessageId: messageId,
+      reason,
+    }),
   });
   const data = await res.json();
   if (!res.ok) {
