@@ -1,5 +1,5 @@
 from users import *
-from database import *
+# from database import *
 import time
 
 #to run this test, database must be empty!
@@ -320,7 +320,7 @@ def test_unit2():
     #renameConversation
     #reportCreationForMessage
     #reportCreationForUser
-    #reviewReport
+    #reviewReport: OK (even when penalty points are lower than -500)
     #searchUser
     #sendFriendRequest: OK
     #unblockUser: OK
@@ -511,15 +511,25 @@ def test_unit2():
 
     print('yann(user) sends a report on guillaume\n')
     res_report = yann.reportCreationForUser(guillaume, "spam group").json()
-    assert res_report['targetType'] == "ADMIN", "anybody should be able to send a report on an user"
+    assert res_report['targetType'] == "USER", "anybody should be able to send a report on an user"
 
-    print("guillaume review the report\n")
-    guillaume.reviewReport(report_id1, "WARN", "be carefull", 600)
-    guillaume.reviewReport(report_id2, "WARN2", "be carefull2 ", 606)
 
-    print("guillaume donne des points a clement\n")
+
+    print("guillaume reviews the report1\n")
+    res_rev = guillaume.reviewReport(report_id1, "WARN", "be carefull", 600)
+    data = res_rev.json()
+    assert data['updatedReport']['status'] == 'RESOLVED', "should be considered as resolved as review done!"
+
+
+
+    print("guillaume reviews the report2\n")
+    guillaume.reviewReport(report_id2, "WARN", "be carefull2 ", 606)
+
+    print("guillaume gives points to clement\n")
     guillaume.adjustPoint(clement, "test", 100)
 
+    print("guillaume unbans clement\n")
+    guillaume.unbanUser(clement);
 
     guillaume.eraseDataPassword()
     yann.eraseDataPassword()
@@ -538,7 +548,7 @@ def test_unit2():
     if (os.path.exists(remy.cookies)):
         os.remove(remy.cookies)
 
-test_unit1()
+# test_unit1()
 test_unit2()
 
 

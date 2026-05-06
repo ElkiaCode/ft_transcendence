@@ -539,11 +539,11 @@ class User:
 
         return response
 
-    def adjustPoint(self, targetUser, note: str, penenaltyPoint: int):
+    def adjustPoint(self, targetUser, note: str, penaltyPoint: int):
         response = requests.post(
             f"{BASE_URL}/moderation/users/{targetUser.id}/points",
             headers = { "Authorization": f"Bearer {self.accessToken}"},
-            data = {"points": penenaltyPoint, "note": note},
+            data = {"points": penaltyPoint, "note": note},
             verify = False
         )
 
@@ -561,3 +561,23 @@ class User:
         print(f"{self.username}: {response.json()}\n")
 
         return response
+    
+    def getPenaltyPoints(self):
+    # """Retrieves the current penalty points from the backend."""
+    
+        response = requests.get(
+            f"{BASE_URL}/users/me/points",
+            headers={ "Authorization": f"Bearer {self.accessToken}" },
+            verify=False
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            # points = response;
+
+            points = data.get('penaltyPoints', 0)
+            print(f"{self.username} has {points} penalty points.")
+            return points
+        else:
+            print(f"Error fetching penalty points: {response.status_code}")
+            return None
