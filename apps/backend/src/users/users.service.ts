@@ -355,4 +355,12 @@ export class UsersService {
       } : null,
     };
   }
+
+	async getMyPoints(userId: string) {
+	const user = await this.prisma.user.findUnique({
+		where: { id: userId },
+	});
+	if (!user) throw new NotFoundException('User not found');
+	return { penaltyPoints: user.penaltyPoints };
+	}
 }

@@ -38,10 +38,8 @@ async function handleConfirm() {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-zinc-900">
+    <div className="min-h-0 bg-white dark:bg-zinc-900">
       <div className="max-w-3xl mx-auto px-6 py-12 text-center">
-
-        {/* Hero */}
         <div className="border-b border-gray-200 dark:border-zinc-700 pb-6 mb-8">
           <h1 className="text-3xl font-medium text-gray-900 dark:text-white mb-2">Privacy Policy</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -49,8 +47,6 @@ async function handleConfirm() {
             <span className="inline-block bg-emerald-50 text-emerald-700 text-xs font-medium px-3 py-0.5 rounded-full">GDPR compliant</span>
           </p>
         </div>
-
-        {/* Cards */}
         <div className="grid grid-cols-3 gap-3 mb-8">
           {[
             { dot: "bg-emerald-500", title: "Data collected", text: "Username, email, avatar, and 42 OAuth data if applicable." },
@@ -64,8 +60,6 @@ async function handleConfirm() {
             </div>
           ))}
         </div>
-
-        {/* Sections */}
         {[
           {
             title: "How we use your data",
@@ -90,14 +84,11 @@ async function handleConfirm() {
             <hr className="border-gray-100 dark:border-zinc-700 mt-4" />
           </div>
         ))}
-
         {user && (
   <div className="mt-10 border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 rounded-xl px-6 py-6">
-    
     <p className="text-sm text-red-600/70 dark:text-red-400/60 mb-4">
       Permanently delete your account and all associated data. This action is immediate and cannot be undone.
     </p>
-
     {error && (
       <p className="text-sm text-red-600 dark:text-red-400 mb-3 font-medium">{error}</p>
     )}
