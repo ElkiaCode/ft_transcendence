@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { EraseMyDataDto } from 'src/auth/dto/erase-my-data.dto';
+import { EraseMyDataDto } from '../auth/dto/erase-my-data.dto';
 import * as bcrypt from 'bcrypt';
 import { UpdateProfileDto } from './dto/dto';
 import { UpdatePasswordDto } from './dto/update-password.dto';
