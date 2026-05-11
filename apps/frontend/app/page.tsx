@@ -626,21 +626,29 @@ function UserContextMenu({
   onViewProfile: (username: string) => void;
 }) {
   return (
-      <div className="fixed z-50 w-44 ColorsS rounded-lg overflow-hidden shadow-lg" style={{ top: y, left: x }}>
-      <button onClick={() => onViewProfile(user.username)} className="block w-full text-left px-4 py-2 text-sm font-bold text-white hover:bg-white/20 transition">
+      <div
+        className="fixed z-50 w-44 ColorsS rounded-lg overflow-hidden shadow-lg border-2 border-pink-500"
+        style={{ top: y, left: x }}
+       >
+      <button className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition">
+        <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
         View Profile
-      </button>
-      <button onClick={() => onAddFriend(user.id)} className="block w-full text-left px-4 py-2 text-sm font-bold text-white hover:bg-white/20 transition">
+     </button>
+      <button className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition">
+        <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
         Add friend
       </button>
-      <button onClick={() => onBlock(user.id)} className="block w-full text-left px-4 py-2 text-sm font-bold text-white hover:bg-white/20 transition">
+      <button className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition">
+        <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
         Block User
       </button>
-      <button onClick={() => onUnblock(user.id)} className="block w-full text-left px-4 py-2 text-sm font-bold text-white hover:bg-white/20 transition">
+      <button className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition">
+        <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
         Unblock User
       </button>
       {isAdmin && (
-          <button onClick={() => onPromote(user.id)} className="block w-full text-left px-4 py-2 text-sm font-bold text-white hover:bg-white/20 transition">
+          <button className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition">
+            <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
             Promote to Moderator
         </button>
       )}
