@@ -15,7 +15,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { JwtPayload } from '../auth/types/jwt-payload.type';
-import { EraseMyDataDto } from 'src/auth/dto/erase-my-data.dto';
+import { EraseMyDataDto } from '../auth/dto/erase-my-data.dto';
 import { UpdateProfileDto } from './dto/dto';
 import { UpdatePasswordDto } from './dto/update-password.dto';
 

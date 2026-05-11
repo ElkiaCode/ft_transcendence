@@ -417,9 +417,14 @@ export default function Header() {
             <Link className="text-3xl font-bold" href="/">
               Transcendence
             </Link>
-            <Link className="text-sm font-normal text-gray-500 hover:underline" href="/rgpd">
-              Privacy Policy
-            </Link>
+            <div className="flex gap-3 text-sm font-normal text-gray-500">
+              <Link className="hover:underline" href="/rgpd">
+                Privacy Policy
+              </Link>
+              <Link className="hover:underline" href="/terms">
+                Terms of Service
+              </Link>
+            </div>
           </div>
           <FriendInterface user={user} />
         </nav>

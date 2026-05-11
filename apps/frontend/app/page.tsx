@@ -627,24 +627,44 @@ function UserContextMenu({
         className="fixed z-50 w-44 ColorsS rounded-lg overflow-hidden shadow-lg border-2 border-pink-500"
         style={{ top: y, left: x }}
        >
-      <button className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition">
+      <button
+        type="button"
+        onClick={() => onViewProfile(user.username)}
+        className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition"
+      >
         <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
         View Profile
      </button>
-      <button className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition">
+      <button
+        type="button"
+        onClick={() => onAddFriend(user.id)}
+        className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition"
+      >
         <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
         Add friend
       </button>
-      <button className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition">
+      <button
+        type="button"
+        onClick={() => onBlock(user.id)}
+        className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition"
+      >
         <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
         Block User
       </button>
-      <button className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition">
+      <button
+        type="button"
+        onClick={() => onUnblock(user.id)}
+        className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition"
+      >
         <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
         Unblock User
       </button>
       {isAdmin && (
-          <button className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition">
+          <button
+            type="button"
+            onClick={() => onPromote(user.id)}
+            className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition"
+          >
             <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
             Promote to Moderator
         </button>
@@ -1263,9 +1283,9 @@ useEffect(() => {
   };
 }, [selectedConv]);
 
-const handleReport = async (messageId: string, userId: string, reason: string) => {
+const handleReport = async (messageId: string, _userId: string, reason: string) => {
   try {
-    await apiReportMessage(messageId, userId, reason);
+    await apiReportMessage(messageId, reason);
     setReportModal(null);
   } catch (err) {
     console.error("Failed to report:", err);
