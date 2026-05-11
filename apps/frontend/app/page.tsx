@@ -8,6 +8,7 @@ import { Socket } from "socket.io-client";
 import { getChatSocket, resetChatSocket } from "@/lib/socket/chat-socket";
 import { apiPromoteUser } from "@/lib/api/auth";
 import type { ChatMessage, GroupMember, MessageReaction } from "@/lib/types";
+import { useRouter } from "next/navigation";
 
 interface SearchUser {
   id: string;
@@ -115,9 +116,9 @@ function InviteMembersModal({
                 <div
                   key={user.id}
                   onClick={() => toggleUser(user)}
-                  className={`flex items-center gap-3 p-2 cursor-pointer transition ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-100'}`}
+                  className={`flex items-center gap-3 p-2 cursor-pointer transition ${isSelected ? 'ColorsS' : 'hover:bg-gray-100'}`}
                 >
-                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
+                  <div className="w-8 h-8 ColorsS rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
                     {user.profile?.avatarUrl ? (
                       <img src={user.profile.avatarUrl} alt={user.username} className="w-full h-full object-cover rounded-full" />
                     ) : (
@@ -134,7 +135,7 @@ function InviteMembersModal({
         {selectedUsers.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {selectedUsers.map((user) => (
-              <span key={user.id} className="flex items-center gap-1 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+              <span key={user.id} className="flex items-center gap-1 ColorsS text-blue-800 text-xs px-2 py-1 rounded-full">
                 {user.username}
                 <button onClick={() => toggleUser(user)} className="hover:text-blue-600 cursor-pointer">×</button>
               </span>
@@ -146,7 +147,7 @@ function InviteMembersModal({
           <button
             onClick={() => onSubmit(selectedUsers.map((u) => u.id))}
             disabled={selectedUsers.length === 0}
-            className="px-4 py-2 rounded-full bg-blue-500 text-white hover:bg-blue-600 cursor-pointer transition disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-4 py-2 rounded-full ColorsS text-white hover:ColorsScursor-pointer transition disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Add
           </button>
@@ -177,7 +178,7 @@ function MembersModal({
         <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
           {members.map((member) => (
             <div key={member.userId} className="flex items-center gap-3 p-2 rounded-lg">
-              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0 overflow-hidden">
+              <div className="w-8 h-8 ColorsS rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0 overflow-hidden">
                 {member.user.avatarUrl ? (
                   <img src={member.user.avatarUrl} alt={member.user.username} className="w-full h-full object-cover" />
                 ) : (
@@ -233,7 +234,7 @@ function RenameModal({
           <button
             onClick={() => onSubmit(title)}
             disabled={!title.trim()}
-            className="px-4 py-2 rounded-full bg-blue-500 text-white hover:bg-blue-600 cursor-pointer transition disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-4 py-2 rounded-full ColorsS text-white hover:ColorsS cursor-pointer transition disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Rename
           </button>
@@ -326,10 +327,10 @@ function CreateGroupModal({
                   key={user.id}
                   onClick={() => toggleUser(user)}
                   className={`flex items-center gap-3 p-2 cursor-pointer transition ${
-                    isSelected ? 'bg-blue-50' : 'hover:bg-gray-100'
+                    isSelected ? 'ColorsS' : 'hover:bg-gray-100'
                   }`}
                 >
-                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
+                  <div className="w-8 h-8 ColorsS rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
                     {user.profile?.avatarUrl ? (
                       <img src={user.profile.avatarUrl} alt={user.username} className="w-full h-full object-cover rounded-full" />
                     ) : (
@@ -348,7 +349,7 @@ function CreateGroupModal({
             {selectedUsers.map((user) => (
               <span
                 key={user.id}
-                className="flex items-center gap-1 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
+                className="flex items-center gap-1 ColorsS text-blue-800 text-xs px-2 py-1 rounded-full"
               >
                 {user.username}
                 <button
@@ -412,7 +413,7 @@ function EditModal({
           <button
             onClick={() => onSubmit(content)}
             disabled={!content.trim()}
-            className="px-4 py-2 rounded-full bg-blue-500 text-white hover:bg-blue-600 cursor-pointer transition disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-4 py-2 rounded-full ColorsS text-white hover:ColorsS cursor-pointer transition disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Save
           </button>
@@ -525,10 +526,12 @@ function SidebarSearch({
             key={conv.id}
             onClick={() => onSelectConv(conv)}
             className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition ${
-              selectedConvId === conv.id ? 'bg-blue-500 text-white' : 'hover:bg-gray-300'
+              selectedConvId === conv.id ? 'ColorsS text-white' : 'hover:bg-gray-300'
             }`}
           >
-            <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold overflow-hidden">
+            <div className={`w-10 h-10 ColorsS rounded-full flex items-center justify-center text-white font-bold overflow-hidden ${
+               selectedConvId === conv.id ? 'ring-2 ring-white' : ''
+              }`}>
               {conv.avatarUrl ? (
                 <img src={conv.avatarUrl} alt={conv.name} className="w-full h-full object-cover" />
               ) : (
@@ -536,8 +539,8 @@ function SidebarSearch({
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm truncate">{conv.name}</p>
-              <p className="text-xs text-gray-600 truncate">{conv.lastMessage || 'No messages yet'}</p>
+              <p className="font-bold text-sm truncate">{conv.name}</p>
+              <p className="text-xs text-gray-900 truncate">{conv.lastMessage || 'No messages yet'}</p>
             </div>
           </div>
         ))}
@@ -565,7 +568,7 @@ function SearchDropdown({
           onClick={() => onSelectUser(user)}
           className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-300 cursor-pointer"
         >
-          <div className="w-10 h-10 bg-blue-500 rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center text-white font-medium">
+          <div className="w-10 h-10 ColorsS rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center text-white font-medium">
             {user.profile?.avatarUrl ? (
               <img src={user.profile.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
             ) : (
@@ -607,6 +610,7 @@ function UserContextMenu({
   onBlock,
   onUnblock,
   onPromote,
+  onViewProfile
 }: {
   user: SearchUser;
   x: number;
@@ -616,21 +620,33 @@ function UserContextMenu({
   onBlock: (userId: string) => void;
   onUnblock: (userId: string) => void;
   onPromote: (userId: string) => void;
+  onViewProfile: (username: string) => void;
 }) {
   return (
-    <div className="fixed z-50 w-40 bg-white shadow-lg rounded-lg" style={{ top: y, left: x }}>
-      <button onClick={() => onAddFriend(user.id)} className="block w-full text-green-500 text-left px-4 py-2 hover:bg-gray-100">
+      <div
+        className="fixed z-50 w-44 ColorsS rounded-lg overflow-hidden shadow-lg border-2 border-pink-500"
+        style={{ top: y, left: x }}
+       >
+      <button className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition">
+        <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
+        View Profile
+     </button>
+      <button className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition">
+        <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
         Add friend
       </button>
-      <button onClick={() => onBlock(user.id)} className="block w-full text-red-500 text-left px-4 py-2 hover:bg-gray-100">
+      <button className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition">
+        <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
         Block User
       </button>
-      <button onClick={() => onUnblock(user.id)} className="block w-full text-blue-500 text-left px-4 py-2 hover:bg-gray-100">
+      <button className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition">
+        <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
         Unblock User
       </button>
       {isAdmin && (
-        <button onClick={() => onPromote(user.id)} className="block w-full text-purple-500 text-left px-4 py-2 hover:bg-gray-100">
-          Promote to Moderator
+          <button className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition">
+            <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
+            Promote to Moderator
         </button>
       )}
     </div>
@@ -714,7 +730,7 @@ function ChatPanel({
                     {!isMe && (
                       <span className="text-xs text-gray-500 mb-1 ml-1">{msg.sender.username}</span>
                     )}
-                    <div className={`px-3 py-2 rounded-lg text-sm break-words overflow-hidden ${isMe ? "bg-blue-500 text-white" : "bg-gray-300 text-black"} ${isDeleted ? "italic opacity-70" : ""}`}>
+                    <div className={`px-3 py-2 rounded-lg text-sm font-bold break-words overflow-hidden ${isMe ? "ColorsS text-white" : "bg-gray-300 text-black"} ${isDeleted ? "italic opacity-70" : ""}`}>
                       {isDeleted ? "Message deleted" : msg.content}
                     </div>
                     {!isMe && !isDeleted && (
@@ -796,6 +812,8 @@ function Section() {
   const [searchQuery, setSearchQuery] = useState("");
   const user = useAuthStore((state) => state.user);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const router = useRouter();
+  //const [messages, setMessages] = useState<any[]>([]);
   const [messageInput, setMessageInput] = useState("");
   const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -1279,6 +1297,8 @@ const handleReport = async (messageId: string, userId: string, reason: string) =
           onBlock={(id) => { blockUser(id); setMenu(null); }}
           onUnblock={(id) => { unblockUser(id); setMenu(null); }}
           onPromote={(id) => { apiPromoteUser(id).catch(console.error); setMenu(null); }}
+          //onPromote={(id) => { console.log('promote', id); setMenu(null); }}
+          onViewProfile={(username) => { router.push(`/profils/${username}`); setMenu(null); }}
         />
       )}
       {reportModal && (
