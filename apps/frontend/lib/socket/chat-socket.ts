@@ -24,7 +24,7 @@ export function getChatSocket(accessToken: string | null): Socket | null {
 
       isRefreshingSocketToken = true;
       try {
-        const user = await apiRefresh();
+        await apiRefresh();
         const freshToken = useAuthStore.getState().accessToken;
 
         if (freshToken && socket) {

@@ -1,5 +1,22 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import type { Prisma } from '../generated/prisma';
+
+type NotificationType = 'MESSAGE' | 'MODERATION' | 'SYSTEM';
+
+type NotificationContext = {
+  actorId?: string;
+  entityType?: string;
+  entityId?: string;
+  action?: string;
+  metadata?: Prisma.InputJsonValue;
+};
+
+type NotificationInput = NotificationContext & {
+  type: NotificationType;
+  title: string;
+  body?: string;
+};
 
 @Injectable()
 export class NotificationsService {
@@ -7,9 +24,10 @@ export class NotificationsService {
 
   async createForUser(
     userId: string,
-    type: 'MESSAGE' | 'MODERATION' | 'SYSTEM',
+    type: NotificationType,
     title: string,
     body?: string,
+    context: NotificationContext = {},
   ) {
     return this.prisma.notification.create({
       data: {
@@ -17,27 +35,42 @@ export class NotificationsService {
         type,
         title,
         body,
+        actorId: context.actorId,
+        entityType: context.entityType,
+        entityId: context.entityId,
+        action: context.action,
+        metadata: context.metadata,
       },
     });
   }
 
   async createForMany(
     userIds: string[],
-    type: 'MESSAGE' | 'MODERATION' | 'SYSTEM',
+    type: NotificationType,
     title: string,
     body?: string,
+    context: NotificationContext = {},
   ) {
     return Promise.all(
       userIds.map((userId) =>
-        this.prisma.notification.create({
-          data: {
-            userId,
-            type,
-            title,
-            body,
-          },
-        }),
+        this.createForUser(userId, type, title, body, context),
       ),
+    );
+  }
+
+  async createFromInput(userId: string, input: NotificationInput) {
+    return this.createForUser(
+      userId,
+      input.type,
+      input.title,
+      input.body,
+      input,
+    );
+  }
+
+  async createFromInputForMany(userIds: string[], input: NotificationInput) {
+    return Promise.all(
+      userIds.map((userId) => this.createFromInput(userId, input)),
     );
   }
 
