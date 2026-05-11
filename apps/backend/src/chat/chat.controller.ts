@@ -1,4 +1,13 @@
-import { Body, Controller, Delete, Get, Param, Post, Patch, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Patch,
+  UseGuards,
+} from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { ChatGateway } from './chat.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -22,55 +31,224 @@ export class ChatController {
     private readonly notificationsService: NotificationsService,
   ) {}
 
+  private async notifyUser(
+    userId: string,
+    input: Parameters<NotificationsService['createFromInput']>[1],
+  ) {
+    const notification = await this.notificationsService.createFromInput(
+      userId,
+      input,
+    );
+    await this.chatGateway.emitNotificationCreated(userId, notification);
+    return notification;
+  }
+
+  private async notifyUsers(
+    userIds: string[],
+    input: Parameters<NotificationsService['createFromInput']>[1],
+  ) {
+    const uniqueUserIds = [...new Set(userIds)];
+    const notifications =
+      await this.notificationsService.createFromInputForMany(
+        uniqueUserIds,
+        input,
+      );
+
+    for (const notification of notifications) {
+      await this.chatGateway.emitNotificationCreated(
+        notification.userId,
+        notification,
+      );
+    }
+
+    return notifications;
+  }
+
   @Post('direct/:userId')
   createOrGetDirectConversation(
     @CurrentUser() user: JwtPayload,
     @Param('userId') targetUserId: string,
   ) {
-    return this.chatService.createOrGetDirectConversation(user.sub, targetUserId);
+    return this.chatService.createOrGetDirectConversation(
+      user.sub,
+      targetUserId,
+    );
   }
 
   @Post('group')
-  createGroupeConversation(
+  async createGroupeConversation(
     @CurrentUser() user: JwtPayload,
     @Body() dto: CreateGroupConversationDto,
   ) {
-    return this.chatService.createGroupeConversation(user.sub, dto);
+    const result = await this.chatService.createGroupeConversation(
+      user.sub,
+      dto,
+    );
+    const conversation = result.conversation;
+    const groupName = conversation.title ?? 'Group chat';
+    const recipientIds = conversation.participants
+      .map((participant) => participant.userId)
+      .filter((userId) => userId !== user.sub);
+
+    await this.notifyUsers(recipientIds, {
+      type: 'SYSTEM',
+      title: 'Added to group',
+      body: `${user.username} added you to ${groupName}.`,
+      actorId: user.sub,
+      entityType: 'conversation',
+      entityId: conversation.id,
+      action: 'group_created',
+      metadata: {
+        conversationId: conversation.id,
+        groupName,
+        creatorUsername: user.username,
+      },
+    });
+
+    return result;
   }
 
   @Post('conversation/:conversationId/invite')
-  inviteUsers(
+  async inviteUsers(
     @CurrentUser() user: JwtPayload,
     @Param('conversationId') conversationId: string,
     @Body() dto: InviteUsersDto,
   ) {
-    return this.chatService.inviteUsers(user.sub, conversationId, dto);
+    const result = await this.chatService.inviteUsers(
+      user.sub,
+      conversationId,
+      dto,
+    );
+    const groupName = result.conversation?.title ?? 'Group chat';
+
+    if (result.invitedUserIds?.length) {
+      await this.notifyUsers(result.invitedUserIds, {
+        type: 'SYSTEM',
+        title: 'Group invitation',
+        body: `${user.username} added you to ${groupName}.`,
+        actorId: user.sub,
+        entityType: 'conversation',
+        entityId: conversationId,
+        action: 'group_members_invited',
+        metadata: {
+          conversationId,
+          groupName,
+          invitedByUsername: user.username,
+        },
+      });
+    }
+
+    return result;
   }
 
   @Post('conversation/:conversationId/remove-user/:userId')
-  removeUserFromGroup(
+  async removeUserFromGroup(
     @CurrentUser() user: JwtPayload,
     @Param('conversationId') conversationId: string,
-    @Param('userId') userId: string
+    @Param('userId') userId: string,
   ) {
-    return this.chatService.removeUserFromGroup(user.sub, conversationId, userId);
+    const result = await this.chatService.removeUserFromGroup(
+      user.sub,
+      conversationId,
+      userId,
+    );
+
+    await this.notifyUser(userId, {
+      type: 'SYSTEM',
+      title: 'Removed from group',
+      body: `${user.username} removed you from ${result.conversationTitle}.`,
+      actorId: user.sub,
+      entityType: 'conversation',
+      entityId: conversationId,
+      action: 'group_member_removed',
+      metadata: {
+        conversationId,
+        groupName: result.conversationTitle,
+        removedByUsername: user.username,
+      },
+    });
+
+    return result;
   }
 
   @Post('conversation/:conversationId/leave')
-  leaveConversation(
+  async leaveConversation(
     @CurrentUser() user: JwtPayload,
-    @Param('conversationId') conversationId: string
+    @Param('conversationId') conversationId: string,
   ) {
-    return this.chatService.leaveConversation(user.sub, conversationId);
+    const result = await this.chatService.leaveConversation(
+      user.sub,
+      conversationId,
+    );
+
+    await this.notifyUsers(result.remainingUserIds, {
+      type: 'SYSTEM',
+      title: 'Member left group',
+      body: `${user.username} left ${result.conversationTitle}.`,
+      actorId: user.sub,
+      entityType: 'conversation',
+      entityId: conversationId,
+      action: 'group_member_left',
+      metadata: {
+        conversationId,
+        groupName: result.conversationTitle,
+        previousRole: result.previousRole,
+        nextOwnerId: result.nextOwnerId,
+      },
+    });
+
+    if (result.nextOwnerId) {
+      await this.notifyUser(result.nextOwnerId, {
+        type: 'SYSTEM',
+        title: 'You are now group owner',
+        body: `Ownership of ${result.conversationTitle} was transferred to you.`,
+        actorId: user.sub,
+        entityType: 'conversation',
+        entityId: conversationId,
+        action: 'group_owner_transferred',
+        metadata: {
+          conversationId,
+          groupName: result.conversationTitle,
+          previousOwnerUsername: user.username,
+        },
+      });
+    }
+
+    return result;
   }
 
   @Patch('conversation/:conversationId/rename')
-  renameConversation(
+  async renameConversation(
     @CurrentUser() user: JwtPayload,
     @Param('conversationId') conversationId: string,
-    @Body() dto: RenameConversationDto
+    @Body() dto: RenameConversationDto,
   ) {
-    return this.chatService.renameConversation(user.sub, conversationId, dto.title);
+    const result = await this.chatService.renameConversation(
+      user.sub,
+      conversationId,
+      dto.title,
+    );
+    const recipientIds = await this.chatService.getOtherParticipantIds(
+      conversationId,
+      user.sub,
+    );
+
+    await this.notifyUsers(recipientIds, {
+      type: 'SYSTEM',
+      title: 'Group renamed',
+      body: `${user.username} renamed the group to ${result.conversation.title}.`,
+      actorId: user.sub,
+      entityType: 'conversation',
+      entityId: conversationId,
+      action: 'group_renamed',
+      metadata: {
+        conversationId,
+        groupName: result.conversation.title ?? 'Group chat',
+        renamedByUsername: user.username,
+      },
+    });
+
+    return result;
   }
 
   @Get('conversations')
@@ -146,7 +324,8 @@ export class ChatController {
       if ((message as any).moderationWarning.isBanned) {
         await this.chatGateway.emitModerationBanAndDisconnect(user.sub, {
           message: 'Your account was banned by automatic moderation.',
-          reason: (message as any).moderationWarning.banReason ?? 'harmful message',
+          reason:
+            (message as any).moderationWarning.banReason ?? 'harmful message',
           penaltyPoints: (message as any).moderationWarning.penaltyPoints,
         });
       }
@@ -163,19 +342,19 @@ export class ChatController {
         ? `${messageContent.trim().slice(0, 80)}…`
         : messageContent.trim();
 
-    const notifications = await this.notificationsService.createForMany(
-      recipientIds,
-      'MESSAGE',
-      'New message',
-      preview,
-    );
-
-    for (const notification of notifications) {
-      await this.chatGateway.emitNotificationCreated(
-        notification.userId,
-        notification,
-      );
-    }
+    await this.notifyUsers(recipientIds, {
+      type: 'MESSAGE',
+      title: 'New message',
+      body: preview,
+      actorId: user.sub,
+      entityType: 'message',
+      entityId: message.id,
+      action: 'message_created',
+      metadata: {
+        conversationId,
+        senderUsername: user.username,
+      },
+    });
 
     return message;
   }
@@ -196,6 +375,25 @@ export class ChatController {
 
     await this.chatGateway.emitMessageUpdated(conversationId, message);
 
+    const recipientIds = await this.chatService.getOtherParticipantIds(
+      conversationId,
+      user.sub,
+    );
+
+    await this.notifyUsers(recipientIds, {
+      type: 'MESSAGE',
+      title: 'Message edited',
+      body: `${user.username} edited a message.`,
+      actorId: user.sub,
+      entityType: 'message',
+      entityId: message.id,
+      action: 'message_updated',
+      metadata: {
+        conversationId,
+        senderUsername: user.username,
+      },
+    });
+
     return message;
   }
 
@@ -213,21 +411,75 @@ export class ChatController {
 
     await this.chatGateway.emitMessageDeleted(conversationId, message);
 
+    const recipientIds = await this.chatService.getOtherParticipantIds(
+      conversationId,
+      user.sub,
+    );
+
+    await this.notifyUsers(recipientIds, {
+      type: 'MESSAGE',
+      title: 'Message deleted',
+      body: `${user.username} deleted a message.`,
+      actorId: user.sub,
+      entityType: 'message',
+      entityId: message.id,
+      action: 'message_deleted',
+      metadata: {
+        conversationId,
+        senderUsername: user.username,
+      },
+    });
+
     return message;
   }
 
   @Post('conversations/:conversationId/messages/:messageId/reactions')
-  addMessageReaction(
+  async addMessageReaction(
     @CurrentUser() user: JwtPayload,
     @Param('conversationId') conversationId: string,
     @Param('messageId') messageId: string,
     @Body() dto: AddMessageReactionDto,
   ) {
-    return this.chatService.addMessageReaction(
+    const result = await this.chatService.addMessageReaction(
       user.sub,
       conversationId,
       messageId,
       dto.type,
     );
+
+    if (result.pointsAwarded > 0) {
+      await this.notifyUser(result.sender.id, {
+        type: 'SYSTEM',
+        title: 'New reaction',
+        body: `${user.username} reacted to your message.`,
+        actorId: user.sub,
+        entityType: 'message',
+        entityId: messageId,
+        action: 'message_reaction_created',
+        metadata: {
+          conversationId,
+          reactionType: dto.type,
+          pointsAwarded: result.pointsAwarded,
+        },
+      });
+    }
+
+    if (result.senderPromoted) {
+      await this.notifyUser(result.sender.id, {
+        type: 'SYSTEM',
+        title: 'Role updated',
+        body: 'You were promoted to moderator after earning enough points.',
+        actorId: user.sub,
+        entityType: 'user',
+        entityId: result.sender.id,
+        action: 'user_auto_promoted',
+        metadata: {
+          newRole: result.sender.globalRole,
+          penaltyPoints: result.sender.penaltyPoints,
+        },
+      });
+    }
+
+    return result;
   }
 }

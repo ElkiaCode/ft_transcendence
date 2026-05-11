@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -15,6 +14,47 @@ export class ModerationService {
     private readonly notificationsService: NotificationsService,
     private readonly chatGateway: ChatGateway,
   ) {}
+
+  private async notifyUser(
+    userId: string,
+    input: Parameters<NotificationsService['createFromInput']>[1],
+  ) {
+    const notification = await this.notificationsService.createFromInput(
+      userId,
+      input,
+    );
+    await this.chatGateway.emitNotificationCreated(userId, notification);
+    return notification;
+  }
+
+  private async notifyModerators(
+    input: Parameters<NotificationsService['createFromInput']>[1],
+    excludeUserId?: string,
+  ) {
+    const recipients = await this.prisma.user.findMany({
+      where: {
+        globalRole: { in: ['ADMIN', 'MODERATOR'] },
+        isActive: true,
+        ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
+      },
+      select: { id: true },
+    });
+
+    const notifications =
+      await this.notificationsService.createFromInputForMany(
+        recipients.map((recipient) => recipient.id),
+        input,
+      );
+
+    for (const notification of notifications) {
+      await this.chatGateway.emitNotificationCreated(
+        notification.userId,
+        notification,
+      );
+    }
+
+    return notifications;
+  }
 
   async createReport(
     creatorId: string,
@@ -40,7 +80,7 @@ export class ModerationService {
         throw new NotFoundException('target user not found');
       }
 
-      return this.prisma.report.create({
+      const report = await this.prisma.report.create({
         data: {
           creatorId,
           targetType: 'USER',
@@ -48,6 +88,25 @@ export class ModerationService {
           reason: reason.trim(),
         },
       });
+
+      await this.notifyModerators(
+        {
+          type: 'MODERATION',
+          title: 'New user report',
+          body: 'A user report needs review.',
+          actorId: creatorId,
+          entityType: 'report',
+          entityId: report.id,
+          action: 'report_created',
+          metadata: {
+            targetType: 'USER',
+            targetUserId,
+          },
+        },
+        creatorId,
+      );
+
+      return report;
     }
 
     if (targetType === 'MESSAGE') {
@@ -63,7 +122,7 @@ export class ModerationService {
         throw new NotFoundException('target message not found');
       }
 
-      return this.prisma.report.create({
+      const report = await this.prisma.report.create({
         data: {
           creatorId,
           targetType: 'MESSAGE',
@@ -71,6 +130,25 @@ export class ModerationService {
           reason: reason.trim(),
         },
       });
+
+      await this.notifyModerators(
+        {
+          type: 'MODERATION',
+          title: 'New message report',
+          body: 'A message report needs review.',
+          actorId: creatorId,
+          entityType: 'report',
+          entityId: report.id,
+          action: 'report_created',
+          metadata: {
+            targetType: 'MESSAGE',
+            targetMessageId,
+          },
+        },
+        creatorId,
+      );
+
+      return report;
     }
 
     throw new BadRequestException('invalid targetType');
@@ -122,7 +200,9 @@ export class ModerationService {
 
     const targetUserId = report.targetUserId ?? report.targetMessage?.senderId;
     const penaltyPointsChange =
-      targetUserId && penaltyPointsToSubtract > 0 ? -penaltyPointsToSubtract : 0;
+      targetUserId && penaltyPointsToSubtract > 0
+        ? -penaltyPointsToSubtract
+        : 0;
 
     const result = await this.prisma.$transaction(async (tx) => {
       const moderationAction = await tx.moderationAction.create({
@@ -143,7 +223,11 @@ export class ModerationService {
         },
       });
 
-      let updatedTargetUser: { id: string; penaltyPoints: number; isBanned: boolean } | null = null;
+      let updatedTargetUser: {
+        id: string;
+        penaltyPoints: number;
+        isBanned: boolean;
+      } | null = null;
 
       if (penaltyPointsChange !== 0 && targetUserId) {
         updatedTargetUser = await tx.user.update({
@@ -199,17 +283,27 @@ export class ModerationService {
     });
 
     if (targetUserId) {
-      const notification = await this.notificationsService.createForUser(
-        targetUserId,
-        'MODERATION',
-        'Moderation update',
-        note ?? action,
-      );
+      await this.notifyUser(targetUserId, {
+        type: 'MODERATION',
+        title: 'Moderation update',
+        body: note ?? action,
+        actorId: moderatorId,
+        entityType: 'report',
+        entityId: reportId,
+        action: `report_${action.toLowerCase()}`,
+        metadata: {
+          reportId,
+          moderationActionId: result.moderationAction.id,
+          penaltyPointsChange,
+        },
+      });
 
-      await this.chatGateway.emitNotificationCreated(
-        targetUserId,
-        notification,
-      );
+      if (action === 'BAN') {
+        await this.chatGateway.emitModerationBanAndDisconnect(targetUserId, {
+          message: 'Your account was banned by moderation.',
+          reason: note ?? action,
+        });
+      }
     }
 
     return result;
@@ -222,7 +316,9 @@ export class ModerationService {
     note?: string,
   ) {
     if (moderatorId === targetUserId) {
-      throw new BadRequestException('you cannot adjust your own penalty points');
+      throw new BadRequestException(
+        'you cannot adjust your own penalty points',
+      );
     }
 
     const targetUser = await this.prisma.user.findUnique({
@@ -325,14 +421,45 @@ export class ModerationService {
       return { moderationAction, user: updatedUser, promoted: false };
     });
 
-    const notification = await this.notificationsService.createForUser(
-      targetUserId,
-      'MODERATION',
-      'Penalty points updated',
-      note ?? `Penalty points changed by ${points}`,
-    );
+    await this.notifyUser(targetUserId, {
+      type: 'MODERATION',
+      title: 'Penalty points updated',
+      body: note ?? `Penalty points changed by ${points}`,
+      actorId: moderatorId,
+      entityType: 'user',
+      entityId: targetUserId,
+      action: 'penalty_points_updated',
+      metadata: {
+        moderationActionId: result.moderationAction.id,
+        points,
+        newPenaltyPoints: result.user.penaltyPoints,
+        promoted: Boolean(result.promoted),
+      },
+    });
 
-    await this.chatGateway.emitNotificationCreated(targetUserId, notification);
+    if (result.promoted) {
+      await this.notifyUser(targetUserId, {
+        type: 'SYSTEM',
+        title: 'Role updated',
+        body: 'You were promoted to moderator after earning enough points.',
+        actorId: moderatorId,
+        entityType: 'user',
+        entityId: targetUserId,
+        action: 'user_auto_promoted',
+        metadata: {
+          newRole: result.user.globalRole,
+          penaltyPoints: result.user.penaltyPoints,
+        },
+      });
+    }
+
+    if (result.user.isBanned) {
+      await this.chatGateway.emitModerationBanAndDisconnect(targetUserId, {
+        message: 'Your account was banned by moderation.',
+        reason: note ?? `Penalty points changed by ${points}`,
+        penaltyPoints: result.user.penaltyPoints,
+      });
+    }
 
     return result;
   }

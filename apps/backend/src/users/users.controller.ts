@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Body, UseGuards, Patch, UploadedFile, UseInterceptors, Query, Param } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  UseGuards,
+  Patch,
+  UploadedFile,
+  UseInterceptors,
+  Query,
+  Param,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -19,17 +30,20 @@ export class UsersController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('me/export-data')
+  exportMyData(@CurrentUser() user: JwtPayload) {
+    return this.usersService.exportMyData(user.sub);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('friends')
   getAcceptedFriends(@CurrentUser() user: JwtPayload) {
-    return this.usersService.getMyFriends(user.sub)
+    return this.usersService.getMyFriends(user.sub);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('search')
-  searchUsers(
-    @CurrentUser() user: JwtPayload,
-    @Query('q') q: string,
-  ) {
+  searchUsers(@CurrentUser() user: JwtPayload, @Query('q') q: string) {
     return this.usersService.searchUsers(user.sub, q);
   }
 
@@ -40,10 +54,10 @@ export class UsersController {
   }
 
   @UseGuards(JwtAuthGuard)
- @Get('me/points')
- getMyPoints(@CurrentUser() user: JwtPayload) {
-  return this.usersService.getMyPoints(user.sub);
-} 
+  @Get('me/points')
+  getMyPoints(@CurrentUser() user: JwtPayload) {
+    return this.usersService.getMyPoints(user.sub);
+  }
 
   @UseGuards(JwtAuthGuard)
   @Patch('update/profile')
@@ -66,10 +80,7 @@ export class UsersController {
 
   @UseGuards(JwtAuthGuard)
   @Post('me/erase-data')
-  eraseMyData(
-    @CurrentUser() user: JwtPayload,
-    @Body() dto: EraseMyDataDto,
-  ) {
+  eraseMyData(@CurrentUser() user: JwtPayload, @Body() dto: EraseMyDataDto) {
     return this.usersService.eraseMyData(user.sub, dto);
   }
 
@@ -88,5 +99,3 @@ export class UsersController {
     return this.usersService.getUserByUsername(username);
   }
 }
-
-

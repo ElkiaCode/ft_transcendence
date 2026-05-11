@@ -7,6 +7,7 @@ import { useAuthStore } from "@/store/authStore";
 import { Socket } from "socket.io-client";
 import { getChatSocket, resetChatSocket } from "@/lib/socket/chat-socket";
 import { apiPromoteUser } from "@/lib/api/auth";
+import type { ChatMessage, GroupMember, MessageReaction } from "@/lib/types";
 
 interface SearchUser {
   id: string;
@@ -34,16 +35,12 @@ const reactionIcons: Record<ReactionType, string> = {
 };
 
 function GroupMenuModal({
-  conv,
-  currentUserId,
   onInvite,
   onMembers,
   onRename,
   onLeave,
   onClose,
 }: {
-  conv: Conversation;
-  currentUserId: string | undefined;
   onInvite: () => void;
   onMembers: () => void;
   onRename: () => void;
@@ -122,7 +119,7 @@ function InviteMembersModal({
                 >
                   <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
                     {user.profile?.avatarUrl ? (
-                      <img src={user.profile.avatarUrl} className="w-full h-full object-cover rounded-full" />
+                      <img src={user.profile.avatarUrl} alt={user.username} className="w-full h-full object-cover rounded-full" />
                     ) : (
                       user.username.charAt(0).toUpperCase()
                     )}
@@ -166,7 +163,7 @@ function MembersModal({
   onRemove,
   onClose,
 }: {
-  members: any[];
+  members: GroupMember[];
   currentUserId: string | undefined;
   currentUserRole: string | undefined;
   onRemove: (userId: string) => void;
@@ -182,7 +179,7 @@ function MembersModal({
             <div key={member.userId} className="flex items-center gap-3 p-2 rounded-lg">
               <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0 overflow-hidden">
                 {member.user.avatarUrl ? (
-                  <img src={member.user.avatarUrl} className="w-full h-full object-cover" />
+                  <img src={member.user.avatarUrl} alt={member.user.username} className="w-full h-full object-cover" />
                 ) : (
                   member.user.username.charAt(0).toUpperCase()
                 )}
@@ -334,7 +331,7 @@ function CreateGroupModal({
                 >
                   <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
                     {user.profile?.avatarUrl ? (
-                      <img src={user.profile.avatarUrl} className="w-full h-full object-cover rounded-full" />
+                      <img src={user.profile.avatarUrl} alt={user.username} className="w-full h-full object-cover rounded-full" />
                     ) : (
                       user.username.charAt(0).toUpperCase()
                     )}
@@ -390,7 +387,7 @@ function EditModal({
   onSubmit,
   onClose,
 }: {
-  message: any;
+  message: ChatMessage;
   onSubmit: (content: string) => void;
   onClose: () => void;
 }) {
@@ -533,7 +530,7 @@ function SidebarSearch({
           >
             <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold overflow-hidden">
               {conv.avatarUrl ? (
-                <img src={conv.avatarUrl} className="w-full h-full object-cover" />
+                <img src={conv.avatarUrl} alt={conv.name} className="w-full h-full object-cover" />
               ) : (
                 conv.name?.charAt(0).toUpperCase()
               )}
@@ -657,7 +654,7 @@ function ChatPanel({
   onOpenGroupMenu,
 }: {
   selectedConv: Conversation | null;
-  messages: any[];
+  messages: ChatMessage[];
   messageInput: string;
   currentUserId: string | undefined;
   typingUsers: string[];
@@ -666,9 +663,9 @@ function ChatPanel({
   onInputChange: (value: string) => void;
   onSend: () => void;
   onReport: (messageId: string, userId: string) => void;
-  onEditMessage: (message: any) => void;
-  onDeleteMessage: (message: any) => void;
-  onReact: (message: any, type: ReactionType) => void;
+  onEditMessage: (message: ChatMessage) => void;
+  onDeleteMessage: (message: ChatMessage) => void;
+  onReact: (message: ChatMessage, type: ReactionType) => void;
   onOpenGroupMenu: () => void;
 }) {
   return (
@@ -699,9 +696,6 @@ function ChatPanel({
 		            const isMe = msg.sender.id === currentUserId;
 		            const isDeleted = Boolean(msg.deletedAt);
                 const isSystemMessage = msg.type === 'SYSTEM';
-                const isAutomaticModerationMessage =
-                  isSystemMessage &&
-                  msg.content === 'message deleted by automatic moderation';
                 const canEditOrDelete =
                   isMe &&
                   !isDeleted &&
@@ -740,7 +734,7 @@ function ChatPanel({
                           <button onClick={() => onDeleteMessage(msg)} className="hover:underline">Delete</button>
                         </>
                       )}
-	                      {isMe && msg.reads?.length > 0 && <span>seen by {msg.reads.length}</span>}
+	                      {isMe && (msg.reads?.length ?? 0) > 0 && <span>seen by {msg.reads?.length ?? 0}</span>}
 	                    </div>
                     {!isDeleted && !isSystemMessage && (
                       <div className={`mt-1 flex items-center gap-1 ${isMe ? "justify-end" : "justify-start"}`}>
@@ -801,8 +795,7 @@ function Section() {
   const socketRef = useRef<Socket | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const user = useAuthStore((state) => state.user);
-  console.log(user);
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [messageInput, setMessageInput] = useState("");
   const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -812,14 +805,14 @@ function Section() {
   const [reportModal, setReportModal] = useState<{ messageId: string, userId: string } | null>(null);
   const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
   const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
-  const [editModal, setEditModal] = useState<{ message: any } | null>(null);
-  const [deleteModal, setDeleteModal] = useState<{ message: any } | null>(null);
+  const [editModal, setEditModal] = useState<{ message: ChatMessage } | null>(null);
+  const [deleteModal, setDeleteModal] = useState<{ message: ChatMessage } | null>(null);
   const isTypingRef = useRef(false);
   const [groupModal, setGroupModal] = useState(false);
   const [groupMenuOpen, setGroupMenuOpen] = useState(false);
   const [inviteModal, setInviteModal] = useState(false);
   const [membersModal, setMembersModal] = useState(false);
-  const [members, setMembers] = useState<any[]>([]);
+  const [members, setMembers] = useState<GroupMember[]>([]);
   const [renameModal, setRenameModal] = useState(false);
   const [leaveModal, setLeaveModal] = useState(false);
 
@@ -881,11 +874,11 @@ function Section() {
     }
   };
 
-  const handleEditMessage = (message: any) => {
+  const handleEditMessage = (message: ChatMessage) => {
     setEditModal({ message });
   };
 
-  const handleDeleteMessage = (message: any) => {
+  const handleDeleteMessage = (message: ChatMessage) => {
     setDeleteModal({ message });
   };
 
@@ -928,7 +921,7 @@ function Section() {
       }
     };
     fetchConversations();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (!selectedConv) return;
@@ -960,11 +953,13 @@ function Section() {
 
   useEffect(() => {
     if (!user) {
-      setConversations([]);
-      setMessages([]);
-      setSelectedConv(null);
-      setSearchResults([]);
-      setSearchQuery("");
+      queueMicrotask(() => {
+        setConversations([]);
+        setMessages([]);
+        setSelectedConv(null);
+        setSearchResults([]);
+        setSearchQuery("");
+      });
     }
   }, [user]);
 
@@ -1052,8 +1047,9 @@ function Section() {
     setDeleteModal(null);
   };
 
-  const handleReact = async (message: any, type: ReactionType) => {
-    if (!selectedConv || message.sender.id === user?.id || message.deletedAt) return;
+  const handleReact = async (message: ChatMessage, type: ReactionType) => {
+    if (!selectedConv || !user?.id || message.sender.id === user.id || message.deletedAt) return;
+    const currentUserId = user.id;
 
     try {
       const result = await apiAddMessageReaction(selectedConv.id, message.id, type);
@@ -1064,8 +1060,7 @@ function Section() {
 
           const reactions = item.reactions ?? [];
           const alreadyExists = reactions.some(
-            (reaction: any) =>
-              reaction.userId === user?.id && reaction.type === result.reaction.type,
+            (reaction) => reaction.userId === user?.id && reaction.type === result.reaction.type,
           );
 
           if (alreadyExists) return item;
@@ -1075,8 +1070,8 @@ function Section() {
             reactions: [
               ...reactions,
               {
-                ...result.reaction,
-                userId: user?.id,
+                ...(result.reaction as MessageReaction),
+                userId: currentUserId,
               },
             ],
           };
@@ -1095,7 +1090,7 @@ useEffect(() => {
   if (!socket) return;
   socketRef.current = socket;
 
-  socket.on('chat.message.created', (msg) => {
+  socket.on('chat.message.created', (msg: ChatMessage) => {
     setMessages((prev) => [...prev, msg]);
     setConversations((prev) => {
       const updated = prev.map((c) =>
@@ -1112,7 +1107,7 @@ useEffect(() => {
     });
   });
 
-  socket.on('chat.message.updated', (msg) => {
+  socket.on('chat.message.updated', (msg: ChatMessage) => {
     setMessages((prev) => prev.map((item) => item.id === msg.id ? msg : item));
     setConversations((prev) =>
       prev.map((c) =>
@@ -1123,7 +1118,7 @@ useEffect(() => {
     );
   });
 
-  socket.on('chat.message.deleted', (msg) => {
+  socket.on('chat.message.deleted', (msg: ChatMessage) => {
     setMessages((prev) => prev.map((item) => item.id === msg.id ? msg : item));
     setConversations((prev) =>
       prev.map((c) =>
@@ -1163,7 +1158,7 @@ useEffect(() => {
         if (payload?.messageId && msg.id !== payload.messageId) return msg;
 
         const reads = msg.reads ?? [];
-        if (reads.some((read: any) => read.userId === payload.userId)) return msg;
+        if (reads.some((read) => read.userId === payload.userId)) return msg;
 
         return {
           ...msg,
@@ -1190,16 +1185,19 @@ useEffect(() => {
     });
   });
 
-  socket.on('presence.changed', (payload) => {
-    if (!payload?.userId) return;
+  const handlePresenceChanged = (payload: { userId?: string; isOnline?: boolean }) => {
+    const userId = payload.userId;
+    if (!userId) return;
 
     setOnlineUserIds((prev) => {
       const next = new Set(prev);
-      if (payload.isOnline) next.add(payload.userId);
-      else next.delete(payload.userId);
+      if (payload.isOnline) next.add(userId);
+      else next.delete(userId);
       return next;
     });
-  });
+  };
+
+  socket.on('presence.changed', handlePresenceChanged);
 
   socket.emit('presence.list', {}, (payload: { onlineUserIds?: string[] }) => {
     setOnlineUserIds(new Set(payload?.onlineUserIds ?? []));
@@ -1221,7 +1219,7 @@ useEffect(() => {
     socket.off('chat.moderation.banned');
     socket.off('chat.conversation.read');
     socket.off('chat.typing');
-    socket.off('presence.changed');
+    socket.off('presence.changed', handlePresenceChanged);
     socket.off('chat.conversation.created');
   };
 }, [user]);
@@ -1237,7 +1235,7 @@ useEffect(() => {
   const socket = socketRef.current;
   if (!socket || !selectedConv) return;
 
-  setTypingUsers({});
+  queueMicrotask(() => setTypingUsers({}));
   socket.emit('chat.joinConversation', { conversationId: selectedConv.id });
 
   return () => {
@@ -1280,7 +1278,7 @@ const handleReport = async (messageId: string, userId: string, reason: string) =
           onAddFriend={(id) => { addFriendRequest(id); setMenu(null); }}
           onBlock={(id) => { blockUser(id); setMenu(null); }}
           onUnblock={(id) => { unblockUser(id); setMenu(null); }}
-          onPromote={(id) => { console.log('promote', id); setMenu(null); }}
+          onPromote={(id) => { apiPromoteUser(id).catch(console.error); setMenu(null); }}
         />
       )}
       {reportModal && (
@@ -1310,8 +1308,6 @@ const handleReport = async (messageId: string, userId: string, reason: string) =
       )}
       {groupMenuOpen && selectedConv?.type === 'group' && (
         <GroupMenuModal
-          conv={selectedConv}
-          currentUserId={user?.id}
           onInvite={() => { setInviteModal(true); setGroupMenuOpen(false); }}
           onMembers={handleOpenMembers}
           onRename={() => { setRenameModal(true); setGroupMenuOpen(false); }}
