@@ -627,7 +627,7 @@ function UserContextMenu({
 }) {
   return (
       <div className="fixed z-50 w-44 ColorsS rounded-lg overflow-hidden shadow-lg" style={{ top: y, left: x }}>
-      <button onClick={() => onViewProfile(user.username)} className="block w-full text-left px-4 py-2 text-sm font-bold text-pink hover:bg-white/20 transition">
+      <button onClick={() => onViewProfile(user.username)} className="block w-full text-left px-4 py-2 text-sm font-bold text-white hover:bg-white/20 transition">
         View Profile
       </button>
       <button onClick={() => onAddFriend(user.id)} className="block w-full text-left px-4 py-2 text-sm font-bold text-white hover:bg-white/20 transition">
