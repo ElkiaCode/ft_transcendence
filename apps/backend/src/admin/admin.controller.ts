@@ -13,19 +13,13 @@ export class AdminController {
 
   @Post('users/:id/ban')
   @Roles('ADMIN', 'MODERATOR')
-  banUser(
-    @Param('id') id: string,
-    @CurrentUser() actor: JwtPayload,
-  ) {
+  banUser(@Param('id') id: string, @CurrentUser() actor: JwtPayload) {
     return this.adminService.banUser(id, actor.sub);
   }
 
   @Post('users/:id/unban')
   @Roles('ADMIN', 'MODERATOR')
-  unbanUser(
-    @Param('id') id: string,
-    @CurrentUser() actor: JwtPayload,
-  ) {
+  unbanUser(@Param('id') id: string, @CurrentUser() actor: JwtPayload) {
     return this.adminService.unbanUser(id, actor.sub);
   }
 
