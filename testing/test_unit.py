@@ -299,11 +299,8 @@ def test_unit1():
         os.remove(yann.cookies)
     if (os.path.exists(clement.cookies)):
         os.remove(clement.cookies)
-<<<<<<< HEAD
-=======
     if (os.path.exists(toto.cookies)):
         os.remove(toto.cookies)
->>>>>>> main
     if (os.path.exists(patsy.cookies)):
         os.remove(patsy.cookies)
 

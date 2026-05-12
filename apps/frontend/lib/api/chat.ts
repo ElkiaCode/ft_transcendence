@@ -102,8 +102,6 @@ export async function apiAddMessageReaction(
   if (!res.ok) {
     throw new Error(data.message || "Failed to react to message");
   }
-<<<<<<< HEAD
-=======
   return data;
 }
 
@@ -118,96 +116,6 @@ export async function apiReportMessage(messageId: string, reason: string) {
       targetMessageId: messageId,
       reason,
     }),
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.message || "Failed to report message");
-  }
-  return data;
-}
-
-export async function apiCreateGroupConversation(title: string, userIds: string[]) {
-  const res = await fetchWithAuth(`${API_URL}/chat/group`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ title: title.trim() || undefined, userIds }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to create group');
-  return data;
-}
-
-export async function apiInviteGroupMembers(conversationId: string, userIds: string[]) {
-  const res = await fetchWithAuth(`${API_URL}/chat/conversation/${conversationId}/invite`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ userIds }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to invite members');
-  return data;
-}
-
-export async function apiRemoveGroupMember(conversationId: string, userId: string) {
-  const res = await fetchWithAuth(`${API_URL}/chat/conversation/${conversationId}/remove-user/${userId}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to remove member');
-  return data;
-}
-
-export async function apiLeaveGroupConversation(conversationId: string) {
-  const res = await fetchWithAuth(`${API_URL}/chat/conversation/${conversationId}/leave`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to leave conversation');
-  return data;
-}
-
-export async function apiRenameGroupConversation(conversationId: string, title: string) {
-  const res = await fetchWithAuth(`${API_URL}/chat/conversation/${conversationId}/rename`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ title }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to rename conversation');
-  return data;
-}
-
-export async function apiGetGroupMembers(conversationId: string) {
-  const res = await fetchWithAuth(`${API_URL}/chat/conversations/${conversationId}/members`, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to get members');
->>>>>>> main
-  return data;
-}
-
-export async function apiReportMessage(conversationId: string, messageId: string, reason: string) {
-  const res = await fetchWithAuth(`${API_URL}/chat/conversations/${conversationId}/messages/${messageId}/report`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ reason }),
   });
   const data = await res.json();
   if (!res.ok) {

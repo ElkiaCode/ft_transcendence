@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-import { useAuthStore } from "@/store/authStore";
-=======
->>>>>>> main
 import { fetchWithAuth } from "./fetchWithAuth";
 
 const API_URL = 'https://localhost/api';
@@ -37,8 +33,4 @@ export async function apiNotifyAllAsRead() {
     },
   });
   if (!res.ok) throw new Error("Failed to mark all notifications as read");
-<<<<<<< HEAD
-} 
-=======
 }
->>>>>>> main

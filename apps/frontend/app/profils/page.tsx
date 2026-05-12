@@ -1,11 +1,8 @@
 "use client";
 
 import { apiUpdateProfile, apiUpdateAvatar, apiUpdatePassword, apiGetMyPoints, apiGetTopUsers, apiGetMe } from "@/lib/api/auth";
-<<<<<<< HEAD
-=======
 import { getEarnedBadges, type GamificationBadge } from "@/lib/gamification";
 import { useOnlinePresence } from "@/lib/hooks/use-online-presence";
->>>>>>> main
 import { useAuthStore } from "@/store/authStore";
 import { useEffect, useState, useMemo } from "react";
 import type { AppUser, TopUser } from "@/lib/types";
@@ -167,8 +164,6 @@ function getRankColor(i: number) {
   return '#00BABC';
 }
 
-<<<<<<< HEAD
-=======
 function BadgeGrid({ badges }: { badges: GamificationBadge[] }) {
   return (
     <div className="w-full max-w-2xl">
@@ -199,7 +194,6 @@ function BadgeGrid({ badges }: { badges: GamificationBadge[] }) {
   );
 }
 
->>>>>>> main
 function Section() {
   const [user, setUser] = useState<AppUser | null>(null);
   const [showEdit, setShowEdit] = useState(false);
@@ -207,15 +201,11 @@ function Section() {
   const setStoreUser = useAuthStore((s) => s.setUser);
   const [copied, setCopied] = useState(false);
   const [points, setPoints] = useState<number | null>(null);
-<<<<<<< HEAD
-  const [topUsers, setTopUsers] = useState<any[]>([]);
-=======
   const [topUsers, setTopUsers] = useState<TopUser[]>([]);
   const { isOnline } = useOnlinePresence();
   const profileIsOnline = isOnline(user?.id);
   const profilePoints = points ?? user?.penaltyPoints ?? 0;
   const earnedBadges = getEarnedBadges(profilePoints);
->>>>>>> main
 
   useEffect(() => {
     async function loadUser() {
@@ -232,11 +222,7 @@ function Section() {
   const handleAvatarChange = async (file?: File) => {
     if (!file) return;
     try {
-<<<<<<< HEAD
-      const updatedUser = await apiUpdateAvatar(file);
-=======
       await apiUpdateAvatar(file);
->>>>>>> main
       const fresh = await apiGetMe();
       setUser(fresh);
       setStoreUser(fresh);

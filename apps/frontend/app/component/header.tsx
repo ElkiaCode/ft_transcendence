@@ -6,103 +6,6 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import "../globals.css";
 import { apiNotify, apiNotifyAsRead, apiNotifyAllAsRead } from "@/lib/api/notify";
-<<<<<<< HEAD
-
-function Notify() {
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const user = useAuthStore((s) => s.user);
-
-  useEffect(() => {
-    if (openMenuId !== 'N' || !user) return;
-    loadNotifications();
-  }, [openMenuId, user]);
-
- const loadNotifications = async () => {
-    try {
-      const data = await apiNotify();
-      setNotifications(data);
-    } catch (err: any) {
-      console.error(err);
-      setNotifications([]);
-    }
-  };
-
-  const handleMarkAsRead = (notificationId: string) => async () => {
-    try {
-      await apiNotifyAsRead(notificationId);
-      setNotifications((prev) =>
-        prev.map((notif) =>
-          notif.id === notificationId ? { ...notif, isRead: true } : notif
-        )
-      );
-    } catch (err: any) {
-      console.error(err);
-    }
-  };
-
-  const handleMarkAllAsRead = async () => {
-    try {
-      await apiNotifyAllAsRead();
-      setNotifications((prev) => prev.map((notif) => ({ ...notif, isRead: true })));
-    } catch (err: any) {
-      console.error(err);
-    }
-  };
-
-  useEffect(() => {
-    if (!user) setNotifications([]);
-  }, [user]);
-
-  return (
-    <div className="relative flex items-center gap-4 ml-4">
-      {user ? (
-        <button
-          className="bg-green-500 text-white px-6 py-2 rounded-full hover:bg-pink-500 transition cursor-pointer"
-          onClick={() => setOpenMenuId(openMenuId === 'N' ? null : 'N')}>
-          <img src="/notif.png" alt="42" width={24} height={24} />
-        </button>
-      ) : null}
-      {openMenuId === 'N' && (
-        <div className="absolute top-full mt-2 w-80 bg-white border border-gray-200 rounded shadow-lg z-10 right-0 p-2 flex flex-col gap-2 text-sm text-gray-700">
-          <div className="max-h-60 overflow-y-auto">
-            {notifications.length === 0 ? (
-              <div className="px-4 py-3 text-sm text-gray-600">
-                No notifications
-              </div>
-            ) : (
-              notifications.map((notif) => (
-                <div
-                  key={notif.id}
-                  className={`px-4 py-3 text-sm border-b ${
-                    notif.isRead ? "text-gray-500" : "text-black cursor-pointer font-bold"
-                  }`}
-                  onClick={handleMarkAsRead(notif.id)}
-                >
-                  <div>{notif.title}</div>
-                  {notif.body && (
-                    <div className="text-xs text-gray-500 break-words">{notif.body}</div>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-          <div className="px-4 py-2 text-xs text-gray-500 border-t border-gray-200">
-            <button
-              onClick={handleMarkAllAsRead}
-              className="text-blue-500 hover:text-blue-700 cursor-pointer"
-            >
-              Read all notifications
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function FriendInterface({ user }: { user: any }) {
-=======
 import { useOnlinePresence } from "@/lib/hooks/use-online-presence";
 import { getChatSocket } from "@/lib/socket/chat-socket";
 import type { AppUser, FriendUser, NotificationItem, PendingFriendRequest } from "@/lib/types";
@@ -110,7 +13,6 @@ import { errorMessage } from "@/lib/types";
 
 function Notify() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
->>>>>>> main
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const user = useAuthStore((s) => s.user);
   const accessToken = useAuthStore((s) => s.accessToken);

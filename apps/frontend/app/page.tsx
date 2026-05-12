@@ -7,11 +7,8 @@ import { useAuthStore } from "@/store/authStore";
 import { Socket } from "socket.io-client";
 import { getChatSocket, resetChatSocket } from "@/lib/socket/chat-socket";
 import { apiPromoteUser } from "@/lib/api/auth";
-<<<<<<< HEAD
-=======
 import type { ChatMessage, GroupMember, MessageReaction } from "@/lib/types";
 import { useRouter } from "next/navigation";
->>>>>>> main
 
 interface SearchUser {
   id: string;
@@ -39,22 +36,12 @@ const reactionIcons: Record<ReactionType, string> = {
 };
 
 function GroupMenuModal({
-<<<<<<< HEAD
-  conv,
-  currentUserId,
-=======
->>>>>>> main
   onInvite,
   onMembers,
   onRename,
   onLeave,
   onClose,
 }: {
-<<<<<<< HEAD
-  conv: Conversation;
-  currentUserId: string | undefined;
-=======
->>>>>>> main
   onInvite: () => void;
   onMembers: () => void;
   onRename: () => void;
@@ -129,19 +116,11 @@ function InviteMembersModal({
                 <div
                   key={user.id}
                   onClick={() => toggleUser(user)}
-<<<<<<< HEAD
-                  className={`flex items-center gap-3 p-2 cursor-pointer transition ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-100'}`}
-                >
-                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
-                    {user.profile?.avatarUrl ? (
-                      <img src={user.profile.avatarUrl} className="w-full h-full object-cover rounded-full" />
-=======
                   className={`flex items-center gap-3 p-2 cursor-pointer transition ${isSelected ? 'ColorsS' : 'hover:bg-gray-100'}`}
                 >
                   <div className="w-8 h-8 ColorsS rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
                     {user.profile?.avatarUrl ? (
                       <img src={user.profile.avatarUrl} alt={user.username} className="w-full h-full object-cover rounded-full" />
->>>>>>> main
                     ) : (
                       user.username.charAt(0).toUpperCase()
                     )}
@@ -156,11 +135,7 @@ function InviteMembersModal({
         {selectedUsers.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {selectedUsers.map((user) => (
-<<<<<<< HEAD
-              <span key={user.id} className="flex items-center gap-1 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
-=======
               <span key={user.id} className="flex items-center gap-1 ColorsS text-blue-800 text-xs px-2 py-1 rounded-full">
->>>>>>> main
                 {user.username}
                 <button onClick={() => toggleUser(user)} className="hover:text-blue-600 cursor-pointer">×</button>
               </span>
@@ -172,11 +147,7 @@ function InviteMembersModal({
           <button
             onClick={() => onSubmit(selectedUsers.map((u) => u.id))}
             disabled={selectedUsers.length === 0}
-<<<<<<< HEAD
-            className="px-4 py-2 rounded-full bg-blue-500 text-white hover:bg-blue-600 cursor-pointer transition disabled:opacity-40 disabled:cursor-not-allowed"
-=======
             className="px-4 py-2 rounded-full ColorsS text-white hover:ColorsScursor-pointer transition disabled:opacity-40 disabled:cursor-not-allowed"
->>>>>>> main
           >
             Add
           </button>
@@ -193,11 +164,7 @@ function MembersModal({
   onRemove,
   onClose,
 }: {
-<<<<<<< HEAD
-  members: any[];
-=======
   members: GroupMember[];
->>>>>>> main
   currentUserId: string | undefined;
   currentUserRole: string | undefined;
   onRemove: (userId: string) => void;
@@ -211,15 +178,9 @@ function MembersModal({
         <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
           {members.map((member) => (
             <div key={member.userId} className="flex items-center gap-3 p-2 rounded-lg">
-<<<<<<< HEAD
-              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0 overflow-hidden">
-                {member.user.avatarUrl ? (
-                  <img src={member.user.avatarUrl} className="w-full h-full object-cover" />
-=======
               <div className="w-8 h-8 ColorsS rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0 overflow-hidden">
                 {member.user.avatarUrl ? (
                   <img src={member.user.avatarUrl} alt={member.user.username} className="w-full h-full object-cover" />
->>>>>>> main
                 ) : (
                   member.user.username.charAt(0).toUpperCase()
                 )}
@@ -273,11 +234,7 @@ function RenameModal({
           <button
             onClick={() => onSubmit(title)}
             disabled={!title.trim()}
-<<<<<<< HEAD
-            className="px-4 py-2 rounded-full bg-blue-500 text-white hover:bg-blue-600 cursor-pointer transition disabled:opacity-40 disabled:cursor-not-allowed"
-=======
             className="px-4 py-2 rounded-full ColorsS text-white hover:ColorsS cursor-pointer transition disabled:opacity-40 disabled:cursor-not-allowed"
->>>>>>> main
           >
             Rename
           </button>
@@ -370,21 +327,12 @@ function CreateGroupModal({
                   key={user.id}
                   onClick={() => toggleUser(user)}
                   className={`flex items-center gap-3 p-2 cursor-pointer transition ${
-<<<<<<< HEAD
-                    isSelected ? 'bg-blue-50' : 'hover:bg-gray-100'
-                  }`}
-                >
-                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
-                    {user.profile?.avatarUrl ? (
-                      <img src={user.profile.avatarUrl} className="w-full h-full object-cover rounded-full" />
-=======
                     isSelected ? 'ColorsS' : 'hover:bg-gray-100'
                   }`}
                 >
                   <div className="w-8 h-8 ColorsS rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
                     {user.profile?.avatarUrl ? (
                       <img src={user.profile.avatarUrl} alt={user.username} className="w-full h-full object-cover rounded-full" />
->>>>>>> main
                     ) : (
                       user.username.charAt(0).toUpperCase()
                     )}
@@ -401,11 +349,7 @@ function CreateGroupModal({
             {selectedUsers.map((user) => (
               <span
                 key={user.id}
-<<<<<<< HEAD
-                className="flex items-center gap-1 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
-=======
                 className="flex items-center gap-1 ColorsS text-blue-800 text-xs px-2 py-1 rounded-full"
->>>>>>> main
               >
                 {user.username}
                 <button
@@ -444,11 +388,7 @@ function EditModal({
   onSubmit,
   onClose,
 }: {
-<<<<<<< HEAD
-  message: any;
-=======
   message: ChatMessage;
->>>>>>> main
   onSubmit: (content: string) => void;
   onClose: () => void;
 }) {
@@ -473,11 +413,7 @@ function EditModal({
           <button
             onClick={() => onSubmit(content)}
             disabled={!content.trim()}
-<<<<<<< HEAD
-            className="px-4 py-2 rounded-full bg-blue-500 text-white hover:bg-blue-600 cursor-pointer transition disabled:opacity-40 disabled:cursor-not-allowed"
-=======
             className="px-4 py-2 rounded-full ColorsS text-white hover:ColorsS cursor-pointer transition disabled:opacity-40 disabled:cursor-not-allowed"
->>>>>>> main
           >
             Save
           </button>
@@ -674,10 +610,7 @@ function UserContextMenu({
   onBlock,
   onUnblock,
   onPromote,
-<<<<<<< HEAD
-=======
   onViewProfile
->>>>>>> main
 }: {
   user: SearchUser;
   x: number;
@@ -687,10 +620,7 @@ function UserContextMenu({
   onBlock: (userId: string) => void;
   onUnblock: (userId: string) => void;
   onPromote: (userId: string) => void;
-<<<<<<< HEAD
-=======
   onViewProfile: (username: string) => void;
->>>>>>> main
 }) {
   return (
       <div
@@ -730,10 +660,6 @@ function UserContextMenu({
         Unblock User
       </button>
       {isAdmin && (
-<<<<<<< HEAD
-        <button onClick={() => onPromote(user.id)} className="block w-full text-purple-500 text-left px-4 py-2 hover:bg-gray-100">
-          Promote to Moderator
-=======
           <button
             type="button"
             onClick={() => onPromote(user.id)}
@@ -741,7 +667,6 @@ function UserContextMenu({
           >
             <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
             Promote to Moderator
->>>>>>> main
         </button>
       )}
     </div>
@@ -774,15 +699,9 @@ function ChatPanel({
   onInputChange: (value: string) => void;
   onSend: () => void;
   onReport: (messageId: string, userId: string) => void;
-<<<<<<< HEAD
-  onEditMessage: (message: any) => void;
-  onDeleteMessage: (message: any) => void;
-  onReact: (message: any, type: ReactionType) => void;
-=======
   onEditMessage: (message: ChatMessage) => void;
   onDeleteMessage: (message: ChatMessage) => void;
   onReact: (message: ChatMessage, type: ReactionType) => void;
->>>>>>> main
   onOpenGroupMenu: () => void;
 }) {
   return (
@@ -813,12 +732,6 @@ function ChatPanel({
 		            const isMe = msg.sender.id === currentUserId;
 		            const isDeleted = Boolean(msg.deletedAt);
                 const isSystemMessage = msg.type === 'SYSTEM';
-<<<<<<< HEAD
-                const isAutomaticModerationMessage =
-                  isSystemMessage &&
-                  msg.content === 'message deleted by automatic moderation';
-=======
->>>>>>> main
                 const canEditOrDelete =
                   isMe &&
                   !isDeleted &&
@@ -837,11 +750,7 @@ function ChatPanel({
                     {!isMe && (
                       <span className="text-xs text-gray-500 mb-1 ml-1">{msg.sender.username}</span>
                     )}
-<<<<<<< HEAD
-                    <div className={`px-3 py-2 rounded-lg text-sm break-words overflow-hidden ${isMe ? "bg-blue-500 text-white" : "bg-gray-300 text-black"} ${isDeleted ? "italic opacity-70" : ""}`}>
-=======
                     <div className={`px-3 py-2 rounded-lg text-sm font-bold break-words overflow-hidden ${isMe ? "ColorsS text-white" : "bg-gray-300 text-black"} ${isDeleted ? "italic opacity-70" : ""}`}>
->>>>>>> main
                       {isDeleted ? "Message deleted" : msg.content}
                     </div>
                     {!isMe && !isDeleted && (
@@ -922,14 +831,9 @@ function Section() {
   const socketRef = useRef<Socket | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const user = useAuthStore((state) => state.user);
-<<<<<<< HEAD
-  console.log(user);
-  const [messages, setMessages] = useState<any[]>([]);
-=======
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const router = useRouter();
   //const [messages, setMessages] = useState<any[]>([]);
->>>>>>> main
   const [messageInput, setMessageInput] = useState("");
   const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -939,23 +843,14 @@ function Section() {
   const [reportModal, setReportModal] = useState<{ messageId: string, userId: string } | null>(null);
   const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
   const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
-<<<<<<< HEAD
-  const [editModal, setEditModal] = useState<{ message: any } | null>(null);
-  const [deleteModal, setDeleteModal] = useState<{ message: any } | null>(null);
-=======
   const [editModal, setEditModal] = useState<{ message: ChatMessage } | null>(null);
   const [deleteModal, setDeleteModal] = useState<{ message: ChatMessage } | null>(null);
->>>>>>> main
   const isTypingRef = useRef(false);
   const [groupModal, setGroupModal] = useState(false);
   const [groupMenuOpen, setGroupMenuOpen] = useState(false);
   const [inviteModal, setInviteModal] = useState(false);
   const [membersModal, setMembersModal] = useState(false);
-<<<<<<< HEAD
-  const [members, setMembers] = useState<any[]>([]);
-=======
   const [members, setMembers] = useState<GroupMember[]>([]);
->>>>>>> main
   const [renameModal, setRenameModal] = useState(false);
   const [leaveModal, setLeaveModal] = useState(false);
 
@@ -1017,19 +912,11 @@ function Section() {
     }
   };
 
-<<<<<<< HEAD
-  const handleEditMessage = (message: any) => {
-    setEditModal({ message });
-  };
-
-  const handleDeleteMessage = (message: any) => {
-=======
   const handleEditMessage = (message: ChatMessage) => {
     setEditModal({ message });
   };
 
   const handleDeleteMessage = (message: ChatMessage) => {
->>>>>>> main
     setDeleteModal({ message });
   };
 
@@ -1396,15 +1283,9 @@ useEffect(() => {
   };
 }, [selectedConv]);
 
-<<<<<<< HEAD
-const handleReport = async (messageId: string, userId: string, reason: string) => {
-  try {
-    await apiReportMessage(messageId, userId, reason);
-=======
 const handleReport = async (messageId: string, _userId: string, reason: string) => {
   try {
     await apiReportMessage(messageId, reason);
->>>>>>> main
     setReportModal(null);
   } catch (err) {
     console.error("Failed to report:", err);
@@ -1435,13 +1316,9 @@ const handleReport = async (messageId: string, _userId: string, reason: string) 
           onAddFriend={(id) => { addFriendRequest(id); setMenu(null); }}
           onBlock={(id) => { blockUser(id); setMenu(null); }}
           onUnblock={(id) => { unblockUser(id); setMenu(null); }}
-<<<<<<< HEAD
-          onPromote={(id) => { console.log('promote', id); setMenu(null); }}
-=======
           onPromote={(id) => { apiPromoteUser(id).catch(console.error); setMenu(null); }}
           //onPromote={(id) => { console.log('promote', id); setMenu(null); }}
           onViewProfile={(username) => { router.push(`/profils/${username}`); setMenu(null); }}
->>>>>>> main
         />
       )}
       {reportModal && (
@@ -1471,11 +1348,6 @@ const handleReport = async (messageId: string, _userId: string, reason: string) 
       )}
       {groupMenuOpen && selectedConv?.type === 'group' && (
         <GroupMenuModal
-<<<<<<< HEAD
-          conv={selectedConv}
-          currentUserId={user?.id}
-=======
->>>>>>> main
           onInvite={() => { setInviteModal(true); setGroupMenuOpen(false); }}
           onMembers={handleOpenMembers}
           onRename={() => { setRenameModal(true); setGroupMenuOpen(false); }}

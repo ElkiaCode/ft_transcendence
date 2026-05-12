@@ -12,12 +12,8 @@ import { AutoModerationService } from '../moderation/auto-moderation.service';
 @Injectable()
 export class ChatService {
   private readonly positiveReactionPointValue = 5;
-<<<<<<< HEAD
-  private readonly automaticModerationPlaceholder = 'message deleted by automatic moderation';
-=======
   private readonly automaticModerationPlaceholder =
     'message deleted by automatic moderation';
->>>>>>> main
 
   constructor(
     private readonly prisma: PrismaService,
@@ -667,17 +663,10 @@ export class ChatService {
         id: conv.id,
         type: conv.type === 'DIRECT' ? 'dm' : 'group',
 
-<<<<<<< HEAD
-      name:
-        conv.type === 'DIRECT'
-          ? otherUser?.username
-          : conv.title ?? 'Group chat',
-=======
         name:
           conv.type === 'DIRECT'
             ? otherUser?.username
             : (conv.title ?? 'Group chat'),
->>>>>>> main
 
         avatarUrl:
           conv.type === 'DIRECT'
@@ -1105,13 +1094,9 @@ export class ChatService {
         moderationResult,
         message.id,
       );
-<<<<<<< HEAD
-      const banReason = this.buildAutomaticBanReason(moderationResult.categories);
-=======
       const banReason = this.buildAutomaticBanReason(
         moderationResult.categories,
       );
->>>>>>> main
       const banAnnouncementMessage = moderation.penalty.isBanned
         ? await this.prisma.message.create({
             data: {
@@ -1174,13 +1159,9 @@ export class ChatService {
       );
 
       if (moderation) {
-<<<<<<< HEAD
-        const banReason = this.buildAutomaticBanReason(moderationResult.categories);
-=======
         const banReason = this.buildAutomaticBanReason(
           moderationResult.categories,
         );
->>>>>>> main
         const banAnnouncementMessage = moderation.penalty.isBanned
           ? await this.prisma.message.create({
               data: {

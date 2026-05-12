@@ -264,8 +264,6 @@ export async function apiEraseMyData(currentPassword: string) {
   return data;
 }
 
-<<<<<<< HEAD
-=======
 export async function apiExportMyData() {
   const res = await fetchWithAuth(`${API_URL}/users/me/export-data`, {
     credentials: 'include',
@@ -280,7 +278,6 @@ export async function apiExportMyData() {
   return data;
 }
 
->>>>>>> main
 export async function apiPromoteUser(userId: string) {
   const res = await fetchWithAuth(`${API_URL}/admin/users/${userId}/promote`, {
     method: "POST",

@@ -72,14 +72,11 @@ async function handleConfirm() {
     setError(null);
   }
 
-<<<<<<< HEAD
-=======
   function handleExportCancel() {
     setExportStep("idle");
     setExportError(null);
   }
 
->>>>>>> main
   return (
     <div className="min-h-0 bg-white dark:bg-zinc-900">
       <div className="max-w-3xl mx-auto px-6 py-12 text-center">
@@ -127,8 +124,6 @@ async function handleConfirm() {
             <hr className="border-gray-100 dark:border-zinc-700 mt-4" />
           </div>
         ))}
-<<<<<<< HEAD
-=======
         {user && (
           <div className="mt-10 border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/30 rounded-xl px-6 py-6">
             <h2 className="text-base font-medium text-gray-900 dark:text-white mb-2">Request my data</h2>
@@ -186,7 +181,6 @@ async function handleConfirm() {
             )}
           </div>
         )}
->>>>>>> main
         {user && (
   <div className="mt-10 border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 rounded-xl px-6 py-6">
     <p className="text-sm text-red-600/70 dark:text-red-400/60 mb-4">
