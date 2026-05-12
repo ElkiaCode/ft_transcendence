@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { InviteUsersDto } from './dto/invite-users.dto';
 import { CreateGroupConversationDto } from './dto/create-group-conversation.dto';
@@ -7,7 +12,12 @@ import { AutoModerationService } from '../moderation/auto-moderation.service';
 @Injectable()
 export class ChatService {
   private readonly positiveReactionPointValue = 5;
+<<<<<<< HEAD
   private readonly automaticModerationPlaceholder = 'message deleted by automatic moderation';
+=======
+  private readonly automaticModerationPlaceholder =
+    'message deleted by automatic moderation';
+>>>>>>> main
 
   constructor(
     private readonly prisma: PrismaService,
@@ -27,7 +37,9 @@ export class ChatService {
     }
 
     if (conversation.type !== 'GROUP') {
-      throw new BadRequestException('this action is only allowed for group conversations');
+      throw new BadRequestException(
+        'this action is only allowed for group conversations',
+      );
     }
 
     return conversation;
@@ -50,11 +62,15 @@ export class ChatService {
     });
 
     if (!membership) {
-      throw new ForbiddenException('you are not a participant of this conversation');
+      throw new ForbiddenException(
+        'you are not a participant of this conversation',
+      );
     }
 
     if (membership.conversation.type !== 'GROUP') {
-      throw new BadRequestException('this action is only allowed for group conversations');
+      throw new BadRequestException(
+        'this action is only allowed for group conversations',
+      );
     }
 
     if (membership.role !== 'OWNER' && membership.role !== 'ADMIN') {
@@ -66,22 +82,26 @@ export class ChatService {
 
   async ensureUsersCanBeAdded(actorUserId: string, targetUserIds: string[]) {
     const users = await this.prisma.user.findMany({
-      where: {id: { in: targetUserIds } },
+      where: { id: { in: targetUserIds } },
       select: {
         id: true,
         username: true,
         isActive: true,
         isBanned: true,
-      }
+      },
     });
 
     if (users.length !== targetUserIds.length) {
-      throw new BadRequestException('One or more selected users does not exist');
+      throw new BadRequestException(
+        'One or more selected users does not exist',
+      );
     }
 
     for (const user of users) {
       if (!user.isActive || user.isBanned) {
-        throw new BadRequestException(`user ${user.username} cannot be added to the conversation`);
+        throw new BadRequestException(
+          `user ${user.username} cannot be added to the conversation`,
+        );
       }
 
       const block = await this.prisma.block.findFirst({
@@ -94,25 +114,34 @@ export class ChatService {
       });
 
       if (block) {
-        throw new ForbiddenException(`cannot add ${user.username} because one of you has blocked the other`);
+        throw new ForbiddenException(
+          `cannot add ${user.username} because one of you has blocked the other`,
+        );
       }
     }
 
     return users;
   }
 
-  async ensureCanInviteToConversation(actorUserId: string, conversationId: string) {
+  async ensureCanInviteToConversation(
+    actorUserId: string,
+    conversationId: string,
+  ) {
     const menbership = await this.prisma.conversationParticipant.findUnique({
-      where: { conversationId_userId: { conversationId, userId: actorUserId} },
-      include: { conversation: true }
+      where: { conversationId_userId: { conversationId, userId: actorUserId } },
+      include: { conversation: true },
     });
 
     if (!menbership) {
-      throw new ForbiddenException('You are not a participant of this conversation');
+      throw new ForbiddenException(
+        'You are not a participant of this conversation',
+      );
     }
 
     if (menbership.conversation.type !== 'GROUP') {
-      throw new BadRequestException('You can only invite users to a group conversation');
+      throw new BadRequestException(
+        'You can only invite users to a group conversation',
+      );
     }
 
     /*if (menbership.role !== 'OWNER' && menbership.role !== 'ADMIN') {
@@ -169,7 +198,10 @@ export class ChatService {
     return user;
   }
 
-  private async ensureCanDirectMessage(actorUserId: string, targetUserId: string) {
+  private async ensureCanDirectMessage(
+    actorUserId: string,
+    targetUserId: string,
+  ) {
     if (actorUserId === targetUserId) {
       throw new BadRequestException('cannot message yourself');
     }
@@ -211,22 +243,28 @@ export class ChatService {
     });
 
     if (!membership) {
-      throw new ForbiddenException('you are not a participant of this conversation');
+      throw new ForbiddenException(
+        'you are not a participant of this conversation',
+      );
     }
 
     return membership;
   }
 
   private normalizeTargetUserIds(rawUserIds: string[], actorUserId: string) {
-    return [...new Set(rawUserIds.map((id) => id.trim()))]
-      .filter((id) => id.length > 0 && id !== actorUserId);
+    return [...new Set(rawUserIds.map((id) => id.trim()))].filter(
+      (id) => id.length > 0 && id !== actorUserId,
+    );
   }
 
   private buildAutomaticBanReason(categories: string[]) {
     return categories.length > 0 ? categories.join(', ') : 'harmful message';
   }
 
-  async createOrGetDirectConversation(actorUserId: string, targetUserId: string) {
+  async createOrGetDirectConversation(
+    actorUserId: string,
+    targetUserId: string,
+  ) {
     await this.ensureCanDirectMessage(actorUserId, targetUserId);
 
     const existing = await this.prisma.conversation.findFirst({
@@ -278,11 +316,16 @@ export class ChatService {
     });
   }
 
-  async createGroupeConversation(actorUserId: string, dto: CreateGroupConversationDto) {
+  async createGroupeConversation(
+    actorUserId: string,
+    dto: CreateGroupConversationDto,
+  ) {
     const targetUserIds = this.normalizeTargetUserIds(dto.userIds, actorUserId);
 
     if (targetUserIds.length < 2) {
-      throw new BadRequestException('a group conversation must contain at least 2 other users');
+      throw new BadRequestException(
+        'a group conversation must contain at least 2 other users',
+      );
     }
 
     await this.ensureLiveSender(actorUserId);
@@ -296,7 +339,7 @@ export class ChatService {
           create: [
             {
               userId: actorUserId,
-              role: 'OWNER'
+              role: 'OWNER',
             },
             ...targetUserIds.map((userId) => ({
               userId,
@@ -324,11 +367,18 @@ export class ChatService {
     };
   }
 
-  async inviteUsers(actorUserId: string, conversationId: string, dto: InviteUsersDto) {
+  async inviteUsers(
+    actorUserId: string,
+    conversationId: string,
+    dto: InviteUsersDto,
+  ) {
     await this.ensureLiveSender(actorUserId);
     await this.ensureCanInviteToConversation(actorUserId, conversationId);
 
-    const normalizedUserIds = this.normalizeTargetUserIds(dto.userIds, actorUserId);
+    const normalizedUserIds = this.normalizeTargetUserIds(
+      dto.userIds,
+      actorUserId,
+    );
 
     if (normalizedUserIds.length === 0) {
       throw new BadRequestException('no valid users to invite');
@@ -336,24 +386,29 @@ export class ChatService {
 
     await this.ensureUsersCanBeAdded(actorUserId, normalizedUserIds);
 
-    const existingParticipants = await this.prisma.conversationParticipant.findMany({
-      where: {
-        conversationId,
-        userId: { in: normalizedUserIds },
-      },
-      select: {
-        userId: true,
-      },
-    });
+    const existingParticipants =
+      await this.prisma.conversationParticipant.findMany({
+        where: {
+          conversationId,
+          userId: { in: normalizedUserIds },
+        },
+        select: {
+          userId: true,
+        },
+      });
 
     const existingUserIds = new Set(existingParticipants.map((p) => p.userId));
 
-    const newUserIds = normalizedUserIds.filter((id) => !existingUserIds.has(id));
+    const newUserIds = normalizedUserIds.filter(
+      (id) => !existingUserIds.has(id),
+    );
 
     if (newUserIds.length === 0) {
       return {
         message: 'all selected users are already in the conversation',
         invitedCount: 0,
+        invitedUserIds: [],
+        conversation: null,
       };
     }
 
@@ -389,38 +444,52 @@ export class ChatService {
     return {
       message: 'users invited successfully',
       invitedCount: newUserIds.length,
+      invitedUserIds: newUserIds,
       conversation,
     };
   }
 
-  async removeUserFromGroup(actorUserId: string, conversationId: string, targetUserId: string) {
+  async removeUserFromGroup(
+    actorUserId: string,
+    conversationId: string,
+    targetUserId: string,
+  ) {
     await this.ensureLiveSender(actorUserId);
-    const actorMenbership = await this.ensureGroupManagementPermission(actorUserId, conversationId);
+    const actorMenbership = await this.ensureGroupManagementPermission(
+      actorUserId,
+      conversationId,
+    );
 
     if (actorUserId === targetUserId) {
-      throw new BadRequestException('To quit the group click on the leave option');
+      throw new BadRequestException(
+        'To quit the group click on the leave option',
+      );
     }
 
-    const targetMenbership = await this.prisma.conversationParticipant.findUnique({
-      where: {
-        conversationId_userId: {
-          conversationId,
-          userId: targetUserId,
-        }
-      }
-    });
+    const targetMenbership =
+      await this.prisma.conversationParticipant.findUnique({
+        where: {
+          conversationId_userId: {
+            conversationId,
+            userId: targetUserId,
+          },
+        },
+      });
 
     if (!targetMenbership) {
       throw new NotFoundException('target user is not in this conversation');
     }
 
     if (targetMenbership.role === 'OWNER' && actorMenbership.role !== 'OWNER') {
-      throw new ForbiddenException('only the room owner can remove another user');
+      throw new ForbiddenException(
+        'only the room owner can remove another user',
+      );
     }
 
-    const remainingParticipantsCount = await this.prisma.conversationParticipant.count({
-      where: { conversationId }
-    });
+    const remainingParticipantsCount =
+      await this.prisma.conversationParticipant.count({
+        where: { conversationId },
+      });
 
     if (remainingParticipantsCount <= 1) {
       throw new BadRequestException('cannot remove the last participant');
@@ -431,20 +500,22 @@ export class ChatService {
         where: {
           conversationId_userId: {
             conversationId,
-            userId: targetUserId
-          }
-        }
+            userId: targetUserId,
+          },
+        },
       }),
       this.prisma.conversation.update({
         where: { id: conversationId },
-        data: {updatedAt: new Date() },
-      })
+        data: { updatedAt: new Date() },
+      }),
     ]);
 
     return {
       message: 'user removed from group',
-      removedUserId: targetUserId
-    }
+      removedUserId: targetUserId,
+      conversationId,
+      conversationTitle: actorMenbership.conversation.title ?? 'Group chat',
+    };
   }
 
   async leaveConversation(userId: string, conversationId: string) {
@@ -454,25 +525,29 @@ export class ChatService {
       where: {
         conversationId_userId: {
           conversationId,
-          userId
-        }
+          userId,
+        },
       },
       include: {
         conversation: true,
-      }
+      },
     });
 
     if (!membership) {
-      throw new ForbiddenException('You are not a participant of this conversation');
+      throw new ForbiddenException(
+        'You are not a participant of this conversation',
+      );
     }
 
     if (membership.conversation.type !== 'GROUP') {
-      throw new BadRequestException('leave is only supported for group conversation');
+      throw new BadRequestException(
+        'leave is only supported for group conversation',
+      );
     }
 
     const participants = await this.prisma.conversationParticipant.findMany({
       where: { conversationId },
-      orderBy: { joinedAt: 'asc' }
+      orderBy: { joinedAt: 'asc' },
     });
 
     if (participants.length <= 1) {
@@ -480,44 +555,56 @@ export class ChatService {
     }
 
     const otherParticipants = participants.filter((p) => p.userId !== userId);
+    const remainingUserIds = otherParticipants.map((p) => p.userId);
+    const previousRole = membership.role;
+    const nextOwnerId =
+      previousRole === 'OWNER' ? otherParticipants[0]?.userId : null;
 
     await this.prisma.$transaction(async (tx) => {
       await tx.conversationParticipant.delete({
         where: {
           conversationId_userId: {
             conversationId,
-            userId
-          }
-        }
+            userId,
+          },
+        },
       });
 
-      if (membership.role === 'OWNER') {
+      if (previousRole === 'OWNER') {
         const nextOwner = otherParticipants[0];
 
         await tx.conversationParticipant.update({
           where: {
             conversationId_userId: {
               conversationId,
-              userId: nextOwner.userId
-            }
+              userId: nextOwner.userId,
+            },
           },
-          data: { role: 'OWNER' }
+          data: { role: 'OWNER' },
         });
       }
 
       await tx.conversation.update({
         where: { id: conversationId },
-        data: { updatedAt: new Date() }
+        data: { updatedAt: new Date() },
       });
     });
 
     return {
       message: 'left conversation successfully',
-      conversationId
+      conversationId,
+      conversationTitle: membership.conversation.title ?? 'Group chat',
+      remainingUserIds,
+      previousRole,
+      nextOwnerId,
     };
   }
 
-  async renameConversation(actorUserId: string, conversationId: string, title: string) {
+  async renameConversation(
+    actorUserId: string,
+    conversationId: string,
+    title: string,
+  ) {
     await this.ensureLiveSender(actorUserId);
     await this.ensureGroupManagementPermission(actorUserId, conversationId);
 
@@ -531,71 +618,78 @@ export class ChatService {
       where: { id: conversationId },
       data: {
         title: trimmedTitle,
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     });
 
     return {
       message: 'conversation renamed successfully',
-      conversation
-    }
+      conversation,
+    };
   }
 
   async listMyConversations(userId: string) {
-  const conversations = await this.prisma.conversation.findMany({
-    where: {
-      participants: {
-        some: { userId },
+    const conversations = await this.prisma.conversation.findMany({
+      where: {
+        participants: {
+          some: { userId },
+        },
       },
-    },
-    include: {
-      participants: {
-        include: {
-          user: {
-            include: { profile: true },
+      include: {
+        participants: {
+          include: {
+            user: {
+              include: { profile: true },
+            },
+          },
+        },
+        messages: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          include: {
+            sender: {
+              include: { profile: true },
+            },
           },
         },
       },
-      messages: {
-        orderBy: { createdAt: 'desc' },
-        take: 1,
-        include: {
-          sender: {
-            include: { profile: true },
-          },
-        },
-      },
-    },
-    orderBy: { updatedAt: 'desc' },
-  });
+      orderBy: { updatedAt: 'desc' },
+    });
 
-  return conversations.map((conv) => {
-    const otherUser = conv.participants.find(
-      (p) => p.userId !== userId
-    )?.user;
+    return conversations.map((conv) => {
+      const otherUser = conv.participants.find(
+        (p) => p.userId !== userId,
+      )?.user;
 
-    const lastMessage = conv.messages[0];
+      const lastMessage = conv.messages[0];
 
-    return {
-      id: conv.id,
-      type: conv.type === 'DIRECT' ? 'dm' : 'group',
+      return {
+        id: conv.id,
+        type: conv.type === 'DIRECT' ? 'dm' : 'group',
 
+<<<<<<< HEAD
       name:
         conv.type === 'DIRECT'
           ? otherUser?.username
           : conv.title ?? 'Group chat',
+=======
+        name:
+          conv.type === 'DIRECT'
+            ? otherUser?.username
+            : (conv.title ?? 'Group chat'),
+>>>>>>> main
 
-      avatarUrl:
-        conv.type === 'DIRECT'
-          ? otherUser?.profile?.avatarUrl ?? null
-          : null,
+        avatarUrl:
+          conv.type === 'DIRECT'
+            ? (otherUser?.profile?.avatarUrl ?? null)
+            : null,
 
-      lastMessage: lastMessage?.content ?? null,
+        lastMessage: lastMessage?.content ?? null,
 
-      unreadCount: 0,
-    };
-  });
-}
+        unreadCount: 0,
+      };
+    });
+  }
 
   async listMessages(userId: string, conversationId: string) {
     await this.ensureConversationMembership(userId, conversationId);
@@ -717,7 +811,11 @@ export class ChatService {
     });
   }
 
-  async deleteMessage(userId: string, conversationId: string, messageId: string) {
+  async deleteMessage(
+    userId: string,
+    conversationId: string,
+    messageId: string,
+  ) {
     await this.ensureLiveSender(userId);
     await this.ensureConversationMembership(userId, conversationId);
 
@@ -1007,7 +1105,13 @@ export class ChatService {
         moderationResult,
         message.id,
       );
+<<<<<<< HEAD
       const banReason = this.buildAutomaticBanReason(moderationResult.categories);
+=======
+      const banReason = this.buildAutomaticBanReason(
+        moderationResult.categories,
+      );
+>>>>>>> main
       const banAnnouncementMessage = moderation.penalty.isBanned
         ? await this.prisma.message.create({
             data: {
@@ -1070,7 +1174,13 @@ export class ChatService {
       );
 
       if (moderation) {
+<<<<<<< HEAD
         const banReason = this.buildAutomaticBanReason(moderationResult.categories);
+=======
+        const banReason = this.buildAutomaticBanReason(
+          moderationResult.categories,
+        );
+>>>>>>> main
         const banAnnouncementMessage = moderation.penalty.isBanned
           ? await this.prisma.message.create({
               data: {

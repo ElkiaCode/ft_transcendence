@@ -264,6 +264,23 @@ export async function apiEraseMyData(currentPassword: string) {
   return data;
 }
 
+<<<<<<< HEAD
+=======
+export async function apiExportMyData() {
+  const res = await fetchWithAuth(`${API_URL}/users/me/export-data`, {
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.message || 'Error exporting account data');
+  }
+  return data;
+}
+
+>>>>>>> main
 export async function apiPromoteUser(userId: string) {
   const res = await fetchWithAuth(`${API_URL}/admin/users/${userId}/promote`, {
     method: "POST",

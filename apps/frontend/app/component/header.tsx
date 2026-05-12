@@ -2,12 +2,11 @@
 
 import { acceptFriendRequest, apiGetMyFriends, apiGetPendingFriendRequests, apiLogin, apiLogout, apiRegister, declineFriendRequest } from "@/lib/api/auth";
 import { useAuthStore } from "@/store/authStore";
-import { FetchStrategy } from "next/dist/client/components/segment-cache/types";
 import Link from "next/link";
-import { use, useEffect, useState } from "react";
-import isAuth from "./isAuth";
+import { useCallback, useEffect, useState } from "react";
 import "../globals.css";
 import { apiNotify, apiNotifyAsRead, apiNotifyAllAsRead } from "@/lib/api/notify";
+<<<<<<< HEAD
 
 function Notify() {
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -103,16 +102,161 @@ function Notify() {
 }
 
 function FriendInterface({ user }: { user: any }) {
+=======
+import { useOnlinePresence } from "@/lib/hooks/use-online-presence";
+import { getChatSocket } from "@/lib/socket/chat-socket";
+import type { AppUser, FriendUser, NotificationItem, PendingFriendRequest } from "@/lib/types";
+import { errorMessage } from "@/lib/types";
+
+function Notify() {
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+>>>>>>> main
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const [friends, setFriends] = useState<any[]>([]);
+  const user = useAuthStore((s) => s.user);
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const unreadCount = notifications.filter((notif) => !notif.isRead).length;
+
+  const loadNotifications = useCallback(async () => {
+    try {
+      const data = await apiNotify();
+      setNotifications(data);
+    } catch (err: unknown) {
+      console.error(err);
+      setNotifications([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (openMenuId !== 'N' || !user) return;
+    queueMicrotask(() => {
+      loadNotifications();
+    });
+  }, [loadNotifications, openMenuId, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    queueMicrotask(() => {
+      loadNotifications();
+    });
+  }, [loadNotifications, user]);
+
+  useEffect(() => {
+    if (!user || !accessToken) return;
+
+    const socket = getChatSocket(accessToken);
+    if (!socket) return;
+
+    const handleNotificationCreated = (notification: NotificationItem) => {
+      setNotifications((prev) => {
+        if (prev.some((item) => item.id === notification.id)) return prev;
+        return [notification, ...prev].slice(0, 100);
+      });
+    };
+
+    socket.on('notification.created', handleNotificationCreated);
+
+    return () => {
+      socket.off('notification.created', handleNotificationCreated);
+    };
+  }, [accessToken, user]);
+
+  const handleMarkAsRead = (notificationId: string) => async () => {
+    try {
+      await apiNotifyAsRead(notificationId);
+      setNotifications((prev) =>
+        prev.map((notif) =>
+          notif.id === notificationId ? { ...notif, isRead: true } : notif
+        )
+      );
+    } catch (err: unknown) {
+      console.error(err);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await apiNotifyAllAsRead();
+      setNotifications((prev) => prev.map((notif) => ({ ...notif, isRead: true })));
+    } catch (err: unknown) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    if (!user) queueMicrotask(() => setNotifications([]));
+  }, [user]);
+
+  return (
+    <div className="relative flex items-center gap-4 ml-4">
+      {user ? (
+        <button
+          className="relative bg-green-500 text-white px-6 py-2 rounded-full hover:bg-pink-500 transition cursor-pointer"
+          onClick={() => setOpenMenuId(openMenuId === 'N' ? null : 'N')}>
+          <img src="/notif.png" alt="42" width={24} height={24} />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-600 text-white text-xs font-bold flex items-center justify-center">
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
+          )}
+        </button>
+      ) : null}
+      {openMenuId === 'N' && (
+        <div className="absolute top-full mt-2 w-80 bg-white border border-gray-200 rounded shadow-lg z-10 right-0 p-2 flex flex-col gap-2 text-sm text-gray-700">
+          <div className="max-h-60 overflow-y-auto">
+            {notifications.length === 0 ? (
+              <div className="px-4 py-3 text-sm text-gray-600">
+                No notifications
+              </div>
+            ) : (
+              notifications.map((notif) => (
+                <div
+                  key={notif.id}
+                  className={`px-4 py-3 text-sm border-b ${
+                    notif.isRead ? "text-gray-500" : "text-black cursor-pointer font-bold"
+                  }`}
+                  onClick={handleMarkAsRead(notif.id)}
+                >
+                  <div>{notif.title}</div>
+                  {notif.body && (
+                    <div className="text-xs text-gray-500 break-words">{notif.body}</div>
+                  )}
+                  <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-400">
+                    {notif.type && <span>{notif.type.toLowerCase()}</span>}
+                    {notif.createdAt && (
+                      <span>{new Date(notif.createdAt).toLocaleString()}</span>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          <div className="px-4 py-2 text-xs text-gray-500 border-t border-gray-200">
+            <button
+              onClick={handleMarkAllAsRead}
+              className="text-blue-500 hover:text-blue-700 cursor-pointer"
+            >
+              Read all notifications
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FriendInterface({ user }: { user: AppUser | null }) {
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [friends, setFriends] = useState<FriendUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<PendingFriendRequest[]>([]);
+  const { isOnline } = useOnlinePresence();
+
   const handleAccept = (userId: string) => async () => {
     try {
       await acceptFriendRequest(userId);
       await loadFriends();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error accepting friend request:', err);
     }
   };
@@ -120,7 +264,7 @@ function FriendInterface({ user }: { user: any }) {
     try {
       await declineFriendRequest(userId);
       await loadFriends();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error declining friend request:', err);
     }
   };
@@ -132,8 +276,8 @@ function FriendInterface({ user }: { user: any }) {
       const pendingReqs = await apiGetPendingFriendRequests();
       setFriends(data);
       setPendingRequests(pendingReqs);
-    } catch (err: any) {
-      setError(err.message || 'Error loading friends');
+    } catch (err: unknown) {
+      setError(errorMessage(err, 'Error loading friends'));
     } finally {
       setLoading(false);
     }
@@ -171,7 +315,19 @@ function FriendInterface({ user }: { user: any }) {
                 <div className="max-h-56 overflow-auto">
                   {friends.map((friend) => (
                     <div key={friend.id} className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-3">
-                      {friend.username || friend.profile?.displayName || friend.email}
+                      <div
+                        className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${isOnline(friend.id) ? "bg-green-500" : "bg-gray-300"}`}
+                        aria-label={isOnline(friend.id) ? "Online" : "Offline"}
+                        title={isOnline(friend.id) ? "Online" : "Offline"}
+                      />
+                      <div className="min-w-0">
+                        <div className="truncate font-medium">
+                          {friend.displayName || friend.profile?.displayName || friend.username || friend.email}
+                        </div>
+                        <div className={`text-xs ${isOnline(friend.id) ? "text-green-600" : "text-gray-500"}`}>
+                          {isOnline(friend.id) ? "Online" : "Offline"}
+                        </div>
+                      </div>
                       <div className="relative flex gap-2 ml-auto">
                         <button
                           onClick={handleDecline(friend.id)}
@@ -233,8 +389,8 @@ function LoginModal({ onClose }: { onClose: () => void }) {
       const user = await apiLogin(email, password);
       setUser(user);
       onClose();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(errorMessage(err, 'Login failed'));
     }
   };
 
@@ -299,8 +455,8 @@ function RegisterModal({ onClose }: { onClose: () => void }) {
       const user = await apiRegister(username, email, password);
       setUser(user);
       onClose();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(errorMessage(err, 'Registration failed'));
     }
   };
 
@@ -360,9 +516,14 @@ export default function Header() {
             <Link className="text-3xl font-bold" href="/">
               Transcendence
             </Link>
-            <Link className="text-sm font-normal text-gray-500 hover:underline" href="/rgpd">
-              Privacy Policy
-            </Link>
+            <div className="flex gap-3 text-sm font-normal text-gray-500">
+              <Link className="hover:underline" href="/rgpd">
+                Privacy Policy
+              </Link>
+              <Link className="hover:underline" href="/terms">
+                Terms of Service
+              </Link>
+            </div>
           </div>
           <FriendInterface user={user} />
         </nav>

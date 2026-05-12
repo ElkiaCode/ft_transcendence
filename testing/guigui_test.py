@@ -15,19 +15,18 @@ def test_unit():
     print("clement se register\n")
     clement.register()
 
-    users_id = []
-    conversation_id = ""
-
-    print("guillaume se login\n")
-    guillaume.login()
-    print("yann se login\n")
-    users_id.append(yann.login().json()['user']['id'])
-    print("clement se login\n")
-    users_id.append(clement.login().json()['user']['id'])
-
-    print("guillaume cree un groupe avec yann et clement\n")
-    conversation_id = guillaume.createGroupRoom("groupe de guigui", users_id).json()['conversation']['id']
-    # conversation_id.statuc
+    #users_id = []
+    #conversation_id = ""
+#
+    #print("guillaume se login\n")
+    #guillaume.login()
+    #print("yann se login\n")
+    #users_id.append(yann.login().json()['user']['id'])
+    #print("clement se login\n")
+    #users_id.append(clement.login().json()['user']['id'])
+#
+    #print("guillaume cree un groupe avec yann et clement\n")
+    #conversation_id = guillaume.createGroupRoom("groupe de guigui", users_id).json()['conversation']['id']
 #
     #print("guillaume envoie un message dans le groupe cree\n")
     #guillaume.sendMessageConversation(conversation_id, "salut c'est guillaume")

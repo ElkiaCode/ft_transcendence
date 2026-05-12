@@ -290,12 +290,20 @@ def test_unit1():
     print("patsy erases all his data\n")
     patsy.eraseDataPassword()
 
+    print("patsy erases all his data\n")
+    patsy.eraseDataPassword()
+
     if (os.path.exists(guillaume.cookies)):
         os.remove(guillaume.cookies)
     if (os.path.exists(yann.cookies)):
         os.remove(yann.cookies)
     if (os.path.exists(clement.cookies)):
         os.remove(clement.cookies)
+<<<<<<< HEAD
+=======
+    if (os.path.exists(toto.cookies)):
+        os.remove(toto.cookies)
+>>>>>>> main
     if (os.path.exists(patsy.cookies)):
         os.remove(patsy.cookies)
 

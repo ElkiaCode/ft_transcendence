@@ -1,18 +1,53 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiEraseMyData, apiLogout } from "@/lib/api/auth";
+import { apiEraseMyData, apiExportMyData, apiLogout } from "@/lib/api/auth";
 import { useAuthStore } from "@/store/authStore";
+import { errorMessage } from "@/lib/types";
 
 type Step = "idle" | "password" | "confirm" | "deleted";
+type ExportStep = "idle" | "confirm" | "downloaded";
 
 export default function RgpdPage() {
   const router = useRouter();
-  const user = useAuthStore((s: any) => s.user);
+  const user = useAuthStore((s) => s.user);
   const [step, setStep] = useState<Step>("idle");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [exportStep, setExportStep] = useState<ExportStep>("idle");
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [exportLoading, setExportLoading] = useState(false);
+
+function downloadReadableJson(data: unknown) {
+  const prettyJson = JSON.stringify(data, null, 2);
+  const blob = new Blob([prettyJson], { type: "application/json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const safeUsername = (user?.username ?? "user").replace(/[^a-z0-9_-]/gi, "_");
+  const date = new Date().toISOString().slice(0, 10);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = `transcendence-data-${safeUsername}-${date}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function handleExportData() {
+  setExportLoading(true);
+  setExportError(null);
+  try {
+    const data = await apiExportMyData();
+    downloadReadableJson(data);
+    setExportStep("downloaded");
+  } catch (e: unknown) {
+    setExportError(errorMessage(e, "Unable to export your data."));
+  } finally {
+    setExportLoading(false);
+  }
+}
 
 async function handleConfirm() {
   if (!password) return; // 👈 à ajouter
@@ -23,8 +58,8 @@ async function handleConfirm() {
     await apiLogout();
     setStep("deleted");
     setTimeout(() => router.push("/"), 2000);
-  } catch (e: any) {
-    setError(e.message || "Wrong password.");
+  } catch (e: unknown) {
+    setError(errorMessage(e, "Wrong password."));
     setStep("password");
   } finally {
     setLoading(false);
@@ -37,6 +72,14 @@ async function handleConfirm() {
     setError(null);
   }
 
+<<<<<<< HEAD
+=======
+  function handleExportCancel() {
+    setExportStep("idle");
+    setExportError(null);
+  }
+
+>>>>>>> main
   return (
     <div className="min-h-0 bg-white dark:bg-zinc-900">
       <div className="max-w-3xl mx-auto px-6 py-12 text-center">
@@ -84,6 +127,66 @@ async function handleConfirm() {
             <hr className="border-gray-100 dark:border-zinc-700 mt-4" />
           </div>
         ))}
+<<<<<<< HEAD
+=======
+        {user && (
+          <div className="mt-10 border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/30 rounded-xl px-6 py-6">
+            <h2 className="text-base font-medium text-gray-900 dark:text-white mb-2">Request my data</h2>
+            <p className="text-sm text-blue-700/80 dark:text-blue-300/80 mb-4">
+              Download a readable JSON export containing your account, profile, friendships, chat activity, notifications, and moderation records.
+            </p>
+            {exportError && (
+              <p className="text-sm text-red-600 dark:text-red-400 mb-3 font-medium">{exportError}</p>
+            )}
+
+            {exportStep === "idle" && (
+              <button
+                onClick={() => setExportStep("confirm")}
+                className="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium px-6 py-2 rounded-lg transition-colors cursor-pointer"
+              >
+                Request my data
+              </button>
+            )}
+
+            {exportStep === "confirm" && (
+              <div className="flex flex-col items-center gap-3">
+                <p className="text-sm text-blue-800 dark:text-blue-300 font-medium">
+                  Your data export may include private messages and account details. Download it only on a trusted device.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleExportData}
+                    disabled={exportLoading}
+                    className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-1.5 rounded-lg transition-colors cursor-pointer"
+                  >
+                    {exportLoading ? "Preparing..." : "Download JSON"}
+                  </button>
+                  <button
+                    onClick={handleExportCancel}
+                    className="bg-gray-200 dark:bg-zinc-700 hover:bg-gray-300 dark:hover:bg-zinc-600 text-gray-800 dark:text-gray-200 text-sm font-medium px-4 py-1.5 rounded-lg transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {exportStep === "downloaded" && (
+              <div className="flex flex-col items-center gap-3">
+                <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                  Your readable JSON export has been downloaded.
+                </p>
+                <button
+                  onClick={() => setExportStep("confirm")}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-1.5 rounded-lg transition-colors cursor-pointer"
+                >
+                  Download again
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+>>>>>>> main
         {user && (
   <div className="mt-10 border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 rounded-xl px-6 py-6">
     <p className="text-sm text-red-600/70 dark:text-red-400/60 mb-4">

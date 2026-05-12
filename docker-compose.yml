@@ -63,7 +63,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       REDIS_URL: redis://redis:6379
       CORS_ORIGIN: https://localhost
-    command: sh -lc "npx prisma generate && npx prisma migrate deploy && npm run start:dev"
+    command: sh -lc "npx prisma generate && npx prisma migrate deploy && npm run seed:admin && npm run start:dev"
     depends_on:
       postgres:
         condition: service_healthy

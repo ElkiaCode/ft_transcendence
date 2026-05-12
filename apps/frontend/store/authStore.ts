@@ -1,21 +1,9 @@
 import {create} from 'zustand';
-
-interface User {
-  id: string;
-  username: string;
-  email: string;
-  globalRole?: 'USER' | 'MODERATOR' | 'ADMIN'; 
-  provider?: 'local' | '42';
-  profile: {
-    displayName: string;
-    bio: string | null;
-    avatarUrl: string | null;
-  };
-}
+import type { AppUser } from '@/lib/types';
 
 interface AuthStore {
-  user: User | null;
-  setUser: (user: User) => void;
+  user: AppUser | null;
+  setUser: (user: AppUser) => void;
   logout: () => void;
   accessToken: string | null;
   setAccessToken: (token: string | null) => void;
