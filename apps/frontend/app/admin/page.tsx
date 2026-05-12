@@ -1,9 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuthStore } from "@/store/authStore";
-import {apiListReports, apiReviewReport, apiBanUser, apiUnbanUser, apiPromoteToModerator, apiUnpromoteModerator, apiAdjustPenaltyPoints} from "@/lib/api/admin";
+import { apiListReports, apiReviewReport, apiBanUser, apiUnbanUser, apiPromoteToModerator, apiUnpromoteModerator, apiAdjustPenaltyPoints } from "@/lib/api/admin";
 import { apiGetUserByUsername } from "@/lib/api/auth";
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+type ModerationAction = {
+  id: string;
+  action: string;
+  note?: string | null;
+  penaltyPointsChange?: number | null;
+  createdAt: string;
+  moderator?: { username: string } | null;
+};
 
 type Report = {
   id: string;
@@ -12,19 +23,100 @@ type Report = {
   reason: string;
   createdAt: string;
   creator: { username: string; profile: { avatarUrl: string | null } | null };
-  targetUser: { id: string; username: string } | null;
+  targetUser: { id: string; username: string; profile?: { avatarUrl: string | null } | null } | null;
   targetMessage: { id: string; content: string | null; sender: { id: string; username: string } } | null;
-  actions: any[];
+  actions: ModerationAction[];
 };
 
-function ReviewModal({
-  report,
-  isAdmin,
-  onSubmit,
-  onClose,
+type ToastType = 'success' | 'error';
+
+function Toast({ message, type, onClose }: { message: string; type: ToastType; onClose: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onClose, 3000);
+    return () => clearTimeout(t);
+  }, [onClose]);
+
+  return (
+    <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-medium transition-all ${
+      type === 'success' ? 'bg-green-500' : 'bg-red-500'
+    }`}>
+      <span>{type === 'success' ? '✓' : '✕'}</span>
+      <span>{message}</span>
+      <button onClick={onClose} className="ml-2 opacity-70 hover:opacity-100 cursor-pointer">✕</button>
+    </div>
+  );
+}
+
+function useToast() {
+  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+  const showToast = useCallback((message: string, type: ToastType = 'success') => {
+    setToast({ message, type });
+  }, []);
+  const hideToast = useCallback(() => setToast(null), []);
+  return { toast, showToast, hideToast };
+}
+
+function ConfirmModal({
+  title, description, confirmLabel, confirmColor, onConfirm, onClose,
 }: {
-  report: Report;
-  isAdmin: boolean;
+  title: string; description: string; confirmLabel: string; confirmColor: string;
+  onConfirm: () => void; onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+      <div className="bg-white rounded-xl p-6 w-[400px] flex flex-col gap-4 shadow-xl">
+        <h2 className="text-lg font-bold text-gray-900">{title}</h2>
+        <p className="text-sm text-gray-600">{description}</p>
+        <div className="flex gap-2 justify-end">
+          <button onClick={onClose} className="px-4 py-2 rounded-full text-black hover:bg-gray-100 transition cursor-pointer text-sm">Cancel</button>
+          <button onClick={() => { onConfirm(); onClose(); }} className={`px-4 py-2 rounded-full text-white text-sm cursor-pointer transition ${confirmColor}`}>
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ActionHistory({ actions }: { actions: ModerationAction[] }) {
+  if (actions.length === 0) return null;
+
+  const actionColors: Record<string, string> = {
+    WARN: 'bg-yellow-100 text-yellow-700',
+    BAN: 'bg-red-100 text-red-700',
+    UNBAN: 'bg-green-100 text-green-700',
+    DISMISS_REPORT: 'bg-gray-100 text-gray-500',
+    ADJUST_POINTS: 'bg-blue-100 text-blue-700',
+  };
+
+  return (
+    <div className="flex flex-col gap-1.5 border-t border-gray-100 pt-3 mt-1">
+      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Action history</p>
+      {actions.map((a) => (
+        <div key={a.id} className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
+          <span className={`px-2 py-0.5 rounded-full font-medium ${actionColors[a.action] ?? 'bg-gray-100 text-gray-500'}`}>
+            {a.action}
+          </span>
+          {a.moderator && (
+            <span className="text-gray-400">by <span className="font-medium text-gray-600">{a.moderator.username}</span></span>
+          )}
+          {a.penaltyPointsChange !== null && a.penaltyPointsChange !== undefined && a.penaltyPointsChange !== 0 && (
+            <span className={`font-medium ${a.penaltyPointsChange > 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {a.penaltyPointsChange > 0 ? `+${a.penaltyPointsChange}` : a.penaltyPointsChange} pts
+            </span>
+          )}
+          {a.note && <span className="italic text-gray-400">"{a.note}"</span>}
+          <span className="text-gray-300">{new Date(a.createdAt).toLocaleDateString()}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ReviewModal({
+  report, isAdmin, onSubmit, onClose,
+}: {
+  report: Report; isAdmin: boolean;
   onSubmit: (action: string, note: string, points: number) => void;
   onClose: () => void;
 }) {
@@ -34,16 +126,36 @@ function ReviewModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
-      <div className="bg-white rounded-xl p-6 w-[480px] flex flex-col gap-4 shadow-xl">
+      <div className="bg-white rounded-xl p-6 w-[520px] flex flex-col gap-4 shadow-xl max-h-[90vh] overflow-y-auto">
         <h2 className="text-lg font-bold text-gray-900">Review report</h2>
-        <div className="text-sm text-gray-600 bg-gray-50 rounded-lg p-3">
-          <p className="font-medium text-gray-900 mb-1">
+
+        {/* Context */}
+        <div className="text-sm text-gray-600 bg-gray-50 rounded-lg p-3 flex flex-col gap-2">
+          <p className="font-medium text-gray-900">
             {report.targetType === 'USER'
-              ? `User: ${report.targetUser?.username}`
+              ? `Reported user: ${report.targetUser?.username}`
               : `Message by: ${report.targetMessage?.sender.username}`}
           </p>
-          <p className="italic">{report.reason}</p>
+          {report.targetType === 'MESSAGE' && report.targetMessage?.content && (
+            <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 italic">
+              "{report.targetMessage.content}"
+            </div>
+          )}
+          <p className="text-gray-500">
+            <span className="font-medium text-gray-700">Reason:</span> {report.reason}
+          </p>
+          <p className="text-gray-400 text-xs">
+            Reported by <span className="font-medium">{report.creator.username}</span> on {new Date(report.createdAt).toLocaleDateString()}
+          </p>
         </div>
+
+        {/* Existing actions */}
+        {report.actions.length > 0 && (
+          <div className="bg-gray-50 rounded-lg p-3">
+            <ActionHistory actions={report.actions} />
+          </div>
+        )}
+
         <div className="flex flex-col gap-2">
           <label className="text-sm font-medium text-gray-700">Action</label>
           <select
@@ -57,6 +169,7 @@ function ReviewModal({
             <option value="DISMISS_REPORT">Dismiss</option>
           </select>
         </div>
+
         <div className="flex flex-col gap-2">
           <label className="text-sm font-medium text-gray-700">Note (optional)</label>
           <textarea
@@ -65,6 +178,7 @@ function ReviewModal({
             className="border border-gray-300 rounded-lg p-3 text-sm text-black resize-none h-24 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
+
         <div className="flex flex-col gap-2">
           <label className="text-sm font-medium text-gray-700">Penalty points to subtract</label>
           <input
@@ -75,14 +189,10 @@ function ReviewModal({
             className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
+
         <div className="flex gap-2 justify-end">
-          <button onClick={onClose} className="px-4 py-2 rounded-full text-black hover:bg-gray-100 transition cursor-pointer">
-            Cancel
-          </button>
-          <button
-            onClick={() => onSubmit(action, note, points)}
-            className="px-4 py-2 rounded-full bg-blue-500 text-white hover:bg-blue-600 cursor-pointer transition"
-          >
+          <button onClick={onClose} className="px-4 py-2 rounded-full text-black hover:bg-gray-100 transition cursor-pointer">Cancel</button>
+          <button onClick={() => onSubmit(action, note, points)} className="px-4 py-2 rounded-full bg-blue-500 text-white hover:bg-blue-600 cursor-pointer transition">
             Submit
           </button>
         </div>
@@ -91,11 +201,87 @@ function ReviewModal({
   );
 }
 
-function ReportsTab({ isAdmin }: { isAdmin: boolean }) {
+function ReportCard({ report, onReview }: { report: Report; onReview: (r: Report) => void }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col gap-2">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+            report.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
+            report.status === 'RESOLVED' ? 'bg-green-100 text-green-700' :
+            'bg-gray-100 text-gray-500'
+          }`}>
+            {report.status}
+          </span>
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+            report.targetType === 'USER' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'
+          }`}>
+            {report.targetType}
+          </span>
+        </div>
+        <span className="text-xs text-gray-400">{new Date(report.createdAt).toLocaleDateString()}</span>
+      </div>
+
+      {/* Who reported who */}
+      <div className="text-sm text-gray-700">
+        <span className="font-medium">By:</span> {report.creator?.username ?? "Unknown"}
+        {report.targetType === 'USER' && report.targetUser && (
+          <> → <span className="font-medium">{report.targetUser.username}</span></>
+        )}
+        {report.targetType === 'MESSAGE' && report.targetMessage && (
+          <> → message by <span className="font-medium">{report.targetMessage.sender.username}</span></>
+        )}
+      </div>
+
+      {/* Reason */}
+      <p className="text-sm text-gray-500 italic">{report.reason}</p>
+
+      {/* Message content preview */}
+      {report.targetType === 'MESSAGE' && report.targetMessage?.content && (
+        <div className="bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 text-sm text-gray-600 italic">
+          "{report.targetMessage.content.length > 120
+            ? report.targetMessage.content.slice(0, 120) + '…'
+            : report.targetMessage.content}"
+        </div>
+      )}
+
+      {/* Expand/collapse history */}
+      {report.actions.length > 0 && (
+        <button
+          onClick={() => setExpanded(v => !v)}
+          className="self-start text-xs text-gray-400 hover:text-gray-600 transition cursor-pointer"
+        >
+          {expanded ? '▲ Hide history' : `▼ Show history (${report.actions.length})`}
+        </button>
+      )}
+      {expanded && <ActionHistory actions={report.actions} />}
+
+      {/* Actions */}
+      {report.status === 'PENDING' && (
+        <button
+          onClick={() => onReview(report)}
+          className="self-end px-3 py-1 rounded-full bg-blue-500 text-white text-xs hover:bg-blue-600 cursor-pointer transition"
+        >
+          Review
+        </button>
+      )}
+    </div>
+  );
+}
+
+const REPORTS_PER_PAGE = 10;
+
+function ReportsTab({ isAdmin, showToast }: { isAdmin: boolean; showToast: (msg: string, type: ToastType) => void }) {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [reviewModal, setReviewModal] = useState<Report | null>(null);
   const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'RESOLVED' | 'DISMISSED'>('PENDING');
+  const [typeFilter, setTypeFilter] = useState<'ALL' | 'USER' | 'MESSAGE'>('ALL');
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     apiListReports()
@@ -116,18 +302,29 @@ function ReportsTab({ isAdmin }: { isAdmin: boolean }) {
         )
       );
       setReviewModal(null);
-    } catch (err) {
-      console.error("Failed to review report:", err);
+      showToast('Report reviewed successfully', 'success');
+    } catch {
+      showToast('Failed to review report', 'error');
     }
   };
 
-  const filtered = reports.filter((r) => {
-    if (filter === 'ALL') return true;
-    if (filter === 'PENDING') return r.status === 'PENDING';
-    if (filter === 'RESOLVED') return r.status === 'RESOLVED';
-    if (filter === 'DISMISSED') return r.status === 'DISMISSED';
-    return true;
-  });
+  const pendingCount = reports.filter(r => r.status === 'PENDING').length;
+
+  const filtered = reports
+    .filter((r) => {
+      if (filter !== 'ALL' && r.status !== filter) return false;
+      if (typeFilter !== 'ALL' && r.targetType !== typeFilter) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      const diff = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      return sortOrder === 'newest' ? -diff : diff;
+    });
+
+  const totalPages = Math.ceil(filtered.length / REPORTS_PER_PAGE);
+  const paginated = filtered.slice((page - 1) * REPORTS_PER_PAGE, page * REPORTS_PER_PAGE);
+
+  useEffect(() => { setPage(1); }, [filter, typeFilter, sortOrder]);
 
   if (loading) return <p className="text-sm text-gray-500 p-4">Loading...</p>;
 
@@ -141,110 +338,142 @@ function ReportsTab({ isAdmin }: { isAdmin: boolean }) {
           onClose={() => setReviewModal(null)}
         />
       )}
-      <div className="flex gap-2">
-        {(['ALL', 'PENDING', 'RESOLVED', 'DISMISSED'] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-3 py-1 rounded-full text-xs transition cursor-pointer ${
-              filter === f ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            {f}
-          </button>
-        ))}
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 items-center justify-between">
+        <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-1">
+            {(['ALL', 'PENDING', 'RESOLVED', 'DISMISSED'] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`px-3 py-1 rounded-full text-xs transition cursor-pointer flex items-center gap-1 ${
+                  filter === f ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {f}
+                {f === 'PENDING' && pendingCount > 0 && (
+                  <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${
+                    filter === 'PENDING' ? 'bg-white text-blue-500' : 'bg-blue-500 text-white'
+                  }`}>
+                    {pendingCount}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-1 border-l border-gray-200 pl-2">
+            {(['ALL', 'USER', 'MESSAGE'] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTypeFilter(t)}
+                className={`px-3 py-1 rounded-full text-xs transition cursor-pointer ${
+                  typeFilter === t ? 'bg-purple-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+        <select
+          value={sortOrder}
+          onChange={(e) => setSortOrder(e.target.value as any)}
+          className="border border-gray-200 rounded-lg px-3 py-1 text-xs text-gray-600 focus:outline-none cursor-pointer"
+        >
+          <option value="newest">Newest first</option>
+          <option value="oldest">Oldest first</option>
+        </select>
       </div>
-      {filtered.length === 0 ? (
+
+      <p className="text-xs text-gray-400">{filtered.length} report{filtered.length !== 1 ? 's' : ''} found</p>
+
+      {paginated.length === 0 ? (
         <p className="text-sm text-gray-500">No reports found.</p>
       ) : (
-        <div className="flex flex-col gap-3">
-          {filtered.map((report) => (
-            <div key={report.id} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                    report.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
-                    report.status === 'RESOLVED' ? 'bg-green-100 text-green-700' :
-                    'bg-gray-100 text-gray-500'
-                  }`}>
-                    {report.status}
-                  </span>
-                  <span className="text-xs text-gray-400">{report.targetType}</span>
-                </div>
-                <span className="text-xs text-gray-400">
-                  {new Date(report.createdAt).toLocaleDateString()}
-                </span>
-              </div>
-              <div className="text-sm text-gray-700">
-                <div className="text-sm text-gray-700">
-                    <span className="font-medium">By:</span>{" "}
-                    {report.creator?.username ?? "Unknown"}
-
-                    {report.targetType === 'USER' && report.targetUser && (
-                        <>
-                        {" "}→{" "}
-                        <span className="font-medium">
-                            {report.targetUser?.username ?? "Unknown"}
-                        </span>
-                        </>
-                    )}
-                </div>
-                {report.targetType === 'MESSAGE' && report.targetMessage && (
-                  <> → message by <span className="font-medium">{report.targetMessage.sender.username}</span></>
-                )}
-              </div>
-              <p className="text-sm text-gray-500 italic">{report.reason}</p>
-              {report.status === 'PENDING' && (
+        <>
+          <div className="flex flex-col gap-3">
+            {paginated.map((report) => (
+              <ReportCard key={report.id} report={report} onReview={setReviewModal} />
+            ))}
+          </div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-2">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-3 py-1 rounded-lg text-xs border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition"
+              >
+                ← Prev
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
                 <button
-                  onClick={() => setReviewModal(report)}
-                  className="self-end px-3 py-1 rounded-full bg-blue-500 text-white text-xs hover:bg-blue-600 cursor-pointer transition"
+                  key={p}
+                  onClick={() => setPage(p)}
+                  className={`w-7 h-7 rounded-lg text-xs font-medium transition cursor-pointer ${
+                    page === p ? 'bg-blue-500 text-white' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}
                 >
-                  Review
+                  {p}
                 </button>
-              )}
+              ))}
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="px-3 py-1 rounded-lg text-xs border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition"
+              >
+                Next →
+              </button>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
     </div>
   );
 }
 
-function UsersTab() {
+function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => void }) {
   const [username, setUsername] = useState("");
   const [result, setResult] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [points, setPoints] = useState(0);
+  const [confirmModal, setConfirmModal] = useState<{
+    title: string; description: string; confirmLabel: string;
+    confirmColor: string; onConfirm: () => void;
+  } | null>(null);
 
-    const handleSearch = async () => {
+  const handleSearch = async () => {
     if (!username.trim()) return;
     setLoading(true);
     setError(null);
     setResult(null);
     try {
-        const data = await apiGetUserByUsername(username.trim());
-        if (!data) throw new Error('User not found');
-        setResult(data);
+      const data = await apiGetUserByUsername(username.trim());
+      if (!data) throw new Error('User not found');
+      setResult(data);
     } catch (err: any) {
-        setError(err.message);
+      setError(err.message);
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
-    };
+  };
 
-  const handleAction = async (action: () => Promise<any>) => {
+  const handleAction = async (action: () => Promise<any>, successMsg: string) => {
     try {
       const res = await action();
       setResult((prev: any) => ({ ...prev, ...res.user }));
+      showToast(successMsg, 'success');
     } catch (err: any) {
-      setError(err.message);
+      showToast(err.message, 'error');
     }
   };
 
   return (
     <div className="flex flex-col gap-4">
+      {confirmModal && <ConfirmModal {...confirmModal} onClose={() => setConfirmModal(null)} />}
+
       <div className="flex gap-2">
         <input
           type="text"
@@ -254,24 +483,21 @@ function UsersTab() {
           onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
           className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-        <button
-          onClick={handleSearch}
-          className="px-4 py-2 rounded-lg bg-blue-500 text-white text-sm hover:bg-blue-600 cursor-pointer transition"
-        >
+        <button onClick={handleSearch} className="px-4 py-2 rounded-lg bg-blue-500 text-white text-sm hover:bg-blue-600 cursor-pointer transition">
           Search
         </button>
       </div>
+
       {loading && <p className="text-sm text-gray-500">Searching...</p>}
       {error && <p className="text-sm text-red-500">{error}</p>}
+
       {result && (
         <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col gap-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold overflow-hidden flex-shrink-0">
-              {result.profile?.avatarUrl ? (
-                <img src={result.profile.avatarUrl} className="w-full h-full object-cover" />
-              ) : (
-                result.username?.charAt(0).toUpperCase()
-              )}
+              {result.profile?.avatarUrl
+                ? <img src={result.profile.avatarUrl} className="w-full h-full object-cover" />
+                : result.username?.charAt(0).toUpperCase()}
             </div>
             <div>
               <p className="font-medium text-gray-900">{result.username}</p>
@@ -283,17 +509,24 @@ function UsersTab() {
               </span>
             </div>
           </div>
+
           <div className="flex flex-wrap gap-2">
             {!result.isBanned ? (
               <button
-                onClick={() => handleAction(() => apiBanUser(result.id))}
+                onClick={() => setConfirmModal({
+                  title: 'Ban user',
+                  description: `Are you sure you want to ban ${result.username}?`,
+                  confirmLabel: 'Ban',
+                  confirmColor: 'bg-red-500 hover:bg-red-600',
+                  onConfirm: () => handleAction(() => apiBanUser(result.id), `${result.username} has been banned`),
+                })}
                 className="px-3 py-1 rounded-full bg-red-500 text-white text-xs hover:bg-red-600 cursor-pointer transition"
               >
                 Ban
               </button>
             ) : (
               <button
-                onClick={() => handleAction(() => apiUnbanUser(result.id))}
+                onClick={() => handleAction(() => apiUnbanUser(result.id), `${result.username} has been unbanned`)}
                 className="px-3 py-1 rounded-full bg-green-500 text-white text-xs hover:bg-green-600 cursor-pointer transition"
               >
                 Unban
@@ -301,7 +534,13 @@ function UsersTab() {
             )}
             {result.globalRole === 'USER' && (
               <button
-                onClick={() => handleAction(() => apiPromoteToModerator(result.id))}
+                onClick={() => setConfirmModal({
+                  title: 'Promote to Moderator',
+                  description: `Give ${result.username} moderator privileges?`,
+                  confirmLabel: 'Promote',
+                  confirmColor: 'bg-blue-500 hover:bg-blue-600',
+                  onConfirm: () => handleAction(() => apiPromoteToModerator(result.id), `${result.username} is now a moderator`),
+                })}
                 className="px-3 py-1 rounded-full bg-blue-500 text-white text-xs hover:bg-blue-600 cursor-pointer transition"
               >
                 Promote to Moderator
@@ -309,13 +548,20 @@ function UsersTab() {
             )}
             {result.globalRole === 'MODERATOR' && (
               <button
-                onClick={() => handleAction(() => apiUnpromoteModerator(result.id))}
+                onClick={() => setConfirmModal({
+                  title: 'Unpromote moderator',
+                  description: `Remove moderator privileges from ${result.username}?`,
+                  confirmLabel: 'Unpromote',
+                  confirmColor: 'bg-gray-500 hover:bg-gray-600',
+                  onConfirm: () => handleAction(() => apiUnpromoteModerator(result.id), `${result.username} is back to user`),
+                })}
                 className="px-3 py-1 rounded-full bg-gray-500 text-white text-xs hover:bg-gray-600 cursor-pointer transition"
               >
                 Unpromote to User
               </button>
             )}
           </div>
+
           <div className="flex flex-col gap-2 border-t border-gray-100 pt-3">
             <p className="text-xs font-medium text-gray-700">Adjust penalty points</p>
             <div className="flex gap-2">
@@ -334,7 +580,10 @@ function UsersTab() {
                 className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <button
-                onClick={() => handleAction(() => apiAdjustPenaltyPoints(result.id, points, note || undefined))}
+                onClick={() => handleAction(
+                  () => apiAdjustPenaltyPoints(result.id, points, note || undefined),
+                  'Penalty points updated'
+                )}
                 className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 cursor-pointer transition"
               >
                 Apply
@@ -351,6 +600,7 @@ export default function AdminPage() {
   const user = useAuthStore((state) => state.user);
   const isAdmin = user?.globalRole === 'ADMIN';
   const [tab, setTab] = useState<'reports' | 'users'>('reports');
+  const { toast, showToast, hideToast } = useToast();
 
   const tabs = [
     { key: 'reports', label: 'Reports', visible: true },
@@ -358,31 +608,34 @@ export default function AdminPage() {
   ] as const;
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8 flex flex-col gap-6 bg-gray-50 min-h-screen">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">
-          {isAdmin ? 'Admin Dashboard' : 'Moderator Dashboard'}
-        </h1>
-        <a href="/profils" className="text-sm text-gray-500 hover:text-gray-700 transition cursor-pointer">
-          ← Back
-        </a>
-      </div>
-      <div className="flex gap-2 border-b border-gray-200 pb-2">
-        {tabs.filter((t) => t.visible).map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition cursor-pointer ${
-              tab === t.key ? 'text-blue-500 border-b-2 border-blue-500' : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-      <div>
-        {tab === 'reports' && <ReportsTab isAdmin={isAdmin} />}
-        {tab === 'users' && isAdmin && <UsersTab />}
+    <div className="min-h-screen bg-white">
+      {toast && <Toast message={toast.message} type={toast.type} onClose={hideToast} />}
+      <div className="max-w-5xl mx-auto px-4 py-8 flex flex-col gap-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-gray-900">
+            {isAdmin ? 'Admin Dashboard' : 'Moderator Dashboard'}
+          </h1>
+          <a href="/profils" className="text-sm text-gray-500 hover:text-gray-700 transition cursor-pointer">
+            ← Back
+          </a>
+        </div>
+        <div className="flex gap-2 border-b border-gray-200 pb-2">
+          {tabs.filter((t) => t.visible).map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`px-4 py-2 text-sm font-medium rounded-t-lg transition cursor-pointer ${
+                tab === t.key ? 'text-blue-500 border-b-2 border-blue-500' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div>
+          {tab === 'reports' && <ReportsTab isAdmin={isAdmin} showToast={showToast} />}
+          {tab === 'users' && isAdmin && <UsersTab showToast={showToast} />}
+        </div>
       </div>
     </div>
   );
