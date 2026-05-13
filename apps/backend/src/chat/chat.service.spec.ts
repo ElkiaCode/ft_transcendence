@@ -8,6 +8,7 @@ import { BadRequestException, ForbiddenException, NotFoundException } from '@nes
 describe('ChatService', () => {
   let service: ChatService;
   let prisma: PrismaService;
+  let autoModerationService: AutoModerationService;
 
   beforeEach(async () => {
     // 1. Define what the 'tx' (transaction client) looks like for callbacks
@@ -20,6 +21,10 @@ describe('ChatService', () => {
       conversation: {
         update: jest.fn().mockResolvedValue({}),
       },
+      message: { create: jest.fn().mockResolvedValue({}) },
+      user: { update: jest.fn().mockResolvedValue({}) },
+       messageRead: { createMany: jest.fn().mockResolvedValue({ count: 0 }) }, // For transactions
+      // messageReaction: { findUnique: jest.fn(), create: jest.fn() },
     };
     const module: TestingModule = await Test.createTestingModule({
     providers: [
@@ -35,25 +40,32 @@ describe('ChatService', () => {
             }
             // If it's an array: $transaction([p1, p2])
             return Promise.all(input);
-          }),
-          
+          }),         
           // 3. Keep your standard mocks here for non-transaction calls
             user: {
+              findUnique: jest.fn(),
               findMany: jest.fn(),
+              update: jest.fn(),
             },
             block: {
               findFirst: jest.fn(),
             },
             conversation: {
               findFirst: jest.fn(),
+              findMany: jest.fn(), 
               findUnique: jest.fn(),
               create: jest.fn(),
               update: jest.fn(),
             },
             message: {
+              findUnique: jest.fn(),
               findMany: jest.fn(),
               create: jest.fn(),
+              update: jest.fn(),
             },
+            messageRead: { 
+              createMany: jest.fn().mockResolvedValue({ count: 0 }) 
+            }, 
             conversationParticipant: {
               findFirst: jest.fn(),
               findUnique: jest.fn(),
@@ -62,6 +74,10 @@ describe('ChatService', () => {
               count: jest.fn(),
               createMany: jest.fn(),
             },
+            messageReaction: {
+              findUnique: jest.fn(),
+              create: jest.fn(),
+            },
           },
         },
         {
@@ -69,13 +85,510 @@ describe('ChatService', () => {
           useValue: {
             // Mock the methods from your moderation service
             moderateText: jest.fn(),
+            analyze: jest.fn(),
+            applyBlockedMessage: jest.fn(),
+            applyFlaggedMessage: jest.fn(),  
           },
         },
       ],
     }).compile();
-
+    
     service = module.get<ChatService>(ChatService);
     prisma = module.get<PrismaService>(PrismaService);
+    autoModerationService = module.get<AutoModerationService>(AutoModerationService);
+  });
+
+  describe('markConversationRead', () => {
+    const userId = 'user-1';
+    const convId = 'conv-1';
+    const msgId = 'msg-1';
+
+    beforeEach(() => {
+      jest.spyOn(service as any, 'ensureLiveSender').mockResolvedValue(undefined);
+      jest.spyOn(service as any, 'ensureConversationMembership').mockResolvedValue(undefined);
+    });
+
+    it('should mark messages as read', async () => {
+      jest.spyOn(prisma.message, 'findMany').mockResolvedValue([{ id: 'm1' }] as any);
+      
+      // This will now work because prisma.messageRead is defined in beforeEach
+      jest.spyOn(prisma.messageRead, 'createMany').mockResolvedValue({ count: 1 } as any);
+
+      const result = await service.markConversationRead(userId, convId);
+      expect(result.readCount).toBe(1);
+    });
+
+    // it('should mark messages as read up to a specific message timestamp', async () => {
+    //   // 1. Mock finding the "target" message
+    //   jest.spyOn(prisma.message, 'findUnique').mockResolvedValue({
+    //     conversationId: convId,
+    //     createdAt: new Date(),
+    //   } as any);
+
+    //   // 2. Mock finding unread messages
+    //   jest.spyOn(prisma.message, 'findMany').mockResolvedValue([{ id: 'm1' }, { id: 'm2' }] as any);
+      
+    //   // 3. Mock createMany to return count
+    //   jest.spyOn(prisma.messageRead, 'createMany').mockResolvedValue({ count: 2 } as any);
+
+    //   const result = await service.markConversationRead(userId, convId, msgId);
+
+    //   expect(result.readCount).toBe(2);
+    //   expect(prisma.messageRead.createMany).toHaveBeenCalled();
+    // });
+
+    it('should return 0 if no messages are found to read', async () => {
+      jest.spyOn(prisma.message, 'findMany').mockResolvedValue([]);
+      const result = await service.markConversationRead(userId, convId);
+      expect(result.readCount).toBe(0);
+    });
+  });
+
+  describe('sendMessage', () => {
+    const userId = 'user-1';
+    const convId = 'conv-1';
+    const sender = { id: userId, username: 'marvin' };
+
+    beforeEach(() => {
+      jest.spyOn(service as any, 'ensureLiveSender').mockResolvedValue(sender);
+      jest.spyOn(service as any, 'ensureConversationMembership').mockResolvedValue(undefined);
+    });
+
+    it('Scenario 1: should return BadRequestException', async () => {
+      const contentEmpty = ' ';
+
+      await expect(
+        service.sendMessage(userId, convId, contentEmpty)
+      ).rejects.toThrow(new BadRequestException('message content is empty'));
+      // Verification: Ensure the AI moderation and Prisma were NEVER called
+      expect(autoModerationService.analyze).not.toHaveBeenCalled();
+      expect(prisma.message.create).not.toHaveBeenCalled();
+    });
+
+    it('Scenario 2: Successful clean message', async () => {
+      const content = 'Hello world';
+      // Mock AI: Allow the message
+      jest.spyOn(autoModerationService, 'analyze').mockResolvedValue({ action: 'ALLOW' } as any);
+      jest.spyOn(prisma.message, 'create').mockResolvedValue({ id: 'm1', content } as any);
+      jest.spyOn(prisma.conversation, 'update').mockResolvedValue({} as any);
+
+      const result = await service.sendMessage(userId, convId, content);
+      expect(result.content).toBe(content);
+    });
+
+    it('Scenario 3: Moderation BLOCK (Bad content)', async () => {
+      const badContent = 'Some illegal content';
+      
+      // 1. Mock AI: BLOCK the message
+      (service['autoModerationService'].analyze as jest.Mock).mockResolvedValue({ 
+        action: 'BLOCK',
+        severity: 'HIGH',
+        categories: ['Hate'],
+        penaltyPointsToSubtract: 100
+      }as any);
+
+      jest.spyOn(autoModerationService, 'applyBlockedMessage').mockResolvedValue({
+      penalty: { isBanned: false, penaltyPoints: 100, pointsLeftBeforeBan: 400 }
+    } as any);
+
+    jest.spyOn(prisma.message, 'create').mockResolvedValue({ id: 'sys-1', content: 'placeholder' } as any);
+    jest.spyOn(prisma.conversation, 'update').mockResolvedValue({} as any);
+
+    const result = await service.sendMessage(userId, convId, 'bad word');
+    expect(result.moderationWarning.message).toContain('deleted');
+    });
+
+    it('Scenario 4: Moderation REPORT + Automatic BAN', async () => {
+      const content = 'Slightly toxic message';
+      
+      // 1. Mock AI: Action is REPORT
+      jest.spyOn(autoModerationService, 'analyze').mockResolvedValue({ 
+        action: 'REPORT',
+        severity: 'MEDIUM',
+        categories: ['Spam'],
+        penaltyPointsToSubtract: 50
+      } as any);
+
+      // 2. Mock: Flagging the message results in a BAN
+      jest.spyOn(autoModerationService, 'applyFlaggedMessage').mockResolvedValue({
+        penalty: { 
+          isBanned: true, // This triggers the red lines!
+          penaltyPoints: 500, 
+          pointsLeftBeforeBan: 0 
+        }
+      } as any);
+
+      // 3. Mock Prisma calls
+      // First create: the user's message
+      // Second create: the ban announcement
+      jest.spyOn(prisma.message, 'create')
+        .mockResolvedValueOnce({ id: 'user-msg', content } as any)
+        .mockResolvedValueOnce({ id: 'ban-announcement', type: 'SYSTEM' } as any);
+
+      jest.spyOn(prisma.conversation, 'update').mockResolvedValue({} as any);
+
+      // 4. Act
+      const result = await service.sendMessage(userId, convId, content);
+
+      // 5. Assert
+      expect(result.moderationWarning.message).toContain('flagged');
+      expect(result.banAnnouncementMessage).not.toBeNull();
+      expect(prisma.message.create).toHaveBeenCalledTimes(2); // One for text, one for system announcement
+      expect(prisma.conversation.update).toHaveBeenCalled();
+    });
+  });
+
+  describe('addMessageReaction', () => {
+    const userId = 'reactor-id';
+    const senderId = 'sender-id';
+    const msgId = 'msg-1';
+    const convId = 'conv-1';
+
+    beforeEach(() => {
+      jest.spyOn(service as any, 'ensureLiveSender').mockResolvedValue(undefined);
+      jest.spyOn(service as any, 'ensureConversationMembership').mockResolvedValue(undefined);
+    });
+
+    it('should throw BadRequest if user reacts to their own message', async () => {
+      jest.spyOn(prisma.message, 'findUnique').mockResolvedValue({
+        senderId: userId, // Same as actor
+        conversationId: convId,
+      } as any);
+
+      await expect(service.addMessageReaction(userId, convId, msgId, 'HEART'))
+        .rejects.toThrow('you cannot react to your own message');
+    });
+
+    it('should return early if reaction already exists', async () => {
+      jest.spyOn(prisma.message, 'findUnique').mockResolvedValue({
+        senderId: senderId,
+        conversationId: convId,
+      } as any);
+
+      // Mock existing reaction in the transaction
+      // (Note: ensure your smart $transaction mock is working)
+      const tx = {
+        messageReaction: { findUnique: jest.fn().mockResolvedValue({ id: 'existing' }) },
+      };
+      jest.spyOn(prisma, '$transaction').mockImplementation((cb: any) => cb(tx));
+
+      const result = await service.addMessageReaction(userId, convId, msgId, 'THUMBS_UP');
+      expect(result.pointsAwarded).toBe(0);
+    });
+
+    it('should promote sender to MODERATOR if points reach 500', async () => {
+      const mockSender = { id: senderId, penaltyPoints: 495, globalRole: 'USER', isActive: true, isBanned: false };
+      
+      jest.spyOn(prisma.message, 'findUnique').mockResolvedValue({
+        senderId, conversationId: convId, sender: mockSender 
+      } as any);
+
+      // Setup transaction mock
+      const tx = {
+        messageReaction: { 
+          findUnique: jest.fn().mockResolvedValue(null),
+          create: jest.fn().mockResolvedValue({}),
+        },
+        user: {
+          // First update adds points (495 + 5 = 500)
+          // Second update changes role
+          update: jest.fn()
+            .mockResolvedValueOnce({ ...mockSender, penaltyPoints: 500 }) 
+            .mockResolvedValueOnce({ ...mockSender, penaltyPoints: 500, globalRole: 'MODERATOR' }),
+        },
+      };
+      jest.spyOn(prisma, '$transaction').mockImplementation((cb: any) => cb(tx));
+
+      const result = await service.addMessageReaction(userId, convId, msgId, 'THUMBS_UP');
+
+      expect(result.senderPromoted).toBe(true);
+      expect(result.sender.globalRole).toBe('MODERATOR');
+      expect(tx.user.update).toHaveBeenCalledTimes(2); // One for points, one for role
+    });
+  });
+
+  describe('deleteMessage', () => {
+    const userId = 'user-1';
+    const convId = 'conv-1';
+    const msgId = 'msg-1';
+
+    beforeEach(() => {
+      jest.spyOn(service as any, 'ensureLiveSender').mockResolvedValue(undefined);
+      jest.spyOn(service as any, 'ensureConversationMembership').mockResolvedValue(undefined);
+      jest.spyOn(service as any, 'ensureLastMessage').mockResolvedValue(undefined);
+    });
+
+    it('should throw Forbidden if trying to delete someone else message', async () => {
+      jest.spyOn(prisma.message, 'findUnique').mockResolvedValue({
+        senderId: 'other-user',
+        conversationId: convId,
+      } as any);
+
+      await expect(service.deleteMessage(userId, convId, msgId))
+        .rejects.toThrow(ForbiddenException);
+    });
+
+    it('should successfully soft-delete the message', async () => {
+      jest.spyOn(prisma.message, 'findUnique').mockResolvedValue({
+        senderId: userId,
+        conversationId: convId,
+        deletedAt: null,
+      } as any);
+
+      const updateSpy = jest.spyOn(prisma.message, 'update').mockResolvedValue({} as any);
+
+      await service.deleteMessage(userId, convId, msgId);
+
+      expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({
+        data: { content: null, deletedAt: expect.any(Date) }
+      }));
+    });
+  });
+
+  describe('editMessage', () => {
+    const userId = 'user-123';
+    const conversationId = 'conv-456';
+    const messageId = 'msg-789';
+    const validContent = 'This is the new content';
+
+    beforeEach(() => {
+      // 1. Mock standard validations
+      jest.spyOn(service as any, 'ensureLiveSender').mockResolvedValue(undefined);
+      jest.spyOn(service as any, 'ensureConversationMembership').mockResolvedValue(undefined);
+      jest.spyOn(service as any, 'ensureLastMessage').mockResolvedValue(undefined);
+    });
+
+    it('Scenario 1: should throw NotFound if message does not exist or belongs to other conv', async () => {
+      // Mock: Message not found
+      jest.spyOn(prisma.message, 'findUnique').mockResolvedValue(null);
+
+      await expect(
+        service.editMessage(userId, conversationId, messageId, validContent)
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('Scenario 2: should throw Forbidden if user is not the sender', async () => {
+      // Mock: Message exists but senderId is different
+      jest.spyOn(prisma.message, 'findUnique').mockResolvedValue({
+        id: messageId,
+        conversationId: conversationId,
+        senderId: 'someone-else',
+        deletedAt: null,
+      } as any);
+
+      await expect(
+        service.editMessage(userId, conversationId, messageId, validContent)
+      ).rejects.toThrow(new ForbiddenException('you can only edit your own messages'));
+    });
+
+    it('Scenario 3: should throw BadRequest if message was already deleted', async () => {
+      // Mock: Message has a deletedAt timestamp
+      jest.spyOn(prisma.message, 'findUnique').mockResolvedValue({
+        id: messageId,
+        conversationId: conversationId,
+        senderId: userId,
+        deletedAt: new Date(),
+      } as any);
+
+      await expect(
+        service.editMessage(userId, conversationId, messageId, validContent)
+      ).rejects.toThrow(new BadRequestException('deleted messages cannot be edited'));
+    });
+
+    it('Scenario 4: should throw BadRequest if new content is empty after trim', async () => {
+      // Mock: Valid message state
+      jest.spyOn(prisma.message, 'findUnique').mockResolvedValue({
+        id: messageId,
+        conversationId: conversationId,
+        senderId: userId,
+        deletedAt: null,
+      } as any);
+
+      await expect(
+        service.editMessage(userId, conversationId, messageId, '    ') // Empty spaces
+      ).rejects.toThrow(new BadRequestException('message content is empty'));
+    });
+
+    it('Scenario 5: should successfully update the message', async () => {
+      const mockUpdatedMessage = { id: messageId, content: 'Clean content', isEdited: true };
+      
+      jest.spyOn(prisma.message, 'findUnique').mockResolvedValue({
+        id: messageId,
+        conversationId: conversationId,
+        senderId: userId,
+        deletedAt: null,
+      } as any);
+
+      jest.spyOn(prisma.message, 'update').mockResolvedValue(mockUpdatedMessage as any);
+
+      const result = await service.editMessage(userId, conversationId, messageId, '  Clean content  ');
+
+      expect(result.content).toBe('Clean content');
+      expect(result.isEdited).toBe(true);
+      
+      // Verify Prisma was called with the trimmed content
+      expect(prisma.message.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { content: 'Clean content', isEdited: true }
+        })
+      );
+    });
+  });
+
+  describe('listMembers', () => {
+    const userId = 'user1';
+    const conversationId = 'conv-123';
+    
+    beforeEach(() => {
+      // 1. Mock internal validations to always pass
+      jest.spyOn(service as any, 'ensureConversationMembership').mockResolvedValue({ 
+        conversationId, 
+        userId,
+      });
+    });
+    it('should format a member list correctly', async () => {
+      const mockDbResult = [
+      {
+        id: 'part-1',
+        userId: 'user-1',
+        role: 'OWNER',
+        joinedAt: new Date(),
+        user: { // Single object, NOT an array
+          id: 'user-1',
+          username: 'marvin',
+          profile: { displayName: 'Marvin the Robot', avatarUrl: 'img1.png' },
+        },
+      },
+      {
+        id: 'part-2',
+        userId: 'user-2',
+        role: 'MEMBER',
+        joinedAt: new Date(),
+        user: {
+          id: 'user-2',
+          username: 'arthur',
+          profile: null, // Test the fallback logic too!
+        },
+      },
+    ];
+
+      jest.spyOn(prisma.conversationParticipant, 'findMany').mockResolvedValue(mockDbResult as any);
+
+      const result = await service.listMembers(userId, conversationId);
+
+      // Check the first user (marvin)
+      expect(result[0].user.username).toBe('marvin');
+      expect(result[0].user.displayName).toBe('Marvin the Robot');
+
+      // Check the second user fallback logic (arthur)
+      expect(result[1].user.username).toBe('arthur');
+      expect(result[1].user.displayName).toBe('arthur'); // Should fallback to username
+    });
+  });
+
+  describe('listMessages', () => {
+    const conversationId = 'conv-123';
+    const userId = 'User1';
+    beforeEach(() => {
+      // 1. Mock internal validations to always pass
+      jest.spyOn(service as any, 'ensureConversationMembership').mockResolvedValue({ 
+        conversationId, 
+        userId,
+      });
+    });
+    it('should list up to 100 messages with sender, reads, and reactions', async () => {
+      // 1. Arrange: Create a mock result that matches your Prisma "include" structure
+      const mockMessages = [
+        {
+          id: 'msg-1',
+          content: 'Hello world',
+          createdAt: new Date(),
+          sender: { username: 'User1', profile: { avatarUrl: 'url1' } },
+          reads: [{ readAt: new Date(), user: { username: 'User2' } }],
+          reactions: [{ content: '👍', user: { username: 'User2' } }],
+        },
+      ];
+
+      jest.spyOn(prisma.message, 'findMany').mockResolvedValue(mockMessages as any);
+
+      // 2. Act
+      const result = await service.listMessages(userId, conversationId);
+
+      // 3. Assert
+      expect(result).toEqual(mockMessages);
+      expect(result.length).toBe(1);
+
+      // 4. Verify Prisma Call: Ensure we are fetching the right data
+      // Fix the verification part in your listMessages test:
+      expect(prisma.message.findMany).toHaveBeenCalledWith({
+        where: { conversationId },
+        include: expect.objectContaining({
+          sender: {
+            include: { profile: true },
+          },
+          reads: expect.anything(),     // Use anything() to save space
+          reactions: expect.anything(), // Use anything() to save space
+        }),
+        orderBy: { createdAt: 'asc' },
+        take: 100,
+      });
+    });
+
+    it('should throw ForbiddenException if user is not a member (Security check)', async () => {
+      // Override the beforeEach mock to simulate a permission failure
+      jest.spyOn(service as any, 'ensureConversationMembership')
+        .mockRejectedValue(new ForbiddenException('you are not a participant'));
+
+      await expect(
+        service.listMessages(userId, conversationId)
+      ).rejects.toThrow(ForbiddenException);
+      
+      // Ensure the database is NEVER queried if permission is denied
+      expect(prisma.message.findMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('listMyConversations', () => {
+
+    it('should format a DIRECT conversation correctly', async () => {
+      const mockDbResult = [{
+        id: '1',
+        type: 'DIRECT',
+        participants: [
+          { userId: 'me', user: { username: 'me' } },
+          { userId: 'other', user: { username: 'Yann', profile: { avatarUrl: 'img.png' } } }
+        ],
+        messages: [{ content: 'Hi!' }]
+      }];
+
+      jest.spyOn(prisma.conversation, 'findMany').mockResolvedValue(mockDbResult as any);
+
+      const result = await service.listMyConversations('me');
+
+      expect(result[0].name).toBe('Yann'); // Correctly picked the other user
+      expect(result[0].type).toBe('dm');
+      expect(result[0].lastMessage).toBe('Hi!');
+    });
+
+    it('should format a GROUP conversation correctly', async () => {
+      const mockDbResult = [{
+        id: '1',
+        type: 'GROUP',
+        participants: [
+          { userId: 'me', user: { username: 'me' } },
+          { userId: 'other', user: { username: 'Yann', profile: { avatarUrl: 'img.png' } } }
+        ],
+        messages: [{ content: 'Hi!' }]
+      }];
+
+      jest.spyOn(prisma.conversation, 'findMany').mockResolvedValue(mockDbResult as any);
+
+      const result = await service.listMyConversations('me');
+
+      expect(result[0].name).toBe('Group chat'); // Correctly picked the other user
+      expect(result[0].type).toBe('group');
+      expect(result[0].lastMessage).toBe('Hi!');
+    });
   });
 
   describe('renameConversation', () => {
