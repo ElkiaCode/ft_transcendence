@@ -1,10 +1,31 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { FriendshipStatus } from 'src/generated/prisma';
+import { ChatGateway } from '../chat/chat.gateway';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class RelationshipsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+    private readonly chatGateway: ChatGateway,
+  ) {}
+
+  private async notifyUser(
+    userId: string,
+    input: Parameters<NotificationsService['createFromInput']>[1],
+  ) {
+    const notification = await this.notificationsService.createFromInput(
+      userId,
+      input,
+    );
+    await this.chatGateway.emitNotificationCreated(userId, notification);
+    return notification;
+  }
 
   private async ensureUserExists(userId: string) {
     const user = await this.prisma.user.findUnique({
@@ -19,7 +40,10 @@ export class RelationshipsService {
     return user;
   }
 
-  private async ensureUsersCanInteract(actorUserId: string, targetUserId: string) {
+  private async ensureUsersCanInteract(
+    actorUserId: string,
+    targetUserId: string,
+  ) {
     if (actorUserId === targetUserId) {
       throw new BadRequestException('you cannot target yourself');
     }
@@ -74,7 +98,9 @@ export class RelationshipsService {
     );
 
     if (existingBlock) {
-      throw new BadRequestException('friend request not allowed because one user has blocked the other');
+      throw new BadRequestException(
+        'friend request not allowed because one user has blocked the other',
+      );
     }
 
     const existingFriendship = await this.findFriendshipBetweenUsers(
@@ -83,7 +109,9 @@ export class RelationshipsService {
     );
 
     if (existingFriendship) {
-      throw new BadRequestException('friendship or friend request already exists');
+      throw new BadRequestException(
+        'friendship or friend request already exists',
+      );
     }
 
     const friendship = await this.prisma.friendship.create({
@@ -91,6 +119,20 @@ export class RelationshipsService {
         requesterId: actorUserId,
         addresseeId: targetUserId,
         status: 'PENDING',
+      },
+    });
+
+    await this.notifyUser(targetUserId, {
+      type: 'SYSTEM',
+      title: 'Friend request received',
+      body: `${actor.username} sent you a friend request.`,
+      actorId: actorUserId,
+      entityType: 'friendship',
+      entityId: friendship.id,
+      action: 'friend_request_created',
+      metadata: {
+        requesterId: actorUserId,
+        requesterUsername: actor.username,
       },
     });
 
@@ -122,7 +164,9 @@ export class RelationshipsService {
     );
 
     if (existingBlock) {
-      throw new BadRequestException('friend request cannot be accepted because one user has blocked the other');
+      throw new BadRequestException(
+        'friend request cannot be accepted because one user has blocked the other',
+      );
     }
 
     const friendship = await this.prisma.friendship.findFirst({
@@ -140,6 +184,22 @@ export class RelationshipsService {
     const updatedFriendship = await this.prisma.friendship.update({
       where: { id: friendship.id },
       data: { status: 'ACCEPTED' },
+    });
+
+    const actor = await this.ensureUserExists(actorUserId);
+
+    await this.notifyUser(requesterUserId, {
+      type: 'SYSTEM',
+      title: 'Friend request accepted',
+      body: `${actor.username} accepted your friend request.`,
+      actorId: actorUserId,
+      entityType: 'friendship',
+      entityId: updatedFriendship.id,
+      action: 'friend_request_accepted',
+      metadata: {
+        acceptedByUserId: actorUserId,
+        acceptedByUsername: actor.username,
+      },
     });
 
     return {
@@ -165,8 +225,28 @@ export class RelationshipsService {
       throw new NotFoundException('friendship not found');
     }
 
+    const actor = await this.ensureUserExists(actorUserId);
+
     await this.prisma.friendship.delete({
       where: { id: friendship.id },
+    });
+
+    await this.notifyUser(targetUserId, {
+      type: 'SYSTEM',
+      title: 'Friendship removed',
+      body: `${actor.username} removed the friendship.`,
+      actorId: actorUserId,
+      entityType: 'friendship',
+      entityId: friendship.id,
+      action:
+        friendship.status === 'PENDING'
+          ? 'friend_request_declined'
+          : 'friendship_removed',
+      metadata: {
+        removedByUserId: actorUserId,
+        removedByUsername: actor.username,
+        previousStatus: friendship.status,
+      },
     });
 
     return {
@@ -179,14 +259,14 @@ export class RelationshipsService {
     const request = await this.prisma.friendship.findMany({
       where: {
         status: 'PENDING',
-        addresseeId: userId
+        addresseeId: userId,
       },
       include: {
         requester: {
           include: { profile: true },
         },
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
 
     return request.map((request) => ({
@@ -195,24 +275,25 @@ export class RelationshipsService {
       user: {
         id: request.requester.id,
         username: request.requester.username,
-        displayName: request.requester.profile?.displayName ?? request.requester.username,
-        avatarUrl: request.requester.profile?.avatarUrl ?? null
-      }
-    }))
+        displayName:
+          request.requester.profile?.displayName ?? request.requester.username,
+        avatarUrl: request.requester.profile?.avatarUrl ?? null,
+      },
+    }));
   }
 
   async getOutGoingFriendRequests(userId: string) {
     const request = await this.prisma.friendship.findMany({
       where: {
         status: 'PENDING',
-        requesterId: userId
+        requesterId: userId,
       },
       include: {
         addressee: {
           include: { profile: true },
         },
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
 
     return request.map((request) => ({
@@ -221,10 +302,11 @@ export class RelationshipsService {
       user: {
         id: request.addressee.id,
         username: request.addressee.username,
-        displayName: request.addressee.profile?.displayName ?? request.addressee.username,
-        avatarUrl: request.addressee.profile?.avatarUrl ?? null
-      }
-    }))
+        displayName:
+          request.addressee.profile?.displayName ?? request.addressee.username,
+        avatarUrl: request.addressee.profile?.avatarUrl ?? null,
+      },
+    }));
   }
 
   async blockUser(actorUserId: string, targetUserId: string) {

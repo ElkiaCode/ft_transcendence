@@ -78,9 +78,7 @@ export class ChatService {
 
   async ensureUsersCanBeAdded(actorUserId: string, targetUserIds: string[]) {
     const users = await this.prisma.user.findMany({
-      where: {
-        id: { in: targetUserIds },
-      },
+      where: { id: { in: targetUserIds } },
       select: {
         id: true,
         username: true,
@@ -405,6 +403,8 @@ export class ChatService {
       return {
         message: 'all selected users are already in the conversation',
         invitedCount: 0,
+        invitedUserIds: [],
+        conversation: null,
       };
     }
 
@@ -440,6 +440,7 @@ export class ChatService {
     return {
       message: 'users invited successfully',
       invitedCount: newUserIds.length,
+      invitedUserIds: newUserIds,
       conversation,
     };
   }
@@ -450,7 +451,7 @@ export class ChatService {
     targetUserId: string,
   ) {
     await this.ensureLiveSender(actorUserId);
-    const actormembership = await this.ensureGroupManagementPermission(
+    const actorMembership = await this.ensureGroupManagementPermission(
       actorUserId,
       conversationId,
     );
@@ -461,7 +462,7 @@ export class ChatService {
       );
     }
 
-    const targetmembership =
+    const targetMembership =
       await this.prisma.conversationParticipant.findUnique({
         where: {
           conversationId_userId: {
@@ -471,11 +472,11 @@ export class ChatService {
         },
       });
 
-    if (!targetmembership) {
+    if (!actorMembership) {
       throw new NotFoundException('target user is not in this conversation');
     }
 
-    if (targetmembership.role === 'OWNER' && actormembership.role !== 'OWNER') {
+    if (actorMembership.role === 'OWNER' && actorMembership.role !== 'OWNER') {
       throw new ForbiddenException(
         'only the room owner can remove another user',
       );
@@ -508,6 +509,8 @@ export class ChatService {
     return {
       message: 'user removed from group',
       removedUserId: targetUserId,
+      conversationId,
+      conversationTitle: actorMembership.conversation.title ?? 'Group chat',
     };
   }
 
@@ -548,6 +551,10 @@ export class ChatService {
     }
 
     const otherParticipants = participants.filter((p) => p.userId !== userId);
+    const remainingUserIds = otherParticipants.map((p) => p.userId);
+    const previousRole = membership.role;
+    const nextOwnerId =
+      previousRole === 'OWNER' ? otherParticipants[0]?.userId : null;
 
     await this.prisma.$transaction(async (tx) => {
       await tx.conversationParticipant.delete({
@@ -559,7 +566,7 @@ export class ChatService {
         },
       });
 
-      if (membership.role === 'OWNER') {
+      if (previousRole === 'OWNER') {
         const nextOwner = otherParticipants[0];
 
         await tx.conversationParticipant.update({
@@ -582,6 +589,10 @@ export class ChatService {
     return {
       message: 'left conversation successfully',
       conversationId,
+      conversationTitle: membership.conversation.title ?? 'Group chat',
+      remainingUserIds,
+      previousRole,
+      nextOwnerId,
     };
   }
 

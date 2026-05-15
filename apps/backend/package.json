@@ -9,6 +9,7 @@
   "scripts": {
     "build": "nest build && npm run postbuild",
     "postbuild": "mkdir -p dist/src/generated && cp -r src/generated/prisma dist/src/generated/ 2>/dev/null || true",
+    "seed:admin": "node scripts/ensure-admin.js",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "npm run build && nest start --watch",
