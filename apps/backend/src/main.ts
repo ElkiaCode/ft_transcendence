@@ -3,6 +3,9 @@ import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+
+
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -21,6 +24,13 @@ async function bootstrap() {
     origin: ['http://localhost:3000', 'https://localhost:3000'],
     credentials: true,
 });
+  const config = new DocumentBuilder()
+    .setTitle('Transcendence API')
+    .setVersion('1.0')
+    .addBearerAuth() // Recommended so you can test logged-in routes
+    .build();
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api/docs', app, document); // This creates the /api route
 
   await app.listen(process.env.PORT ?? 3001);
 }

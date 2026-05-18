@@ -4,6 +4,7 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { clearRefreshCookie, getRefreshTokenFromRequest, setRefreshCookie } from './utils/refresh-cookie.util';
+import { ApiBody, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @Controller('auth')
 export class AuthController {
@@ -29,6 +30,10 @@ export class AuthController {
   }
 
   @Post('login')
+  @ApiOperation({ summary: 'Logs in a user' }) // Human readable title
+  @ApiBody({ type: LoginDto })              // Tells Swagger to use the LoginDto Schema for the request
+  @ApiResponse({ status: 201, description: 'Login successful' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   async login(
     @Body() dto: LoginDto,
     @Res({ passthrough: true }) response: Response,

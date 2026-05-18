@@ -123,28 +123,28 @@ export class ChatService {
     actorUserId: string,
     conversationId: string,
   ) {
-    const menbership = await this.prisma.conversationParticipant.findUnique({
+    const membership = await this.prisma.conversationParticipant.findUnique({
       where: { conversationId_userId: { conversationId, userId: actorUserId } },
       include: { conversation: true },
     });
 
-    if (!menbership) {
+    if (!membership) {
       throw new ForbiddenException(
         'You are not a participant of this conversation',
       );
     }
 
-    if (menbership.conversation.type !== 'GROUP') {
+    if (membership.conversation.type !== 'GROUP') {
       throw new BadRequestException(
         'You can only invite users to a group conversation',
       );
     }
 
-    /*if (menbership.role !== 'OWNER' && menbership.role !== 'ADMIN') {
+    /*if (membership.role !== 'OWNER' && membership.role !== 'ADMIN') {
       throw new ForbiddenException('only room owner or admin can invite users');
     }*/
 
-    return menbership;
+    return membership;
   }
 
   async getOtherParticipantIds(conversationId: string, currentUserId: string) {
@@ -312,7 +312,7 @@ export class ChatService {
     });
   }
 
-  async createGroupeConversation(
+  async createGroupConversation(
     actorUserId: string,
     dto: CreateGroupConversationDto,
   ) {
@@ -451,7 +451,7 @@ export class ChatService {
     targetUserId: string,
   ) {
     await this.ensureLiveSender(actorUserId);
-    const actorMenbership = await this.ensureGroupManagementPermission(
+    const actorMembership = await this.ensureGroupManagementPermission(
       actorUserId,
       conversationId,
     );
@@ -462,7 +462,7 @@ export class ChatService {
       );
     }
 
-    const targetMenbership =
+    const targetMembership =
       await this.prisma.conversationParticipant.findUnique({
         where: {
           conversationId_userId: {
@@ -472,11 +472,11 @@ export class ChatService {
         },
       });
 
-    if (!targetMenbership) {
+    if (!targetMembership) {
       throw new NotFoundException('target user is not in this conversation');
     }
 
-    if (targetMenbership.role === 'OWNER' && actorMenbership.role !== 'OWNER') {
+    if (targetMembership.role === 'OWNER' && actorMembership.role !== 'OWNER') {
       throw new ForbiddenException(
         'only the room owner can remove another user',
       );
@@ -510,7 +510,7 @@ export class ChatService {
       message: 'user removed from group',
       removedUserId: targetUserId,
       conversationId,
-      conversationTitle: actorMenbership.conversation.title ?? 'Group chat',
+      conversationTitle: actorMembership.conversation.title ?? 'Group chat',
     };
   }
 
