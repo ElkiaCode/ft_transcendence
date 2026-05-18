@@ -207,7 +207,7 @@ function ReportCard({
       {isRecentlyReviewed && (
         <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5 text-xs text-green-700 font-medium">
           <span>✓</span>
-          <span>Traité — disparaîtra dans un instant</span>
+          <span>Treaty — will disappear in a moment</span>
         </div>
       )}
       <div className="flex items-center justify-between">
@@ -486,19 +486,30 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
     }
   };
 
-  const handleAction = async (action: () => Promise<any>, successMsg: string) => {
+  const handleAction = async (action: () => Promise<any>, successMsg: string, promotedMsg?: string) => {
     try {
       const res = await action();
       setResult((prev: any) => ({ ...prev, ...res.user }));
-      showToast(successMsg, 'success');
+      if (promotedMsg && res.promoted) {
+        showToast(promotedMsg, 'success');
+      } else {
+        showToast(successMsg, 'success');
+      }
     } catch (err: any) {
       showToast(err.message, 'error');
     }
   };
 
+  const penaltyColor = (pts: number) => {
+    if (pts >= 100) return 'text-green-600';
+    if (pts <= -100) return 'text-red-600';
+    return 'text-gray-700';
+  };
+
   return (
     <div className="flex flex-col gap-4">
       {confirmModal && <ConfirmModal {...confirmModal} onClose={() => setConfirmModal(null)} />}
+
       <div className="flex gap-2">
         <input
           type="text"
@@ -512,32 +523,55 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
           Search
         </button>
       </div>
+
       {loading && <p className="text-sm text-gray-500">Searching...</p>}
       {error && <p className="text-sm text-red-500">{error}</p>}
+
       {result && (
         <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold overflow-hidden flex-shrink-0">
+            <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold overflow-hidden flex-shrink-0">
               {result.profile?.avatarUrl
                 ? <img src={result.profile.avatarUrl} className="w-full h-full object-cover" />
                 : result.username?.charAt(0).toUpperCase()}
             </div>
-            <div>
-              <p className="font-medium text-gray-900">{result.username}</p>
+            <div className="flex flex-col gap-0.5">
+              <p className="font-semibold text-gray-900">{result.username}</p>
+              {result.profile?.displayName && result.profile.displayName !== result.username && (
+                <p className="text-xs text-gray-400">{result.profile.displayName}</p>
+              )}
               <p className="text-xs text-gray-400">{result.globalRole}</p>
             </div>
-            <div className="ml-auto flex gap-2">
-              <span className={`text-xs px-2 py-0.5 rounded-full ${result.isBanned ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
-                {result.isBanned ? 'Banned' : 'Active'}
+            <div className="ml-auto flex flex-col items-end gap-1.5">
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                result.isBanned ? 'bg-red-100 text-red-600' :
+                result.isActive ? 'bg-green-100 text-green-600' :
+                'bg-gray-100 text-gray-500'
+              }`}>
+                {result.isBanned ? 'Banned' : result.isActive ? 'Active' : 'Inactive'}
               </span>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
+            <span className="text-xs text-gray-500 font-medium">Penalty points</span>
+            <span className={`text-sm font-bold ml-auto ${penaltyColor(result.penaltyPoints ?? 0)}`}>
+              {result.penaltyPoints ?? 0} pts
+            </span>
+            {(result.penaltyPoints ?? 0) <= -400 && (
+              <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">
+                ⚠ Ban imminent à -500
+              </span>
+            )}
+          </div>
+          {result.profile?.bio && (
+            <p className="text-xs text-gray-500 italic border-l-2 border-gray-200 pl-2">{result.profile.bio}</p>
+          )}
+          <div className="flex flex-wrap gap-2 border-t border-gray-100 pt-3">
             {!result.isBanned ? (
               <button
                 onClick={() => setConfirmModal({
                   title: 'Ban user',
-                  description: `Are you sure you want to ban ${result.username}?`,
+                  description: `Are you sure you want to ban ${result.username}? They will no longer be able to access the platform.`,
                   confirmLabel: 'Ban',
                   confirmColor: 'bg-red-500 hover:bg-red-600',
                   onConfirm: () => handleAction(() => apiBanUser(result.id), `${result.username} has been banned`),
@@ -561,7 +595,10 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
                   description: `Give ${result.username} moderator privileges?`,
                   confirmLabel: 'Promote',
                   confirmColor: 'bg-blue-500 hover:bg-blue-600',
-                  onConfirm: () => handleAction(() => apiPromoteToModerator(result.id), `${result.username} is now a moderator`),
+                  onConfirm: () => handleAction(
+                    () => apiPromoteToModerator(result.id),
+                    `${result.username} is now a moderator`
+                  ),
                 })}
                 className="px-3 py-1 rounded-full bg-blue-500 text-white text-xs hover:bg-blue-600 cursor-pointer transition"
               >
@@ -575,7 +612,10 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
                   description: `Remove moderator privileges from ${result.username}?`,
                   confirmLabel: 'Unpromote',
                   confirmColor: 'bg-gray-500 hover:bg-gray-600',
-                  onConfirm: () => handleAction(() => apiUnpromoteModerator(result.id), `${result.username} is back to user`),
+                  onConfirm: () => handleAction(
+                    () => apiUnpromoteModerator(result.id),
+                    `${result.username} is back to user`
+                  ),
                 })}
                 className="px-3 py-1 rounded-full bg-gray-500 text-white text-xs hover:bg-gray-600 cursor-pointer transition"
               >
@@ -603,7 +643,8 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
               <button
                 onClick={() => handleAction(
                   () => apiAdjustPenaltyPoints(result.id, points, note || undefined),
-                  'Penalty points updated'
+                  'Penalty points updated',
+                  `${result.username} a été promu modérateur automatiquement !`
                 )}
                 className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 cursor-pointer transition"
               >

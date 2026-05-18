@@ -348,6 +348,10 @@ export class UsersService {
     return {
       id: user.id,
       username: user.username,
+      globalRole: user.globalRole,      // ajouté
+      isBanned: user.isBanned,          // ajouté
+      isActive: user.isActive,          // ajouté
+      penaltyPoints: user.penaltyPoints, // ajouté
       profile: user.profile ? {
         displayName: user.profile.displayName,
         bio: user.profile.bio,
