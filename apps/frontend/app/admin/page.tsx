@@ -5,8 +5,6 @@ import { useAuthStore } from "@/store/authStore";
 import { apiListReports, apiReviewReport, apiBanUser, apiUnbanUser, apiPromoteToModerator, apiUnpromoteModerator, apiAdjustPenaltyPoints } from "@/lib/api/admin";
 import { apiGetUserByUsername } from "@/lib/api/auth";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
 type ModerationAction = {
   id: string;
   action: string;
@@ -18,7 +16,7 @@ type ModerationAction = {
 
 type Report = {
   id: string;
-  status: string;
+  status: 'OPEN' | 'RESOLVED' | 'DISMISSED';
   targetType: 'USER' | 'MESSAGE';
   reason: string;
   createdAt: string;
@@ -128,8 +126,6 @@ function ReviewModal({
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
       <div className="bg-white rounded-xl p-6 w-[520px] flex flex-col gap-4 shadow-xl max-h-[90vh] overflow-y-auto">
         <h2 className="text-lg font-bold text-gray-900">Review report</h2>
-
-        {/* Context */}
         <div className="text-sm text-gray-600 bg-gray-50 rounded-lg p-3 flex flex-col gap-2">
           <p className="font-medium text-gray-900">
             {report.targetType === 'USER'
@@ -148,14 +144,11 @@ function ReviewModal({
             Reported by <span className="font-medium">{report.creator.username}</span> on {new Date(report.createdAt).toLocaleDateString()}
           </p>
         </div>
-
-        {/* Existing actions */}
         {report.actions.length > 0 && (
           <div className="bg-gray-50 rounded-lg p-3">
             <ActionHistory actions={report.actions} />
           </div>
         )}
-
         <div className="flex flex-col gap-2">
           <label className="text-sm font-medium text-gray-700">Action</label>
           <select
@@ -169,7 +162,6 @@ function ReviewModal({
             <option value="DISMISS_REPORT">Dismiss</option>
           </select>
         </div>
-
         <div className="flex flex-col gap-2">
           <label className="text-sm font-medium text-gray-700">Note (optional)</label>
           <textarea
@@ -178,7 +170,6 @@ function ReviewModal({
             className="border border-gray-300 rounded-lg p-3 text-sm text-black resize-none h-24 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-
         <div className="flex flex-col gap-2">
           <label className="text-sm font-medium text-gray-700">Penalty points to subtract</label>
           <input
@@ -189,7 +180,6 @@ function ReviewModal({
             className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-
         <div className="flex gap-2 justify-end">
           <button onClick={onClose} className="px-4 py-2 rounded-full text-black hover:bg-gray-100 transition cursor-pointer">Cancel</button>
           <button onClick={() => onSubmit(action, note, points)} className="px-4 py-2 rounded-full bg-blue-500 text-white hover:bg-blue-600 cursor-pointer transition">
@@ -201,16 +191,29 @@ function ReviewModal({
   );
 }
 
-function ReportCard({ report, onReview }: { report: Report; onReview: (r: Report) => void }) {
+function ReportCard({
+  report,
+  onReview,
+  isRecentlyReviewed,
+}: {
+  report: Report;
+  onReview: (r: Report) => void;
+  isRecentlyReviewed?: boolean;
+}) {
   const [expanded, setExpanded] = useState(false);
 
   return (
     <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col gap-2">
-      {/* Header */}
+      {isRecentlyReviewed && (
+        <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5 text-xs text-green-700 font-medium">
+          <span>✓</span>
+          <span>Traité — disparaîtra dans un instant</span>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-            report.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
+            report.status === 'OPEN' ? 'bg-yellow-100 text-yellow-700' :
             report.status === 'RESOLVED' ? 'bg-green-100 text-green-700' :
             'bg-gray-100 text-gray-500'
           }`}>
@@ -224,8 +227,6 @@ function ReportCard({ report, onReview }: { report: Report; onReview: (r: Report
         </div>
         <span className="text-xs text-gray-400">{new Date(report.createdAt).toLocaleDateString()}</span>
       </div>
-
-      {/* Who reported who */}
       <div className="text-sm text-gray-700">
         <span className="font-medium">By:</span> {report.creator?.username ?? "Unknown"}
         {report.targetType === 'USER' && report.targetUser && (
@@ -235,11 +236,7 @@ function ReportCard({ report, onReview }: { report: Report; onReview: (r: Report
           <> → message by <span className="font-medium">{report.targetMessage.sender.username}</span></>
         )}
       </div>
-
-      {/* Reason */}
       <p className="text-sm text-gray-500 italic">{report.reason}</p>
-
-      {/* Message content preview */}
       {report.targetType === 'MESSAGE' && report.targetMessage?.content && (
         <div className="bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 text-sm text-gray-600 italic">
           "{report.targetMessage.content.length > 120
@@ -247,8 +244,6 @@ function ReportCard({ report, onReview }: { report: Report; onReview: (r: Report
             : report.targetMessage.content}"
         </div>
       )}
-
-      {/* Expand/collapse history */}
       {report.actions.length > 0 && (
         <button
           onClick={() => setExpanded(v => !v)}
@@ -258,9 +253,7 @@ function ReportCard({ report, onReview }: { report: Report; onReview: (r: Report
         </button>
       )}
       {expanded && <ActionHistory actions={report.actions} />}
-
-      {/* Actions */}
-      {report.status === 'PENDING' && (
+      {report.status === 'OPEN' && (
         <button
           onClick={() => onReview(report)}
           className="self-end px-3 py-1 rounded-full bg-blue-500 text-white text-xs hover:bg-blue-600 cursor-pointer transition"
@@ -278,10 +271,12 @@ function ReportsTab({ isAdmin, showToast }: { isAdmin: boolean; showToast: (msg:
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [reviewModal, setReviewModal] = useState<Report | null>(null);
-  const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'RESOLVED' | 'DISMISSED'>('PENDING');
+  const [filter, setFilter] = useState<'ALL' | 'OPEN' | 'RESOLVED' | 'DISMISSED'>('OPEN');
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'USER' | 'MESSAGE'>('ALL');
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [page, setPage] = useState(1);
+  const [recentlyReviewed, setRecentlyReviewed] = useState<Set<string>>(new Set());
+  const currentUser = useAuthStore((state) => state.user);
 
   useEffect(() => {
     apiListReports()
@@ -294,13 +289,39 @@ function ReportsTab({ isAdmin, showToast }: { isAdmin: boolean; showToast: (msg:
     if (!reviewModal) return;
     try {
       await apiReviewReport(reviewModal.id, action as any, note || undefined, points || undefined);
+
+      const newAction: ModerationAction = {
+        id: crypto.randomUUID(),
+        action,
+        note: note || null,
+        penaltyPointsChange: points ? -points : null,
+        createdAt: new Date().toISOString(),
+        moderator: currentUser ? { username: currentUser.username } : null,
+      };
+
+      const reviewedId = reviewModal.id;
+
       setReports((prev) =>
         prev.map((r) =>
-          r.id === reviewModal.id
-            ? { ...r, status: action === 'DISMISS_REPORT' ? 'DISMISSED' : 'RESOLVED' }
+          r.id === reviewedId
+            ? {
+                ...r,
+                status: action === 'DISMISS_REPORT' ? 'DISMISSED' : 'RESOLVED',
+                actions: [...r.actions, newAction],
+              }
             : r
         )
       );
+
+      setRecentlyReviewed((prev) => new Set(prev).add(reviewedId));
+      setTimeout(() => {
+        setRecentlyReviewed((prev) => {
+          const next = new Set(prev);
+          next.delete(reviewedId);
+          return next;
+        });
+      }, 3000);
+
       setReviewModal(null);
       showToast('Report reviewed successfully', 'success');
     } catch {
@@ -308,10 +329,11 @@ function ReportsTab({ isAdmin, showToast }: { isAdmin: boolean; showToast: (msg:
     }
   };
 
-  const pendingCount = reports.filter(r => r.status === 'PENDING').length;
+  const openCount = reports.filter(r => r.status === 'OPEN').length;
 
   const filtered = reports
     .filter((r) => {
+      if (recentlyReviewed.has(r.id)) return true;
       if (filter !== 'ALL' && r.status !== filter) return false;
       if (typeFilter !== 'ALL' && r.targetType !== typeFilter) return false;
       return true;
@@ -339,11 +361,10 @@ function ReportsTab({ isAdmin, showToast }: { isAdmin: boolean; showToast: (msg:
         />
       )}
 
-      {/* Filters */}
       <div className="flex flex-wrap gap-3 items-center justify-between">
         <div className="flex gap-2 flex-wrap">
           <div className="flex gap-1">
-            {(['ALL', 'PENDING', 'RESOLVED', 'DISMISSED'] as const).map((f) => (
+            {(['ALL', 'OPEN', 'RESOLVED', 'DISMISSED'] as const).map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
@@ -352,11 +373,11 @@ function ReportsTab({ isAdmin, showToast }: { isAdmin: boolean; showToast: (msg:
                 }`}
               >
                 {f}
-                {f === 'PENDING' && pendingCount > 0 && (
+                {f === 'OPEN' && openCount > 0 && (
                   <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${
-                    filter === 'PENDING' ? 'bg-white text-blue-500' : 'bg-blue-500 text-white'
+                    filter === 'OPEN' ? 'bg-white text-blue-500' : 'bg-blue-500 text-white'
                   }`}>
-                    {pendingCount}
+                    {openCount}
                   </span>
                 )}
               </button>
@@ -394,7 +415,12 @@ function ReportsTab({ isAdmin, showToast }: { isAdmin: boolean; showToast: (msg:
         <>
           <div className="flex flex-col gap-3">
             {paginated.map((report) => (
-              <ReportCard key={report.id} report={report} onReview={setReviewModal} />
+              <ReportCard
+                key={report.id}
+                report={report}
+                onReview={setReviewModal}
+                isRecentlyReviewed={recentlyReviewed.has(report.id)}
+              />
             ))}
           </div>
           {totalPages > 1 && (
@@ -473,7 +499,6 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
   return (
     <div className="flex flex-col gap-4">
       {confirmModal && <ConfirmModal {...confirmModal} onClose={() => setConfirmModal(null)} />}
-
       <div className="flex gap-2">
         <input
           type="text"
@@ -487,10 +512,8 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
           Search
         </button>
       </div>
-
       {loading && <p className="text-sm text-gray-500">Searching...</p>}
       {error && <p className="text-sm text-red-500">{error}</p>}
-
       {result && (
         <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col gap-3">
           <div className="flex items-center gap-3">
@@ -509,7 +532,6 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
               </span>
             </div>
           </div>
-
           <div className="flex flex-wrap gap-2">
             {!result.isBanned ? (
               <button
@@ -561,7 +583,6 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
               </button>
             )}
           </div>
-
           <div className="flex flex-col gap-2 border-t border-gray-100 pt-3">
             <p className="text-xs font-medium text-gray-700">Adjust penalty points</p>
             <div className="flex gap-2">
