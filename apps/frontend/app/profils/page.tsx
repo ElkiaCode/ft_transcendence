@@ -7,6 +7,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useEffect, useState, useMemo } from "react";
 import type { AppUser, TopUser } from "@/lib/types";
 import { errorMessage } from "@/lib/types";
+import Link from "next/link";
 
 function EditModal({ user, onClose, onSave }: { user: AppUser | null, onClose: () => void, onSave: (u: AppUser) => void }) {
   const [displayName, setDisplayName] = useState(user?.profile?.displayName ?? '');
@@ -206,6 +207,7 @@ function Section() {
   const profileIsOnline = isOnline(user?.id);
   const profilePoints = points ?? user?.penaltyPoints ?? 0;
   const earnedBadges = getEarnedBadges(profilePoints);
+  const users = useAuthStore((s) => s.user);
 
   useEffect(() => {
     async function loadUser() {
@@ -240,7 +242,13 @@ function Section() {
 
   return (
     <section className="flex-1 flex items-center flex-col w-full gap-8 py-12 relative z-10">
-
+      {(users?.globalRole === 'MODERATOR' || users?.globalRole === 'ADMIN') && (
+        <div className="w-full flex justify-end self-stretch px-4">
+          <Link href="/admin" className="px-4 py-2 rounded-full bg-gray-800 text-white text-sm hover:bg-gray-700 transition cursor-pointer">
+            Dashboard
+          </Link>
+        </div>
+      )}
       {/* POINTS BADGE */}
       {points !== null && (
         <div className="absolute top-8 left-4 z-20 w-20 h-20 bg-white rounded-full flex flex-col items-center justify-center shadow-lg" style={{ border: '4px solid #00BABC' }}>
@@ -248,7 +256,6 @@ function Section() {
           <span className="TextColorS text-xs font-medium">pts</span>
         </div>
       )}
-
       {/* AVATAR */}
       <div
         className="relative w-48 h-48 ColorsS rounded-full overflow-hidden flex items-center justify-center group"
@@ -398,7 +405,9 @@ function Section() {
         <ChangePasswordModal onClose={() => setShowPassword(false)} />
       )}
     </section>
+    
   );
+  
 }
 
 export default function Home() {
