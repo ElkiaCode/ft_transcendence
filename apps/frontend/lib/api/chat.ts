@@ -105,7 +105,7 @@ export async function apiAddMessageReaction(
   return data;
 }
 
-export async function apiReportMessage(messageId: string,conversationId: string,reason: string) {
+export async function apiReportMessage(messageId: string, reason: string) {
   const res = await fetchWithAuth(`${API_URL}/moderation/reports`, {
     method: 'POST',
     headers: {
