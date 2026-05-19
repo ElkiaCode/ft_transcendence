@@ -520,7 +520,7 @@ describe('ChatService', () => {
           userId,
       });
     });
-    it('should format a member list correctly', async () => {
+    it('Scenario 1: should format a member list correctly', async () => {
       const mockDbResult = [
         {
           id: 'part-1',
