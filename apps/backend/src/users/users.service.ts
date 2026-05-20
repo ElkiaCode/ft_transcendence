@@ -706,14 +706,15 @@ export class UsersService {
     return {
       id: user.id,
       username: user.username,
-      penaltyPoints: user.penaltyPoints,
-      profile: user.profile
-        ? {
-            displayName: user.profile.displayName,
-            bio: user.profile.bio,
-            avatarUrl: user.profile.avatarUrl,
-          }
-        : null,
+      globalRole: user.globalRole,      // ajouté
+      isBanned: user.isBanned,          // ajouté
+      isActive: user.isActive,          // ajouté
+      penaltyPoints: user.penaltyPoints, // ajouté
+      profile: user.profile ? {
+        displayName: user.profile.displayName,
+        bio: user.profile.bio,
+        avatarUrl: user.profile.avatarUrl,
+      } : null,
     };
   }
 
