@@ -76,11 +76,11 @@ export class ChatController {
   }
 
   @Post('group')
-  async createGroupeConversation(
+  async createGroupConversation(
     @CurrentUser() user: JwtPayload,
     @Body() dto: CreateGroupConversationDto,
   ) {
-    const result = await this.chatService.createGroupeConversation(
+    const result = await this.chatService.createGroupConversation(
       user.sub,
       dto,
     );
