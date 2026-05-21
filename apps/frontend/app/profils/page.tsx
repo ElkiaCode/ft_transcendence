@@ -1,10 +1,15 @@
 "use client";
 
 import { apiUpdateProfile, apiUpdateAvatar, apiUpdatePassword, apiGetMyPoints, apiGetTopUsers, apiGetMe } from "@/lib/api/auth";
+import { getEarnedBadges, type GamificationBadge } from "@/lib/gamification";
+import { useOnlinePresence } from "@/lib/hooks/use-online-presence";
 import { useAuthStore } from "@/store/authStore";
 import { useEffect, useState, useMemo } from "react";
+import type { AppUser, TopUser } from "@/lib/types";
+import { errorMessage } from "@/lib/types";
+import Link from "next/link";
 
-function EditModal({ user, onClose, onSave }: { user: any, onClose: () => void, onSave: (u: any) => void }) {
+function EditModal({ user, onClose, onSave }: { user: AppUser | null, onClose: () => void, onSave: (u: AppUser) => void }) {
   const [displayName, setDisplayName] = useState(user?.profile?.displayName ?? '');
   const [bio, setBio] = useState(user?.profile?.bio ?? '');
   const [error, setError] = useState('');
@@ -15,8 +20,8 @@ function EditModal({ user, onClose, onSave }: { user: any, onClose: () => void, 
       const updated = await apiUpdateProfile(displayName, bio);
       onSave(updated);
       onClose();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(errorMessage(err, 'Error saving profile'));
     }
   };
 
@@ -70,8 +75,8 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
       await apiUpdatePassword(currentPassword, newPassword);
       setSuccess(true);
       setTimeout(() => onClose(), 1500);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(errorMessage(err, 'Error updating password'));
     }
   };
 
@@ -160,14 +165,49 @@ function getRankColor(i: number) {
   return '#00BABC';
 }
 
+function BadgeGrid({ badges }: { badges: GamificationBadge[] }) {
+  return (
+    <div className="w-full max-w-2xl">
+      <h3 className="text-center font-bold mb-3 TextColorS text-lg">Badges</h3>
+      {badges.length === 0 ? (
+        <div className="rounded-lg border-4 BorderColorS bg-white px-4 py-5 text-center">
+          <p className="text-sm font-medium text-black">No badges yet</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {badges.map((badge) => (
+            <div
+              key={badge.id}
+              className={`min-h-24 border-2 rounded-lg px-4 py-3 flex items-center gap-3 shadow-sm ${badge.accentClass}`}
+            >
+              <div className="w-12 h-12 rounded-full bg-white/80 border border-current flex items-center justify-center text-sm font-black flex-shrink-0">
+                {badge.mark}
+              </div>
+              <div className="min-w-0 text-left">
+                <div className="font-bold text-sm">{badge.name}</div>
+                <div className="text-xs opacity-80">{badge.description}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Section() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [showEdit, setShowEdit] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const setStoreUser = useAuthStore((s) => s.setUser);
   const [copied, setCopied] = useState(false);
   const [points, setPoints] = useState<number | null>(null);
-  const [topUsers, setTopUsers] = useState<any[]>([]);
+  const [topUsers, setTopUsers] = useState<TopUser[]>([]);
+  const { isOnline } = useOnlinePresence();
+  const profileIsOnline = isOnline(user?.id);
+  const profilePoints = points ?? user?.penaltyPoints ?? 0;
+  const earnedBadges = getEarnedBadges(profilePoints);
+  const users = useAuthStore((s) => s.user);
 
   useEffect(() => {
     async function loadUser() {
@@ -184,7 +224,7 @@ function Section() {
   const handleAvatarChange = async (file?: File) => {
     if (!file) return;
     try {
-      const updatedUser = await apiUpdateAvatar(file);
+      await apiUpdateAvatar(file);
       const fresh = await apiGetMe();
       setUser(fresh);
       setStoreUser(fresh);
@@ -202,7 +242,13 @@ function Section() {
 
   return (
     <section className="flex-1 flex items-center flex-col w-full gap-8 py-12 relative z-10">
-
+      {(users?.globalRole === 'MODERATOR' || users?.globalRole === 'ADMIN') && (
+        <div className="w-full flex justify-end self-stretch px-4">
+          <Link href="/admin" className="px-4 py-2 rounded-full bg-gray-800 text-white text-sm hover:bg-gray-700 transition cursor-pointer">
+            Dashboard
+          </Link>
+        </div>
+      )}
       {/* POINTS BADGE */}
       {points !== null && (
         <div className="absolute top-8 left-4 z-20 w-20 h-20 bg-white rounded-full flex flex-col items-center justify-center shadow-lg" style={{ border: '4px solid #00BABC' }}>
@@ -210,7 +256,6 @@ function Section() {
           <span className="TextColorS text-xs font-medium">pts</span>
         </div>
       )}
-
       {/* AVATAR */}
       <div
         className="relative w-48 h-48 ColorsS rounded-full overflow-hidden flex items-center justify-center group"
@@ -249,12 +294,20 @@ function Section() {
         <h2 className="text-4xl font-bold text-white">
           {user?.profile?.displayName ?? user?.username ?? "..."}
         </h2>
+        {user && (
+          <div className="flex items-center gap-2 text-sm font-semibold text-white">
+            <span className={`w-2.5 h-2.5 rounded-full ${profileIsOnline ? "bg-green-400" : "bg-gray-400"}`} />
+            <span>{profileIsOnline ? "Online" : "Offline"}</span>
+          </div>
+        )}
         {user?.profile?.bio && (
           <p className="text-center max-w-md TextColorS">
             {user.profile.bio}
           </p>
         )}
       </div>
+
+      <BadgeGrid badges={earnedBadges} />
 
       {/* BUTTONS */}
       <div className="flex gap-3">
@@ -337,13 +390,13 @@ function Section() {
           user={user}
           onClose={() => setShowEdit(false)}
           onSave={(updated) =>
-            setUser((prev: any) => ({
+            setUser((prev) => ({
               ...prev,
               profile: {
-                ...prev.profile,
+                ...prev?.profile,
                 ...(updated.profile ?? updated),
               },
-            }))
+            }) as AppUser)
           }
         />
       )}
@@ -352,7 +405,9 @@ function Section() {
         <ChangePasswordModal onClose={() => setShowPassword(false)} />
       )}
     </section>
+    
   );
+  
 }
 
 export default function Home() {

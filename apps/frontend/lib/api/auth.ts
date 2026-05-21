@@ -18,7 +18,8 @@ export async function apiLogin(email: string, password: string) {
   return data.user;
 }
 
-export async function apiRegister(username: string, email: string, password: string) {
+export async function apiRegister(username: string, 
+    email: string, password: string) {
   const res = await fetch(`${API_URL}/auth/register`, {
     method: 'POST',
     credentials: 'include',
@@ -260,6 +261,20 @@ export async function apiEraseMyData(currentPassword: string) {
   const data = await res.json();
   if (!res.ok) {
     throw new Error(data.message || 'Error deleting account');
+  }
+  return data;
+}
+
+export async function apiExportMyData() {
+  const res = await fetchWithAuth(`${API_URL}/users/me/export-data`, {
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.message || 'Error exporting account data');
   }
   return data;
 }

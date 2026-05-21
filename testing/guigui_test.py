@@ -8,12 +8,17 @@ def test_unit():
     yann        = User("yann@gmail.com", "MegaYann", "pass1234")
     clement     = User("clem@gmail.com", "SuperClem", "pass1234")
 
-    print("guillaume se register\n")
-    guillaume.register()
-    print("yann se register\n")
-    yann.register()
-    print("clement se register\n")
     clement.register()
+    yann.register()
+    guillaume.register()
+
+    clement.login()
+    yann.login()
+    guillaume.login()
+
+    User.promoteAdmin(clement)
+
+    User.promoteUserToModerator(clement, yann)
 
     #users_id = []
     #conversation_id = ""
@@ -45,12 +50,6 @@ def test_unit():
 
     full_database_audit()
 
-    print("guillaume erases all his data\n")
-    guillaume.eraseDataPassword()
-    print("clement erases all his data\n")
-    clement.eraseDataPassword()
-    print("yann erases all his data\n")
-    yann.eraseDataPassword()
 
     if (os.path.exists(guillaume.cookies)):
         os.remove(guillaume.cookies)
@@ -58,5 +57,4 @@ def test_unit():
         os.remove(yann.cookies)
     if (os.path.exists(clement.cookies)):
         os.remove(clement.cookies)
-    
 test_unit()

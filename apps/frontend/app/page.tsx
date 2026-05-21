@@ -7,6 +7,7 @@ import { useAuthStore } from "@/store/authStore";
 import { Socket } from "socket.io-client";
 import { getChatSocket, resetChatSocket } from "@/lib/socket/chat-socket";
 import { apiPromoteUser } from "@/lib/api/auth";
+import type { ChatMessage, GroupMember, MessageReaction } from "@/lib/types";
 import { useRouter } from "next/navigation";
 
 interface SearchUser {
@@ -35,16 +36,12 @@ const reactionIcons: Record<ReactionType, string> = {
 };
 
 function GroupMenuModal({
-  conv,
-  currentUserId,
   onInvite,
   onMembers,
   onRename,
   onLeave,
   onClose,
 }: {
-  conv: Conversation;
-  currentUserId: string | undefined;
   onInvite: () => void;
   onMembers: () => void;
   onRename: () => void;
@@ -119,11 +116,11 @@ function InviteMembersModal({
                 <div
                   key={user.id}
                   onClick={() => toggleUser(user)}
-                  className={`flex items-center gap-3 p-2 cursor-pointer transition ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-100'}`}
+                  className={`flex items-center gap-3 p-2 cursor-pointer transition ${isSelected ? 'ColorsS' : 'hover:bg-gray-100'}`}
                 >
-                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
+                  <div className="w-8 h-8 ColorsS rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
                     {user.profile?.avatarUrl ? (
-                      <img src={user.profile.avatarUrl} className="w-full h-full object-cover rounded-full" />
+                      <img src={user.profile.avatarUrl} alt={user.username} className="w-full h-full object-cover rounded-full" />
                     ) : (
                       user.username.charAt(0).toUpperCase()
                     )}
@@ -138,7 +135,7 @@ function InviteMembersModal({
         {selectedUsers.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {selectedUsers.map((user) => (
-              <span key={user.id} className="flex items-center gap-1 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+              <span key={user.id} className="flex items-center gap-1 ColorsS text-blue-800 text-xs px-2 py-1 rounded-full">
                 {user.username}
                 <button onClick={() => toggleUser(user)} className="hover:text-blue-600 cursor-pointer">×</button>
               </span>
@@ -150,7 +147,7 @@ function InviteMembersModal({
           <button
             onClick={() => onSubmit(selectedUsers.map((u) => u.id))}
             disabled={selectedUsers.length === 0}
-            className="px-4 py-2 rounded-full bg-blue-500 text-white hover:bg-blue-600 cursor-pointer transition disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-4 py-2 rounded-full ColorsS text-white hover:ColorsScursor-pointer transition disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Add
           </button>
@@ -167,7 +164,7 @@ function MembersModal({
   onRemove,
   onClose,
 }: {
-  members: any[];
+  members: GroupMember[];
   currentUserId: string | undefined;
   currentUserRole: string | undefined;
   onRemove: (userId: string) => void;
@@ -181,9 +178,9 @@ function MembersModal({
         <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
           {members.map((member) => (
             <div key={member.userId} className="flex items-center gap-3 p-2 rounded-lg">
-              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0 overflow-hidden">
+              <div className="w-8 h-8 ColorsS rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0 overflow-hidden">
                 {member.user.avatarUrl ? (
-                  <img src={member.user.avatarUrl} className="w-full h-full object-cover" />
+                  <img src={member.user.avatarUrl} alt={member.user.username} className="w-full h-full object-cover" />
                 ) : (
                   member.user.username.charAt(0).toUpperCase()
                 )}
@@ -237,7 +234,7 @@ function RenameModal({
           <button
             onClick={() => onSubmit(title)}
             disabled={!title.trim()}
-            className="px-4 py-2 rounded-full bg-blue-500 text-white hover:bg-blue-600 cursor-pointer transition disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-4 py-2 rounded-full ColorsS text-white hover:ColorsS cursor-pointer transition disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Rename
           </button>
@@ -330,12 +327,12 @@ function CreateGroupModal({
                   key={user.id}
                   onClick={() => toggleUser(user)}
                   className={`flex items-center gap-3 p-2 cursor-pointer transition ${
-                    isSelected ? 'bg-blue-50' : 'hover:bg-gray-100'
+                    isSelected ? 'ColorsS' : 'hover:bg-gray-100'
                   }`}
                 >
-                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
+                  <div className="w-8 h-8 ColorsS rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
                     {user.profile?.avatarUrl ? (
-                      <img src={user.profile.avatarUrl} className="w-full h-full object-cover rounded-full" />
+                      <img src={user.profile.avatarUrl} alt={user.username} className="w-full h-full object-cover rounded-full" />
                     ) : (
                       user.username.charAt(0).toUpperCase()
                     )}
@@ -352,7 +349,7 @@ function CreateGroupModal({
             {selectedUsers.map((user) => (
               <span
                 key={user.id}
-                className="flex items-center gap-1 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
+                className="flex items-center gap-1 ColorsS text-blue-800 text-xs px-2 py-1 rounded-full"
               >
                 {user.username}
                 <button
@@ -391,7 +388,7 @@ function EditModal({
   onSubmit,
   onClose,
 }: {
-  message: any;
+  message: ChatMessage;
   onSubmit: (content: string) => void;
   onClose: () => void;
 }) {
@@ -416,7 +413,7 @@ function EditModal({
           <button
             onClick={() => onSubmit(content)}
             disabled={!content.trim()}
-            className="px-4 py-2 rounded-full bg-blue-500 text-white hover:bg-blue-600 cursor-pointer transition disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-4 py-2 rounded-full ColorsS text-white hover:ColorsS cursor-pointer transition disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Save
           </button>
@@ -534,23 +531,26 @@ function SidebarSearch({
       <div className="flex flex-col gap-2 overflow-y-autoconst router = useRouter(); flex-1">
         <h3 className="text-sm font-bold text-gray-700 px-2 text-center">Chat</h3>
         {conversations.map((conv) => (
-        <div
-          key={conv.id}
-          onClick={() => onSelectConv(conv)}
-          className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition ${
-            selectedConvId === conv.id ? 'bg-blue-500 text-white' : 'hover:bg-gray-300'
-          }`}
-        >
-          <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold overflow-hidden">
-            {conv.avatarUrl ? (
-              <img src={conv.avatarUrl} className="w-full h-full object-cover" />
-            ) : (
-              conv.name?.charAt(0).toUpperCase()
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-sm truncate">{conv.name}</p>
-            <p className="text-xs text-gray-600 truncate">{conv.lastMessage || 'No messages yet'}</p>
+          <div
+            key={conv.id}
+            onClick={() => onSelectConv(conv)}
+            className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition ${
+              selectedConvId === conv.id ? 'ColorsS text-white' : 'hover:bg-gray-300'
+            }`}
+          >
+            <div className={`w-10 h-10 ColorsS rounded-full flex items-center justify-center text-white font-bold overflow-hidden ${
+               selectedConvId === conv.id ? 'ring-2 ring-white' : ''
+              }`}>
+              {conv.avatarUrl ? (
+                <img src={conv.avatarUrl} alt={conv.name} className="w-full h-full object-cover" />
+              ) : (
+                conv.name?.charAt(0).toUpperCase()
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm truncate">{conv.name}</p>
+              <p className="text-xs text-gray-900 truncate">{conv.lastMessage || 'No messages yet'}</p>
+            </div>
           </div>
           <button
             onClick={(e) => { e.stopPropagation(); onDeleteConv(conv.id); }}
@@ -586,7 +586,7 @@ function SearchDropdown({
           onClick={() => onSelectUser(user)}
           className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-300 cursor-pointer"
         >
-          <div className="w-10 h-10 bg-blue-500 rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center text-white font-medium">
+          <div className="w-10 h-10 ColorsS rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center text-white font-medium">
             {user.profile?.avatarUrl ? (
               <img src={user.profile.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
             ) : (
@@ -628,6 +628,7 @@ function UserContextMenu({
   onBlock,
   onUnblock,
   onPromote,
+  onViewProfile
 }: {
   user: SearchUser;
   x: number;
@@ -637,21 +638,53 @@ function UserContextMenu({
   onBlock: (userId: string) => void;
   onUnblock: (userId: string) => void;
   onPromote: (userId: string) => void;
+  onViewProfile: (username: string) => void;
 }) {
   return (
-    <div className="fixed z-50 w-40 bg-white shadow-lg rounded-lg" style={{ top: y, left: x }}>
-      <button onClick={() => onAddFriend(user.id)} className="block w-full text-green-500 text-left px-4 py-2 hover:bg-gray-100">
+      <div
+        className="fixed z-50 w-44 ColorsS rounded-lg overflow-hidden shadow-lg border-2 border-pink-500"
+        style={{ top: y, left: x }}
+       >
+      <button
+        type="button"
+        onClick={() => onViewProfile(user.username)}
+        className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition"
+      >
+        <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
+        View Profile
+     </button>
+      <button
+        type="button"
+        onClick={() => onAddFriend(user.id)}
+        className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition"
+      >
+        <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
         Add friend
       </button>
-      <button onClick={() => onBlock(user.id)} className="block w-full text-red-500 text-left px-4 py-2 hover:bg-gray-100">
+      <button
+        type="button"
+        onClick={() => onBlock(user.id)}
+        className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition"
+      >
+        <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
         Block User
       </button>
-      <button onClick={() => onUnblock(user.id)} className="block w-full text-blue-500 text-left px-4 py-2 hover:bg-gray-100">
+      <button
+        type="button"
+        onClick={() => onUnblock(user.id)}
+        className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition"
+      >
+        <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
         Unblock User
       </button>
       {isAdmin && (
-        <button onClick={() => onPromote(user.id)} className="block w-full text-purple-500 text-left px-4 py-2 hover:bg-gray-100">
-          Promote to Moderator
+          <button
+            type="button"
+            onClick={() => onPromote(user.id)}
+            className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition"
+          >
+            <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
+            Promote to Moderator
         </button>
       )}
     </div>
@@ -675,7 +708,7 @@ function ChatPanel({
   onOpenGroupMenu,
 }: {
   selectedConv: Conversation | null;
-  messages: any[];
+  messages: ChatMessage[];
   messageInput: string;
   currentUserId: string | undefined;
   typingUsers: string[];
@@ -684,9 +717,9 @@ function ChatPanel({
   onInputChange: (value: string) => void;
   onSend: () => void;
   onReport: (messageId: string, userId: string) => void;
-  onEditMessage: (message: any) => void;
-  onDeleteMessage: (message: any) => void;
-  onReact: (message: any, type: ReactionType) => void;
+  onEditMessage: (message: ChatMessage) => void;
+  onDeleteMessage: (message: ChatMessage) => void;
+  onReact: (message: ChatMessage, type: ReactionType) => void;
   onOpenGroupMenu: () => void;
 }) {
   return (
@@ -717,9 +750,6 @@ function ChatPanel({
 		            const isMe = msg.sender.id === currentUserId;
 		            const isDeleted = Boolean(msg.deletedAt);
                 const isSystemMessage = msg.type === 'SYSTEM';
-                const isAutomaticModerationMessage =
-                  isSystemMessage &&
-                  msg.content === 'message deleted by automatic moderation';
                 const canEditOrDelete =
                   isMe &&
                   !isDeleted &&
@@ -738,7 +768,7 @@ function ChatPanel({
                     {!isMe && (
                       <span className="text-xs text-gray-500 mb-1 ml-1">{msg.sender.username}</span>
                     )}
-                    <div className={`px-3 py-2 rounded-lg text-sm break-words overflow-hidden ${isMe ? "bg-blue-500 text-white" : "bg-gray-300 text-black"} ${isDeleted ? "italic opacity-70" : ""}`}>
+                    <div className={`px-3 py-2 rounded-lg text-sm font-bold break-words overflow-hidden ${isMe ? "ColorsS text-white" : "bg-gray-300 text-black"} ${isDeleted ? "italic opacity-70" : ""}`}>
                       {isDeleted ? "Message deleted" : msg.content}
                     </div>
                     {!isMe && !isDeleted && (
@@ -758,7 +788,7 @@ function ChatPanel({
                           <button onClick={() => onDeleteMessage(msg)} className="hover:underline">Delete</button>
                         </>
                       )}
-	                      {isMe && msg.reads?.length > 0 && <span>seen by {msg.reads.length}</span>}
+	                      {isMe && (msg.reads?.length ?? 0) > 0 && <span>seen by {msg.reads?.length ?? 0}</span>}
 	                    </div>
                     {!isDeleted && !isSystemMessage && (
                       <div className={`mt-1 flex items-center gap-1 ${isMe ? "justify-end" : "justify-start"}`}>
@@ -819,8 +849,9 @@ function Section() {
   const socketRef = useRef<Socket | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const user = useAuthStore((state) => state.user);
-  console.log(user);
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const router = useRouter();
+  //const [messages, setMessages] = useState<any[]>([]);
   const [messageInput, setMessageInput] = useState("");
   const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -830,14 +861,14 @@ function Section() {
   const [reportModal, setReportModal] = useState<{ messageId: string, userId: string } | null>(null);
   const [typingUsers, setTypingUsers] = useState<Record<string, string>>({});
   const [onlineUserIds, setOnlineUserIds] = useState<Set<string>>(new Set());
-  const [editModal, setEditModal] = useState<{ message: any } | null>(null);
-  const [deleteModal, setDeleteModal] = useState<{ message: any } | null>(null);
+  const [editModal, setEditModal] = useState<{ message: ChatMessage } | null>(null);
+  const [deleteModal, setDeleteModal] = useState<{ message: ChatMessage } | null>(null);
   const isTypingRef = useRef(false);
   const [groupModal, setGroupModal] = useState(false);
   const [groupMenuOpen, setGroupMenuOpen] = useState(false);
   const [inviteModal, setInviteModal] = useState(false);
   const [membersModal, setMembersModal] = useState(false);
-  const [members, setMembers] = useState<any[]>([]);
+  const [members, setMembers] = useState<GroupMember[]>([]);
   const [renameModal, setRenameModal] = useState(false);
   const [leaveModal, setLeaveModal] = useState(false);
 
@@ -899,11 +930,11 @@ function Section() {
     }
   };
 
-  const handleEditMessage = (message: any) => {
+  const handleEditMessage = (message: ChatMessage) => {
     setEditModal({ message });
   };
 
-  const handleDeleteMessage = (message: any) => {
+  const handleDeleteMessage = (message: ChatMessage) => {
     setDeleteModal({ message });
   };
 
@@ -946,7 +977,7 @@ function Section() {
       }
     };
     fetchConversations();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (!selectedConv) return;
@@ -978,11 +1009,13 @@ function Section() {
 
   useEffect(() => {
     if (!user) {
-      setConversations([]);
-      setMessages([]);
-      setSelectedConv(null);
-      setSearchResults([]);
-      setSearchQuery("");
+      queueMicrotask(() => {
+        setConversations([]);
+        setMessages([]);
+        setSelectedConv(null);
+        setSearchResults([]);
+        setSearchQuery("");
+      });
     }
   }, [user]);
 
@@ -1070,8 +1103,9 @@ function Section() {
     setDeleteModal(null);
   };
 
-  const handleReact = async (message: any, type: ReactionType) => {
-    if (!selectedConv || message.sender.id === user?.id || message.deletedAt) return;
+  const handleReact = async (message: ChatMessage, type: ReactionType) => {
+    if (!selectedConv || !user?.id || message.sender.id === user.id || message.deletedAt) return;
+    const currentUserId = user.id;
 
     try {
       const result = await apiAddMessageReaction(selectedConv.id, message.id, type);
@@ -1082,8 +1116,7 @@ function Section() {
 
           const reactions = item.reactions ?? [];
           const alreadyExists = reactions.some(
-            (reaction: any) =>
-              reaction.userId === user?.id && reaction.type === result.reaction.type,
+            (reaction) => reaction.userId === user?.id && reaction.type === result.reaction.type,
           );
 
           if (alreadyExists) return item;
@@ -1093,8 +1126,8 @@ function Section() {
             reactions: [
               ...reactions,
               {
-                ...result.reaction,
-                userId: user?.id,
+                ...(result.reaction as MessageReaction),
+                userId: currentUserId,
               },
             ],
           };
@@ -1113,7 +1146,7 @@ useEffect(() => {
   if (!socket) return;
   socketRef.current = socket;
 
-  socket.on('chat.message.created', (msg) => {
+  socket.on('chat.message.created', (msg: ChatMessage) => {
     setMessages((prev) => [...prev, msg]);
     setConversations((prev) => {
       const updated = prev.map((c) =>
@@ -1130,7 +1163,7 @@ useEffect(() => {
     });
   });
 
-  socket.on('chat.message.updated', (msg) => {
+  socket.on('chat.message.updated', (msg: ChatMessage) => {
     setMessages((prev) => prev.map((item) => item.id === msg.id ? msg : item));
     setConversations((prev) =>
       prev.map((c) =>
@@ -1141,7 +1174,7 @@ useEffect(() => {
     );
   });
 
-  socket.on('chat.message.deleted', (msg) => {
+  socket.on('chat.message.deleted', (msg: ChatMessage) => {
     setMessages((prev) => prev.map((item) => item.id === msg.id ? msg : item));
     setConversations((prev) =>
       prev.map((c) =>
@@ -1181,7 +1214,7 @@ useEffect(() => {
         if (payload?.messageId && msg.id !== payload.messageId) return msg;
 
         const reads = msg.reads ?? [];
-        if (reads.some((read: any) => read.userId === payload.userId)) return msg;
+        if (reads.some((read) => read.userId === payload.userId)) return msg;
 
         return {
           ...msg,
@@ -1208,16 +1241,19 @@ useEffect(() => {
     });
   });
 
-  socket.on('presence.changed', (payload) => {
-    if (!payload?.userId) return;
+  const handlePresenceChanged = (payload: { userId?: string; isOnline?: boolean }) => {
+    const userId = payload.userId;
+    if (!userId) return;
 
     setOnlineUserIds((prev) => {
       const next = new Set(prev);
-      if (payload.isOnline) next.add(payload.userId);
-      else next.delete(payload.userId);
+      if (payload.isOnline) next.add(userId);
+      else next.delete(userId);
       return next;
     });
-  });
+  };
+
+  socket.on('presence.changed', handlePresenceChanged);
 
   socket.emit('presence.list', {}, (payload: { onlineUserIds?: string[] }) => {
     setOnlineUserIds(new Set(payload?.onlineUserIds ?? []));
@@ -1239,7 +1275,7 @@ useEffect(() => {
     socket.off('chat.moderation.banned');
     socket.off('chat.conversation.read');
     socket.off('chat.typing');
-    socket.off('presence.changed');
+    socket.off('presence.changed', handlePresenceChanged);
     socket.off('chat.conversation.created');
   };
 }, [user]);
@@ -1255,7 +1291,7 @@ useEffect(() => {
   const socket = socketRef.current;
   if (!socket || !selectedConv) return;
 
-  setTypingUsers({});
+  queueMicrotask(() => setTypingUsers({}));
   socket.emit('chat.joinConversation', { conversationId: selectedConv.id });
 
   return () => {
@@ -1265,9 +1301,9 @@ useEffect(() => {
   };
 }, [selectedConv]);
 
-const handleReport = async (messageId: string, userId: string, reason: string) => {
+const handleReport = async (messageId: string, _userId: string, reason: string) => {
   try {
-    await apiReportMessage(messageId, userId, reason);
+    await apiReportMessage(messageId, reason);
     setReportModal(null);
   } catch (err) {
     console.error("Failed to report:", err);
@@ -1302,7 +1338,9 @@ const handleReport = async (messageId: string, userId: string, reason: string) =
           onAddFriend={(id) => { addFriendRequest(id); setMenu(null); }}
           onBlock={(id) => { blockUser(id); setMenu(null); }}
           onUnblock={(id) => { unblockUser(id); setMenu(null); }}
-          onPromote={(id) => { console.log('promote', id); setMenu(null); }}
+          onPromote={(id) => { apiPromoteUser(id).catch(console.error); setMenu(null); }}
+          //onPromote={(id) => { console.log('promote', id); setMenu(null); }}
+          onViewProfile={(username) => { router.push(`/profils/${username}`); setMenu(null); }}
         />
       )}
       {reportModal && (
@@ -1332,8 +1370,6 @@ const handleReport = async (messageId: string, userId: string, reason: string) =
       )}
       {groupMenuOpen && selectedConv?.type === 'group' && (
         <GroupMenuModal
-          conv={selectedConv}
-          currentUserId={user?.id}
           onInvite={() => { setInviteModal(true); setGroupMenuOpen(false); }}
           onMembers={handleOpenMembers}
           onRename={() => { setRenameModal(true); setGroupMenuOpen(false); }}
