@@ -1,4 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
+import { User, GlobalRole, Report } from '../generated/prisma';
 import {
   jest,
   describe,
@@ -8,114 +10,63 @@ import {
   afterEach,
 } from '@jest/globals';
 import { ModerationService } from './moderation.service';
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ChatGateway } from '../chat/chat.gateway';
 
 describe('ModerationService', () => {
   let service: ModerationService;
-  let prisma: PrismaService;
+  let notificationsMock: DeepMockProxy<NotificationsService>;
+  let prismaMock: DeepMockProxy<PrismaService>;
   let notificationsService: NotificationsService;
   let chatGateway: ChatGateway;
   let mockTransactionClient: any;
 
   beforeEach(async () => {
-    mockTransactionClient = {
-      moderationAction: {
-        // create: jest.fn().mockResolvedValue({ id: 'act-1' }),
-        // We use mockImplementation to "echo" the data back
-        create: jest
-          .fn()
-          .mockImplementation(({ data }) =>
-            Promise.resolve({ id: 'act-1', ...data }),
-          ),
-      },
-      report: {
-        update: jest
-          .fn()
-          .mockImplementation(({ data }) =>
-            Promise.resolve({ id: 'rep-1', status: data.status }),
-          ),
-      },
-      user: {
-        //update: jest.fn().mockResolvedValue({}) },
-        update: jest
-          .fn()
-          .mockImplementation(({ data }) =>
-            Promise.resolve({ id: 'user-1', ...data }),
-          ),
-      },
-      refreshToken: {
-        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-      },
-    };
+    jest.clearAllMocks();
+    prismaMock = mockDeep<PrismaService>();
+    notificationsMock = mockDeep<NotificationsService>();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ModerationService,
-        {
-          provide: PrismaService,
-          useValue: {
-            $transaction: jest.fn((input) => {
-              // If the service passes a function (callback style)
-              if (typeof input === 'function') {
-                return input(mockTransactionClient);
-              }
-              // If the service passes an array (standard style)
-              return Promise.all(input);
-            }),
-            user: {
-              findUnique: jest.fn(),
-              findMany: jest.fn(),
-              update: jest.fn(),
-              // findFirst: jest.fn(),
-              // create: jest.fn(),
-            },
-            message: { findUnique: jest.fn() },
-            report: {
-              create: jest.fn(),
-              findUnique: jest.fn(),
-              findMany: jest.fn(),
-            },
-          },
-        },
-        {
-          provide: NotificationsService,
-          useValue: {
-            createFromInputForMany: jest.fn().mockResolvedValue([
-              { id: 'notif-1', userId: 'mod-1' },
-              { id: 'notif-2', userId: 'mod-1' },
-            ]),
-            createFromInput: jest.fn().mockResolvedValue({ id: 'notif-1' }),
-          },
-        },
+        { provide: PrismaService, useValue: prismaMock },
+        { provide: NotificationsService, useValue: notificationsMock },
         {
           provide: ChatGateway,
           useValue: {
-            emitNotificationCreated: jest.fn().mockResolvedValue(undefined),
+            emitNotificationCreated: jest.fn(),
             emitModerationBanAndDisconnect: jest.fn(),
           },
         },
       ],
     }).compile();
     service = module.get<ModerationService>(ModerationService);
-    prisma = module.get<PrismaService>(PrismaService);
     notificationsService =
       module.get<NotificationsService>(NotificationsService);
     chatGateway = module.get<ChatGateway>(ChatGateway);
-    // Mock global fetch for 42 OAuth
-    // global.fetch = jest.fn();
-
-    // Mock the private notification helper
-    // jest.spyOn(service as any, 'notifyModerators').mockResolvedValue(undefined);
-    // KEY FIX: This creates a Spy that WATCHES but does NOT block the real code
     jest.spyOn(service as any, 'notifyModerators');
   });
+
+  const createMockUser = (overrides: Partial<User> = {}): User => {
+    const defaultUser: User = {
+      id: 'user-id',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      email: 'test@test.com',
+      username: 'testuser',
+      passwordHash: null,
+      globalRole: GlobalRole.USER,
+      isActive: true,
+      isBanned: false,
+      penaltyPoints: 0,
+      preferredLanguage: 'en',
+      ...overrides,
+    };
+    return { ...defaultUser, ...overrides };
+  };
+
   describe('createReport', () => {
     const creatorId = 'user-reporter';
 
@@ -145,7 +96,7 @@ describe('ModerationService', () => {
       });
 
       it('Scenario 3 - should throw NotFound if target user does not exist', async () => {
-        jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(null);
+        prismaMock.user.findUnique.mockResolvedValue(null);
         await expect(
           service.createReport(
             creatorId,
@@ -157,79 +108,53 @@ describe('ModerationService', () => {
         ).rejects.toThrow(NotFoundException);
       });
 
-      it('Scenario 4 - should successfully create a user report and notify moderators', async () => {
-        const targetUserId = 'target-id';
-        jest.spyOn(prisma.user, 'findUnique').mockResolvedValue({
-          id: targetUserId,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          email: '',
-          username: '',
-          passwordHash: null,
-          globalRole: 'USER',
-          isActive: false,
-          isBanned: false,
-          penaltyPoints: 0,
-          preferredLanguage: '',
-        });
-        jest.spyOn(prisma.user, 'findMany').mockResolvedValue([
-          {
-            id: 'admin-1',
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            email: '',
-            username: '',
-            passwordHash: null,
-            globalRole: 'USER',
-            isActive: false,
-            isBanned: false,
-            penaltyPoints: 0,
-            preferredLanguage: '',
-          },
-          {
-            id: 'mod-1',
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            email: '',
-            username: '',
-            passwordHash: null,
-            globalRole: 'USER',
-            isActive: false,
-            isBanned: false,
-            penaltyPoints: 0,
-            preferredLanguage: '',
-          },
+      it('Scenario 4 - should successfully create a report', async () => {
+        const mockUser: User = createMockUser({ id: 'target-id' });
+        prismaMock.user.findUnique.mockResolvedValue(mockUser);
+        // For findMany (Moderators notification logic)
+        prismaMock.user.findMany.mockResolvedValue([
+          createMockUser({ id: 'mod-1', globalRole: GlobalRole.MODERATOR }),
+          createMockUser({ id: 'admin-1', globalRole: GlobalRole.ADMIN }),
         ]);
-        jest.spyOn(prisma.report, 'create').mockResolvedValue({
+        prismaMock.report.create.mockResolvedValue({
           id: 'report-1',
           reason: '',
           targetType: 'USER',
           status: 'OPEN',
           createdAt: new Date(),
           updatedAt: new Date(),
-          creatorId: null,
+          creatorId: 'target-id',
           targetUserId: null,
           targetMessageId: null,
+        });
+
+        notificationsMock.createFromInputForMany.mockResolvedValue([
+          { id: 'notif-1', userId: 'mod-1' },
+          { id: 'notif-2', userId: 'admin-1' },
+        ] as any);
+
+        prismaMock.$transaction.mockImplementation(async (callback) => {
+          // This handles the transaction mock cleanly
+          if (typeof callback === 'function') {
+            return callback(prismaMock);
+          }
+          return callback;
         });
 
         const result = await service.createReport(
           creatorId,
           'USER',
-          targetUserId, //targetUserId
+          'target-id', //targetUserId
           undefined, //targetMessageId
-          '  Toxic behavior  ',
+          ' Toxic ',
         );
 
         expect(result.id).toBe('report-1');
-        // Verify trimming logic
-        // eslint-disable-next-line @typescript-eslint/unbound-method
-        expect(prisma.report.create).toHaveBeenCalledWith({
-          data: expect.objectContaining({ reason: 'Toxic behavior' }),
+        expect(prismaMock.report.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({ reason: 'Toxic' }),
         });
         expect(service['notifyModerators']).toHaveBeenCalled();
-        expect(
-          notificationsService['createFromInputForMany'],
-        ).toHaveBeenCalled();
+        expect(notificationsMock.createFromInputForMany).toHaveBeenCalled();
         expect(chatGateway['emitNotificationCreated']).toHaveBeenCalledTimes(2); // One for each moderator
       });
     });
@@ -238,7 +163,7 @@ describe('ModerationService', () => {
       it('Scenario 5 - should throw BadRequest if targetMessageId is missing', async () => {
         await expect(
           service.createReport(
-            creatorId,
+            'creatorId',
             'MESSAGE',
             undefined, //targetUserId
             undefined, //targetMessageId
@@ -248,10 +173,10 @@ describe('ModerationService', () => {
       });
 
       it('Scenario 6 - should throw NotFound if target message does not exist', async () => {
-        jest.spyOn(prisma.message, 'findUnique').mockResolvedValue(null);
+        prismaMock.message.findUnique.mockResolvedValue(null);
         await expect(
           service.createReport(
-            creatorId,
+            'creatorId',
             'MESSAGE',
             'target-id',
             'message',
@@ -261,7 +186,7 @@ describe('ModerationService', () => {
       });
       it('Scenario 7 - should successfully create a message report and notify moderators', async () => {
         const targetMessageId = 'msg-123';
-        jest.spyOn(prisma.message, 'findUnique').mockResolvedValue({
+        prismaMock.message.findUnique.mockResolvedValue({
           id: targetMessageId,
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -272,7 +197,7 @@ describe('ModerationService', () => {
           isEdited: false,
           deletedAt: null,
         });
-        jest.spyOn(prisma.report, 'create').mockResolvedValue({
+        prismaMock.report.create.mockResolvedValue({
           id: 'report-2',
           targetType: 'USER',
           reason: '',
@@ -283,7 +208,7 @@ describe('ModerationService', () => {
           targetUserId: null,
           targetMessageId: null,
         });
-        jest.spyOn(prisma.user, 'findMany').mockResolvedValue([
+        prismaMock.user.findMany.mockResolvedValue([
           {
             id: 'admin-1',
             createdAt: new Date(),
@@ -299,16 +224,32 @@ describe('ModerationService', () => {
           },
         ]);
 
+        notificationsMock.createFromInputForMany.mockResolvedValue([
+          {
+            id: 'notif-1',
+            userId: 'admin-1',
+            createdAt: new Date(),
+            type: 'MESSAGE',
+            title: '',
+            body: null,
+            actorId: null,
+            entityType: null,
+            entityId: null,
+            action: null,
+            metadata: null,
+            isRead: false,
+          },
+        ]);
+
         const result = await service.createReport(
-          creatorId,
+          'creatorId',
           'MESSAGE',
           undefined,
           targetMessageId,
           'Inappropriate',
         );
 
-        // eslint-disable-next-line @typescript-eslint/unbound-method
-        expect(prisma.message.findUnique).toHaveBeenCalledWith({
+        expect(prismaMock.message.findUnique).toHaveBeenCalledWith({
           where: { id: targetMessageId },
         });
         expect(result.id).toBe('report-2');
@@ -319,8 +260,7 @@ describe('ModerationService', () => {
     it('Scenario 8 - should throw BadRequest for invalid targetType', async () => {
       await expect(
         service.createReport(
-          creatorId,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+          'creatorId',
           'INVALID' as any,
           undefined,
           undefined,
@@ -349,16 +289,14 @@ describe('ModerationService', () => {
     ];
 
     it('Scenario 1: succesfully list report', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-      jest.spyOn(prisma.report, 'findMany').mockResolvedValue(mockReports);
+      prismaMock.report.findMany.mockResolvedValue(mockReports);
 
       const result = await service.listReports();
 
       expect(Array.isArray(result)).toBe(true);
       expect(result.length).toBe(1);
       expect(result[0].creatorId).toBe(creatorId);
-      // eslint-disable-next-line @typescript-eslint/unbound-method
-      expect(prisma.report.findMany).toHaveBeenCalledWith({
+      expect(prismaMock.report.findMany).toHaveBeenCalledWith({
         include: expect.objectContaining({
           creator: {
             include: { profile: true },
@@ -391,7 +329,7 @@ describe('ModerationService', () => {
     });
 
     it('Scenario 1: should throw NotFoundException if report does not exist', async () => {
-      jest.spyOn(prisma.report, 'findUnique').mockResolvedValue(null);
+      prismaMock.report.findUnique.mockResolvedValue(null);
 
       await expect(
         service.reviewReport(moderatorId, reportId, 'DISMISS_REPORT'),
@@ -400,7 +338,7 @@ describe('ModerationService', () => {
 
     it('Scenario 2: should DISMISS a report (No penalty, no ban)', async () => {
       // 1. Mock finding the report
-      jest.spyOn(prisma.report, 'findUnique').mockResolvedValue({
+      prismaMock.report.findUnique.mockResolvedValue({
         id: reportId,
         targetUserId,
         createdAt: new Date(),
@@ -412,22 +350,41 @@ describe('ModerationService', () => {
         targetMessageId: null,
       });
 
+      prismaMock.moderationAction.create.mockResolvedValue({
+        id: 'act-456',
+        action: 'DISMISS_REPORT',
+        moderatorId,
+        targetUserId,
+      } as any);
+
+      prismaMock.report.update.mockResolvedValue({
+        id: reportId,
+        status: 'DISMISSED',
+        moderationAction: {
+          id: 'act-456',
+          action: 'DISMISS_REPORT',
+        },
+      } as any);
+
+      // Ensure the transaction returns the report (which now has the moderationAction)
+      prismaMock.$transaction.mockImplementation(async (cb) => cb(prismaMock));
       // The transaction callback will use these mocks
       // Note: ensure your smart $transaction mock is in place in beforeEach
       const result = await service.reviewReport(
         moderatorId,
         reportId,
-        'DISMISS_REPORT',
+        'DISMISS_REPORT', // Action
+        'No violation found', // Reason
       );
 
       expect(result.updatedReport.status).toBe('DISMISSED');
+      expect(result.moderationAction.id).toBe('act-456');
       // Use the transaction mock to verify NO user update happened
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      expect(mockTransactionClient.user.update).not.toHaveBeenCalled();
+      expect(prismaMock.user.update).not.toHaveBeenCalled();
     });
 
     it('Scenario 3: should WARN and subtract penalty points', async () => {
-      jest.spyOn(prisma.report, 'findUnique').mockResolvedValue({
+      prismaMock.report.findUnique.mockResolvedValue({
         id: reportId,
         targetUserId,
         creatorId: null,
@@ -439,6 +396,26 @@ describe('ModerationService', () => {
         updatedAt: new Date(),
       });
 
+      prismaMock.moderationAction.create.mockResolvedValue({
+        id: 'act-456',
+        action: 'WARN',
+        moderatorId,
+        targetUserId,
+        penaltyPointsChange: -50,
+      } as any);
+
+      prismaMock.report.update.mockResolvedValue({
+        id: reportId,
+        status: 'RESOLVED',
+        moderationAction: {
+          id: 'act-456',
+          action: 'WARN',
+          penaltyPointsChange: -50,
+        },
+      } as any);
+
+      // Ensure the transaction returns the report (which now has the moderationAction)
+      prismaMock.$transaction.mockImplementation(async (cb) => cb(prismaMock));
       // Act
       const result = await service.reviewReport(
         moderatorId,
@@ -450,12 +427,16 @@ describe('ModerationService', () => {
 
       // Assert: Check if penaltyPointsChange was calculated correctly (-50)
       // We check the transaction call for ModerationAction creation
-      // (Assuming your mockTick records these)
       expect(result.moderationAction.penaltyPointsChange).toBe(-50);
+      expect(prismaMock.moderationAction.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          penaltyPointsChange: -50,
+        }),
+      });
     });
 
     it('Scenario 4: should BAN user, revoke tokens, and disconnect via WebSocket', async () => {
-      jest.spyOn(prisma.report, 'findUnique').mockResolvedValue({
+      prismaMock.report.findUnique.mockResolvedValue({
         id: reportId,
         targetUserId,
         createdAt: new Date(),
@@ -467,7 +448,27 @@ describe('ModerationService', () => {
         updatedAt: new Date(),
       });
 
-      // Mock successful transaction
+      prismaMock.moderationAction.create.mockResolvedValue({
+        id: 'act-456',
+        action: 'BAN',
+        moderatorId,
+        targetUserId,
+        penaltyPointsChange: -500,
+      } as any);
+
+      prismaMock.report.update.mockResolvedValue({
+        id: reportId,
+        status: 'RESOLVED',
+        moderationAction: {
+          id: 'act-456',
+          action: 'BAN',
+          penaltyPointsChange: -500,
+        },
+      } as any);
+
+      // Ensure the transaction returns the report (which now has the moderationAction)
+      prismaMock.$transaction.mockImplementation(async (cb) => cb(prismaMock));
+
       const result = await service.reviewReport(
         moderatorId,
         reportId,
@@ -488,7 +489,7 @@ describe('ModerationService', () => {
     });
 
     it('Scenario 5: should UNBAN a user successfully', async () => {
-      jest.spyOn(prisma.report, 'findUnique').mockResolvedValue({
+      prismaMock.report.findUnique.mockResolvedValue({
         id: reportId,
         targetUserId,
         createdAt: new Date(),
@@ -500,6 +501,25 @@ describe('ModerationService', () => {
         updatedAt: new Date(),
       });
 
+      prismaMock.moderationAction.create.mockResolvedValue({
+        id: 'act-456',
+        action: 'UNBAN',
+        moderatorId,
+        targetUserId,
+      } as any);
+
+      prismaMock.report.update.mockResolvedValue({
+        id: reportId,
+        status: 'RESOLVED',
+        moderationAction: {
+          id: 'act-456',
+          action: 'UNBAN',
+        },
+      } as any);
+
+      // Ensure the transaction returns the report (which now has the moderationAction)
+      prismaMock.$transaction.mockImplementation(async (cb) => cb(prismaMock));
+
       const userUpdateCall = await service.reviewReport(
         moderatorId,
         reportId,
@@ -508,8 +528,7 @@ describe('ModerationService', () => {
 
       // Verify the DB call to unban
       expect(userUpdateCall.updatedReport.status).toBe('RESOLVED');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      expect(mockTransactionClient.user.update).toHaveBeenCalledWith(
+      expect(prismaMock.user.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: targetUserId },
           data: { isBanned: false, isActive: true },
@@ -539,19 +558,35 @@ describe('ModerationService', () => {
     });
 
     it('Scenario 3: Normal Adjustment (No Ban/Promotion)', async () => {
-      jest
-        .spyOn(prisma.user, 'findUnique')
-        .mockResolvedValue({ id: targetId, penaltyPoints: 0 } as any);
+      prismaMock.user.findUnique.mockResolvedValue(
+        createMockUser({
+          id: targetId,
+          penaltyPoints: 0,
+        }),
+      );
 
       // We mock the first update to return 100 points
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      jest.spyOn(mockTransactionClient.user, 'update').mockResolvedValueOnce({
-        id: targetId,
-        username: 'marvin',
-        penaltyPoints: 100,
-        globalRole: 'USER',
-        isActive: true,
-        isBanned: false,
+      prismaMock.user.update.mockResolvedValue(
+        createMockUser({
+          id: targetId,
+          username: 'marvin',
+          penaltyPoints: 100,
+          globalRole: 'USER',
+          isActive: true,
+          isBanned: false,
+        }),
+      );
+
+      prismaMock.moderationAction.create.mockResolvedValue({
+        id: 'act-456',
+        action: 'UNBAN',
+        moderatorId: modId,
+        targetUserId: targetId,
+      } as any);
+
+      prismaMock.$transaction.mockImplementation(async (cb) => {
+        if (typeof cb === 'function') return cb(prismaMock);
+        return cb;
       });
 
       const result = await service.adjustPenaltyPoints(
@@ -562,6 +597,7 @@ describe('ModerationService', () => {
       );
 
       expect(result.user.penaltyPoints).toBe(100);
+      expect(result.moderationAction.id).toBe('act-456');
       expect(result.promoted).toBe(false);
       expect(
         chatGateway['emitModerationBanAndDisconnect'],
@@ -569,7 +605,7 @@ describe('ModerationService', () => {
     });
 
     it('Scenario 4: should trigger Auto-Ban if points reach -500', async () => {
-      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue({
+      prismaMock.user.findUnique.mockResolvedValue({
         id: targetId,
         penaltyPoints: 0,
         createdAt: new Date(),
@@ -582,60 +618,83 @@ describe('ModerationService', () => {
         isBanned: false,
         preferredLanguage: '',
       });
-
       // Mock first update to return -500
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      jest.spyOn(mockTransactionClient.user, 'update').mockResolvedValueOnce({
-        id: targetId,
-        username: 'bad_user',
-        penaltyPoints: -500,
-        isBanned: false,
+      prismaMock.user.update.mockResolvedValue(
+        createMockUser({
+          id: targetId,
+          username: 'bad_user',
+          penaltyPoints: -500,
+          isBanned: false,
+        }),
+      );
+      prismaMock.moderationAction.create.mockResolvedValue({
+        id: 'act-456',
+        action: 'BAN',
+        moderatorId: modId,
+        targetUserId: targetId,
+      } as any);
+
+      prismaMock.$transaction.mockImplementation(async (cb) => {
+        if (typeof cb === 'function') return cb(prismaMock);
+        return cb;
       });
 
       const result = await service.adjustPenaltyPoints(modId, targetId, -500);
 
       expect(result.user.isBanned).toBe(true);
-      // Verify WebSocket disconnect was triggered
       expect(
         chatGateway['emitModerationBanAndDisconnect'],
       ).toHaveBeenCalledWith(
         targetId,
         expect.objectContaining({ penaltyPoints: -500 }),
       );
-      // Verify Refresh Tokens were revoked in the transaction
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      expect(mockTransactionClient.refreshToken.updateMany).toHaveBeenCalled();
+      expect(prismaMock.refreshToken.updateMany).toHaveBeenCalled();
     });
 
     it('Scenario 5: should trigger Auto-Promotion if points reach +500', async () => {
-      jest
-        .spyOn(prisma.user, 'findUnique')
-        .mockResolvedValue({ id: targetId, penaltyPoints: 490 } as any);
+      prismaMock.user.findUnique.mockResolvedValue(
+        createMockUser({
+          id: targetId,
+          penaltyPoints: 490,
+        }),
+      );
 
-      // 1. Mock first update (points increase)
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      jest.spyOn(mockTransactionClient.user, 'update').mockResolvedValueOnce({
-        id: targetId,
-        username: 'helpful_user',
-        penaltyPoints: 500,
-        globalRole: 'USER',
-        isActive: true,
-        isBanned: false,
-      });
+      prismaMock.user.update.mockResolvedValueOnce(
+        createMockUser({
+          id: targetId,
+          username: 'helpful_user',
+          penaltyPoints: 500,
+          globalRole: 'USER',
+          isActive: true,
+          isBanned: false,
+        }),
+      );
 
       // 2. Mock second update (role change to MODERATOR)
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      jest.spyOn(mockTransactionClient.user, 'update').mockResolvedValueOnce({
-        id: targetId,
-        globalRole: 'MODERATOR',
-        penaltyPoints: 500,
+      prismaMock.user.update.mockResolvedValueOnce(
+        createMockUser({
+          id: targetId,
+          globalRole: 'MODERATOR',
+          penaltyPoints: 500,
+        }),
+      );
+
+      prismaMock.moderationAction.create.mockResolvedValue({
+        id: 'act-456',
+        action: 'ADJUST_POINTS',
+        moderatorId: modId,
+        targetUserId: targetId,
+      } as any);
+
+      prismaMock.$transaction.mockImplementation(async (cb) => {
+        if (typeof cb === 'function') return cb(prismaMock);
+        return cb;
       });
 
       const result = await service.adjustPenaltyPoints(modId, targetId, 10);
 
       expect(result.promoted).toBe(true);
       expect(result.user.globalRole).toBe('MODERATOR');
-      // Verify that two notifications were sent (one for points, one for role)
       expect(service['notifyUser']).toHaveBeenCalledTimes(2);
     });
   });

@@ -5,8 +5,8 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { ChatGateway } from '../chat/chat.gateway';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { jest, describe, beforeEach, it, expect } from '@jest/globals';
-import { Notification } from '@prisma/client'; // Import the type from Prisma
-import { Friendship, FriendshipStatus } from '@prisma/client';
+// import { Notification } from '@prisma/client'; // Import the type from Prisma
+// import { Friendship, FriendshipStatus } from '@prisma/client';
 
 //   afterEach,
 
@@ -33,6 +33,27 @@ describe('RelationshipsService', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        // RelationshipsService,
+        // {
+        //   provide: PrismaService,
+        //   useValue: {
+        //     user: { findUnique: jest.fn() },
+        //     block: {
+        //       findFirst: jest.fn(),
+        //       findUnique: jest.fn(),
+        //       create: jest.fn(),
+        //       delete: jest.fn(),
+        //     },
+        //     friendship: {
+        //       findFirst: jest.fn(),
+        //       create: jest.fn(),
+        //       update: jest.fn(),
+        //       delete: jest.fn(),
+        //       findMany: jest.fn(),
+        //     },
+        //     $transaction: jest.fn((promises: any[]) => Promise.all(promises)),
+        //   },
+        // },
         RelationshipsService,
         {
           provide: PrismaService,
@@ -57,10 +78,15 @@ describe('RelationshipsService', () => {
         {
           provide: NotificationsService,
           useValue: {
-            // Cast to unknown first to break the 'never' link, then to the actual type
-            createFromInput: jest
-              .fn()
-              .mockResolvedValue({ id: 'notif-1' } as unknown as Notification),
+            // We extract the return type of the method directly from the Service
+            createFromInput: jest.fn().mockImplementation(() =>
+              Promise.resolve({
+                id: 'notif-1',
+                // add other mandatory fields here if needed
+              } as unknown as Awaited<
+                ReturnType<NotificationsService['createFromInput']>
+              >),
+            ),
           },
         },
         {
@@ -87,9 +113,7 @@ describe('RelationshipsService', () => {
       // Mock finding users
       jest
         .spyOn(prisma.user, 'findUnique')
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         .mockResolvedValueOnce(mockUser as any)
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         .mockResolvedValueOnce(mockTarget as any);
 
       // Mock finding an existing block
@@ -112,9 +136,7 @@ describe('RelationshipsService', () => {
     it('should successfully create a friend request and notify the user', async () => {
       jest
         .spyOn(prisma.user, 'findUnique')
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         .mockResolvedValueOnce(mockUser as any)
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         .mockResolvedValueOnce(mockTarget as any);
       jest.spyOn(prisma.block, 'findFirst').mockResolvedValue(null);
       jest.spyOn(prisma.friendship, 'findFirst').mockResolvedValue(null);
@@ -129,13 +151,11 @@ describe('RelationshipsService', () => {
       };
       jest
         .spyOn(prisma.friendship, 'create')
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         .mockResolvedValue(mockFriendship as any);
 
       const result = await service.sendFriendRequest('user-1', 'user-2');
 
       expect(result['message']).toBe('friend request sent');
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(prisma.friendship.create).toHaveBeenCalled();
       expect(notifications['createFromInput']).toHaveBeenCalled();
       expect(gateway['emitNotificationCreated']).toHaveBeenCalledWith(
@@ -149,9 +169,7 @@ describe('RelationshipsService', () => {
     it('should create a block and delete existing friendship in a transaction', async () => {
       jest
         .spyOn(prisma.user, 'findUnique')
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         .mockResolvedValueOnce(mockUser as any)
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         .mockResolvedValueOnce(mockTarget as any);
 
       jest.spyOn(prisma.block, 'findUnique').mockResolvedValue(null); // No existing block
@@ -169,9 +187,7 @@ describe('RelationshipsService', () => {
 
       const result = await service.blockUser('user-1', 'user-2');
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(prisma.$transaction).toHaveBeenCalled();
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(prisma.friendship.delete).toHaveBeenCalledWith({
         where: { id: 'f-1' },
       });
@@ -181,7 +197,6 @@ describe('RelationshipsService', () => {
 
   describe('acceptFriendRequest', () => {
     it('should throw NotFound if no pending request exists', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(mockUser as any);
       jest.spyOn(prisma.block, 'findFirst').mockResolvedValue(null);
       jest.spyOn(prisma.friendship, 'findFirst').mockResolvedValue(null);

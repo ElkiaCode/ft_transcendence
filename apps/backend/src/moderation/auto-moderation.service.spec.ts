@@ -151,7 +151,6 @@ describe('AutoModerationService', () => {
       );
 
       expect(result.report.id).toBe('report-1');
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(prisma.user.update).toHaveBeenCalled();
     });
 
@@ -180,7 +179,6 @@ describe('AutoModerationService', () => {
         resultMock,
         '',
       );
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(prisma.report.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           targetType: 'USER',
@@ -219,7 +217,6 @@ describe('AutoModerationService', () => {
         resultMock,
         '',
       );
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(prisma.report.create).toHaveBeenCalled();
     });
   });
@@ -242,7 +239,6 @@ describe('AutoModerationService', () => {
         resultMock,
       );
       expect(result).toBe(null);
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(prisma.report.create).not.toHaveBeenCalled();
     });
 
@@ -307,7 +303,6 @@ describe('AutoModerationService', () => {
 
       jest
         .spyOn(prisma.report, 'create')
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         .mockResolvedValue({ id: 'report-1' } as any);
       jest.spyOn(prisma.user, 'update').mockResolvedValue({
         id: 'user1',
@@ -328,7 +323,6 @@ describe('AutoModerationService', () => {
         'everything is bad',
         resultMock,
       );
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(prisma.report.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           targetType: 'MESSAGE',
