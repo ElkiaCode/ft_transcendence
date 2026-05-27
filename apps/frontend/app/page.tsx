@@ -551,7 +551,7 @@ function SidebarSearch({
               <p className="font-bold text-sm truncate">{conv.name}</p>
               <p className="text-xs text-gray-900 truncate">{conv.lastMessage || 'No messages yet'}</p>
             </div>
-          </div>
+          {/* </div> */}
           <button
             onClick={(e) => { e.stopPropagation(); onDeleteConv(conv.id); }}
             className="text-gray-400 hover:text-red-500 px-1 transition cursor-pointer"

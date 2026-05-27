@@ -81,7 +81,7 @@ export class AdminService {
         id: updateUser.id,
         email: updateUser.email,
         username: updateUser.username,
-        GlobalRole: updateUser.globalRole,
+        globalRole: updateUser.globalRole,
         isActive: updateUser.isActive,
         isBanned: updateUser.isBanned,
         profile: updateUser.profile
@@ -97,7 +97,7 @@ export class AdminService {
 
   async unbanUser(targetUserId: string, actorUserId: string) {
     if (targetUserId == actorUserId) {
-      throw new BadRequestException('cannot unban yourself');
+      throw new BadRequestException('user cannot unban himself...');
     }
 
     const banUser = await this.prisma.user.findUnique({
@@ -106,7 +106,7 @@ export class AdminService {
     });
 
     if (!banUser) {
-      throw new NotFoundException('user does not exist');
+      throw new NotFoundException('user to unban does not exist');
     }
 
     if (banUser.isBanned === false) {

@@ -472,11 +472,11 @@ export class ChatService {
         },
       });
 
-    if (!actorMembership) {
+    if (!targetMembership) {
       throw new NotFoundException('target user is not in this conversation');
     }
 
-    if (actorMembership.role === 'OWNER' && actorMembership.role !== 'OWNER') {
+    if (targetMembership.role === 'OWNER' && actorMembership.role !== 'OWNER') {
       throw new ForbiddenException(
         'only the room owner can remove another user',
       );

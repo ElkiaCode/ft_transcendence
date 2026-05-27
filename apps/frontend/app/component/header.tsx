@@ -439,6 +439,7 @@ return (
 export default function Header() {
   const [showLogin, setShowLogin] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
+  const [res, setRes] = useState("");
 
   const logout = useAuthStore((s) => s.logout);
   const user = useAuthStore((s) => s.user);
