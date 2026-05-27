@@ -28,7 +28,7 @@ def test_unit1():
     guillaume   = User("guillaume.roustan1@gmail.com", "laGuigue06", "pass1234")
     yann        = User("yann@gmail.com", "MegaYann", "pass1234")
     clement     = User("clem@gmail.com", "SuperClem", "pass1234")
-    patsy        = User("patsy@gmail.com", "patsy", "totototo")  
+    patsy        = User("patsy@gmail.com", "patsy", "pass1234")  
 
     print("guillaume tries to logging without registering:\n")
     res_login = guillaume.login()
