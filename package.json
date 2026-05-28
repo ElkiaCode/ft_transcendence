@@ -1,9 +1,13 @@
 {
   "dependencies": {
-    "@nestjs/platform-express": "^11.1.19"
+    "@nestjs/platform-express": "^11.1.19",
+    "@nestjs/swagger": "^11.4.2"
   },
   "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.9.1",
     "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3"
+    "@types/react-dom": "^19.2.3",
+    "jest-mock-extended": "^2.0.4"
   }
 }

@@ -78,7 +78,7 @@ async function handleConfirm() {
   }
 
   return (
-    <div className="min-h-0 bg-white dark:bg-zinc-900">
+    <div className="h-full overflow-y-auto bg-white dark:bg-zinc-900">
       <div className="max-w-3xl mx-auto px-6 py-12 text-center">
         <div className="border-b border-gray-200 dark:border-zinc-700 pb-6 mb-8">
           <h1 className="text-3xl font-medium text-gray-900 dark:text-white mb-2">Privacy Policy</h1>

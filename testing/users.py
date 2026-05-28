@@ -19,6 +19,7 @@ class User:
         self.role = ''
         self.message = []
         self.notification = []
+        self.conversation = []
 
 
     def register(self):
@@ -37,7 +38,10 @@ class User:
             self.id = response.json()['user']['id']
             self.role = response.json()['user']['globalRole']
         
-        print(f"{self.username}: {response.json()}\n")
+        # print(f"{self.username}: {response.json()}\n")
+        # To this (temporarily):
+        print(f"STATUS: {response.status_code}")
+        print(f"RESPONSE BODY: {response.text}") # This will show the real error
 
         return response
 
@@ -227,7 +231,7 @@ class User:
 
     def removeFriend(self, toRemove):
         response = requests.delete(
-            f"{BASE_URL}/relationships/users/{toRemove.id}/friend",
+            f"{BASE_URL}/relationships/users/{toRemove.id}/remove-friend",
             headers = { "Authorization": f"Bearer {self.accessToken}" },
             verify = False
         )
@@ -251,7 +255,7 @@ class User:
 
     def unblockUser(self, toUnblock):
         response = requests.delete(
-            f"{BASE_URL}/relationships/users/{toUnblock.id}/block",
+            f"{BASE_URL}/relationships/users/{toUnblock.id}/unblock",
             headers = { "Authorization": f"Bearer {self.accessToken}" },
             verify = False
         )
@@ -342,8 +346,10 @@ class User:
             headers = { "Authorization": f"Bearer {self.accessToken}" },
             verify = False
         )
-        self.conversation.append(response.json()['id'])
-        secondUser.conversation.append(response.json()['id'])
+
+        if (response.status_code == 200 or response.status_code == 201):
+            self.conversation.append(response.json()['id'])
+            secondUser.conversation.append(response.json()['id'])
 
         print(f"{self.username}: {response.json()}\n")
 
@@ -413,39 +419,41 @@ class User:
             headers = { "Authorization": f"Bearer {self.accessToken}" },
             verify = False
         )
-
+    
         print(f"{self.username}: {response.json()}\n")
 
         return response
 
 
     def getMessageConversation(self):
-        for i in range(len(self.conversation)) :
-            response = requests.get(
-                f"{BASE_URL}/chat/conversations/{self.conversation[i]}/messages",
-                headers = { "Authorization": f"Bearer {self.accessToken}" },
-                verify = False
-            )
+        if (self.conversation):
+            for i in range(len(self.conversation)) :
+                response = requests.get(
+                    f"{BASE_URL}/chat/conversations/{self.conversation[i]}/messages",
+                    headers = { "Authorization": f"Bearer {self.accessToken}" },
+                    verify = False
+                )
 
-            print(f"{self.username}: {response.json()}\n")
-
-        return len(self.conversation)
+                print(f"{self.username}: {response.json()}\n")
+        
+            return len(self.conversation)
+        return 0
 
 
     def sendMessageConversation(self, conversationId: str, message: str):
-            response = requests.post(
-                f"{BASE_URL}/chat/conversations/{conversationId}/messages",
-                headers = { "Authorization": f"Bearer {self.accessToken}" },
-                data = { "content": f"{message}" },
-                verify = False,
-            )
+        response = requests.post(
+            f"{BASE_URL}/chat/conversations/{conversationId}/messages",
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            data = { "content": f"{message}" },
+            verify = False,
+        )
 
-            print(f"{self.username}: {response.json()}\n")
+        print(f"{self.username}: {response.json()}\n")
 
-            #if len(self.conversation) != 0:     #added a condition to avoid a difference
-            #    self.message.append(message)    #between database and python list
-            
-            return message
+        #if len(self.conversation) != 0:     #added a condition to avoid a difference
+        #    self.message.append(message)    #between database and python list
+        
+        return response
 
         
     def getMyNotifications(self):
@@ -531,11 +539,11 @@ class User:
 
         return response
 
-    def adjustPoint(self, targetUser, note: str, penenaltyPoint: int):
+    def adjustPoint(self, targetUser, note: str, penaltyPoint: int):
         response = requests.post(
             f"{BASE_URL}/moderation/users/{targetUser.id}/points",
             headers = { "Authorization": f"Bearer {self.accessToken}"},
-            data = {"points": penenaltyPoint, "note": note},
+            data = {"points": penaltyPoint, "note": note},
             verify = False
         )
 
@@ -553,3 +561,23 @@ class User:
         print(f"{self.username}: {response.json()}\n")
 
         return response
+    
+    def getPenaltyPoints(self):
+    # """Retrieves the current penalty points from the backend."""
+    
+        response = requests.get(
+            f"{BASE_URL}/users/me/points",
+            headers={ "Authorization": f"Bearer {self.accessToken}" },
+            verify=False
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            # points = response;
+
+            points = data.get('penaltyPoints', 0)
+            print(f"{self.username} has {points} penalty points.")
+            return points
+        else:
+            print(f"Error fetching penalty points: {response.status_code}")
+            return None
