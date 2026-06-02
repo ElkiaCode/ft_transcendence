@@ -6,15 +6,10 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { ChatGateway } from '../chat/chat.gateway';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { jest, describe, beforeEach, it, expect } from '@jest/globals';
-import { User, GlobalRole } from '../generated/prisma';
-// import { Notification } from '@prisma/client'; // Import the type from Prisma
-// import { Friendship, FriendshipStatus } from '@prisma/client';
-
-//   afterEach,
+import { User, GlobalRole } from '@prisma/client';
 
 describe('RelationshipsService', () => {
   let service: RelationshipsService;
-  // let prisma: PrismaService;
   let prismaMock: DeepMockProxy<PrismaService>;
   let notificationsService: NotificationsService;
   let gateway: ChatGateway;
@@ -40,26 +35,6 @@ describe('RelationshipsService', () => {
       providers: [
         RelationshipsService,
         { provide: PrismaService, useValue: prismaMock },
-        // {
-        //   provide: PrismaService,
-        //   useValue: {
-        //     user: { findUnique: jest.fn() },
-        //     block: {
-        //       findFirst: jest.fn(),
-        //       findUnique: jest.fn(),
-        //       create: jest.fn(),
-        //       delete: jest.fn(),
-        //     },
-        //     friendship: {
-        //       findFirst: jest.fn(),
-        //       create: jest.fn(),
-        //       update: jest.fn(),
-        //       delete: jest.fn(),
-        //       findMany: jest.fn(),
-        //     },
-        //     $transaction: jest.fn((promises: any[]) => Promise.all(promises)),
-        //   },
-        // },
         {
           provide: NotificationsService,
           useValue: {
@@ -81,7 +56,8 @@ describe('RelationshipsService', () => {
 
     service = module.get<RelationshipsService>(RelationshipsService);
     // prisma = module.get<PrismaService>(PrismaService);
-    notificationsService = module.get<NotificationsService>(NotificationsService);
+    notificationsService =
+      module.get<NotificationsService>(NotificationsService);
     gateway = module.get<ChatGateway>(ChatGateway);
   });
 
@@ -111,11 +87,6 @@ describe('RelationshipsService', () => {
     });
 
     it('should throw BadRequest if a block exists', async () => {
-      // Mock finding users
-      // jest
-      //   .spyOn(prisma.user, 'findUnique')
-      //   .mockResolvedValueOnce(mockUser as any)
-      //   .mockResolvedValueOnce(mockTarget as any);
       prismaMock.user.findUnique.mockResolvedValueOnce(mockUser as any);
       prismaMock.user.findUnique.mockResolvedValueOnce(mockTarget as any);
 
@@ -156,7 +127,7 @@ describe('RelationshipsService', () => {
 
       expect(result['message']).toBe('friend request sent');
       expect(prismaMock.friendship.create).toHaveBeenCalled();
-      expect(NotificationsService['createFromInput']).toHaveBeenCalled();
+      expect(notificationsService['createFromInput']).toHaveBeenCalled();
       expect(gateway['emitNotificationCreated']).toHaveBeenCalledWith(
         'user-2',
         expect.anything(),

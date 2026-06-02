@@ -13,93 +13,127 @@ describe('ChatService', () => {
   let service: ChatService;
   let prisma: PrismaService;
   let autoModerationService: AutoModerationService;
+  // These represent the 'tx' client inside the transaction
+  let mockTick: any;
+  // These represent 'this.prisma' outside the transaction
+  let mockPrisma: any;
 
   beforeEach(async () => {
     // 1. Define what the 'tx' (transaction client) looks like for callbacks
-    const mockTick = {
+    mockTick = {
       conversationParticipant: {
-        delete: jest.fn().mockResolvedValue({}),
-        update: jest.fn().mockResolvedValue({}),
-        createMany: jest.fn().mockResolvedValue({}),
+        delete: jest.fn(),
+        update: jest.fn(),
+        createMany: jest.fn(),
       },
       conversation: {
-        update: jest.fn().mockResolvedValue({}),
+        findFirst: jest.fn(),
+        createMany: jest.fn(),
+        update: jest.fn(),
       },
-      message: { create: jest.fn().mockResolvedValue({}) },
-      user: { update: jest.fn().mockResolvedValue({}) },
-        messageRead: { createMany: jest.fn().mockResolvedValue({}) }, // For transactions
-      // messageReaction: { findUnique: jest.fn(), create: jest.fn() },
+      message: { create: jest.fn() },
+      user: { update: jest.fn() },
+      messageRead: { createMany: jest.fn() }, // For transactions
     };
+    mockPrisma = {
+      $transaction: jest.fn((input) => {
+        if (typeof input === 'function')
+          return input(mockTick);
+        return Promise.all(input);
+      }),
+      conversation: {
+        findUnique: jest.fn(),
+        findFirst: jest.fn(),
+        create: jest.fn(),
+      },
+      user: { findUnique: jest.fn() },
+      block: { findFirst: jest.fn() },
+      // ... add others as needed
+    };
+    // messageReaction: { findUnique: jest.fn(), create: jest.fn() },
+    // const module: TestingModule = await Test.createTestingModule({
+    //   providers: [
+    //     ChatService,
+    //     {
+    //       provide: PrismaService,
+    //       useValue: {
+    //         // 2. The Smart Mock logic
+    //         $transaction: jest.fn((input) => {
+    //           // If it's a callback: $transaction(async (tx) => { ... })
+    //           if (typeof input === 'function') {
+    //             return input(mockTick);
+    //           }
+    //           // If it's an array: $transaction([p1, p2])
+    //           return Promise.all(input);
+    //         }),
+    //         // 3. Keep your standard mocks here for non-transaction calls
+    //         user: {
+    //           findUnique: jest.fn(),
+    //           findMany: jest.fn(),
+    //           update: jest.fn(),
+    //         },
+    //         block: {
+    //           findFirst: jest.fn(),
+    //         },
+    //         conversation: {
+    //           findFirst: jest.fn(),
+    //           findMany: jest.fn(),
+    //           findUnique: jest.fn(),
+    //           create: jest.fn(),
+    //           update: jest.fn(),
+    //         },
+    //         message: {
+    //           findUnique: jest.fn(),
+    //           findMany: jest.fn(),
+    //           create: jest.fn(),
+    //           update: jest.fn(),
+    //         },
+    //         messageRead: {
+    //           createMany: jest.fn().mockResolvedValue({ count: 0 })
+    //         },
+    //         conversationParticipant: {
+    //           findFirst: jest.fn(),
+    //           findUnique: jest.fn(),
+    //           findMany: jest.fn(),
+    //           delete: jest.fn(),
+    //           count: jest.fn(),
+    //           createMany: jest.fn(),
+    //         },
+    //         messageReaction: {
+    //           findUnique: jest.fn(),
+    //           create: jest.fn(),
+    //         },
+    //       },
+    //     },
+    //     {
+    //       provide: AutoModerationService,
+    //       useValue: {
+    //         // Mock the methods from your moderation service
+    //         moderateText: jest.fn(),
+    //         analyze: jest.fn(),
+    //         applyBlockedMessage: jest.fn(),
+    //         applyFlaggedMessage: jest.fn(),
+    //       },
+    //     },
+    //   ],
+    // }).compile();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ChatService,
-        {
-          provide: PrismaService,
-          useValue: {
-            // 2. The Smart Mock logic
-            $transaction: jest.fn((input) => {
-              // If it's a callback: $transaction(async (tx) => { ... })
-              if (typeof input === 'function') {
-                return input(mockTick);
-              }
-              // If it's an array: $transaction([p1, p2])
-              return Promise.all(input);
-            }),
-            // 3. Keep your standard mocks here for non-transaction calls
-            user: {
-              findUnique: jest.fn(),
-              findMany: jest.fn(),
-              update: jest.fn(),
-            },
-            block: {
-              findFirst: jest.fn(),
-            },
-            conversation: {
-              findFirst: jest.fn(),
-              findMany: jest.fn(),
-              findUnique: jest.fn(),
-              create: jest.fn(),
-              update: jest.fn(),
-            },
-            message: {
-              findUnique: jest.fn(),
-              findMany: jest.fn(),
-              create: jest.fn(),
-              update: jest.fn(),
-            },
-            messageRead: {
-              createMany: jest.fn().mockResolvedValue({ count: 0 })
-            },
-            conversationParticipant: {
-              findFirst: jest.fn(),
-              findUnique: jest.fn(),
-              findMany: jest.fn(),
-              delete: jest.fn(),
-              count: jest.fn(),
-              createMany: jest.fn(),
-            },
-            messageReaction: {
-              findUnique: jest.fn(),
-              create: jest.fn(),
-            },
-          },
-        },
+        { provide: PrismaService, useValue: mockPrisma },
         {
           provide: AutoModerationService,
-          useValue: {
-            // Mock the methods from your moderation service
-            moderateText: jest.fn(),
-            analyze: jest.fn(),
-            applyBlockedMessage: jest.fn(),
-            applyFlaggedMessage: jest.fn(),
-          },
+          useValue: { moderateText: jest.fn() },
         },
       ],
     }).compile();
 
     service = module.get<ChatService>(ChatService);
     prisma = module.get<PrismaService>(PrismaService);
-    autoModerationService = module.get<AutoModerationService>(AutoModerationService);
+    autoModerationService = module.get<AutoModerationService>(
+      AutoModerationService,
+    );
   });
 
   describe('markConversationRead', () => {
@@ -1120,10 +1154,20 @@ describe('ChatService', () => {
 
     it('Scenario 1: should return existing conversation if found', async () => {
       // 1. Arrange: findFirst returns a conversation
-      jest
-        .spyOn(prisma.conversation, 'findFirst')
-        .mockResolvedValue(mockConversation as any);
-      const createSpy = jest.spyOn(prisma.conversation, 'create');
+      const actorId = 'user-1';
+      const targetId = 'user-2';
+      const mockConv = {
+        id: 'conv-1',
+        participantHash: 'DM_user-1_user-2',
+        participants: [],
+      };
+
+      // jest
+      //   .spyOn(prisma.conversation, 'findFirst')
+      //   .mockResolvedValue(mockConversation as any);
+      // const createSpy = jest.spyOn(prisma.conversation, 'create');
+      // Setup the mock to return the conversation
+      mockTick.conversation.findUnique.mockResolvedValue(mockConv);
 
       // 2. Act
       const result = await service.createOrGetDirectConversation(

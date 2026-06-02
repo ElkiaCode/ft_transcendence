@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
-import { User, GlobalRole, Report } from '../generated/prisma';
+import { User, GlobalRole, Report } from '@prisma/client';;
 import {
   jest,
   describe,
