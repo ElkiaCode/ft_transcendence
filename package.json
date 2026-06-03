@@ -1,7 +1,6 @@
 {
   "dependencies": {
-    "@nestjs/platform-express": "^11.1.19",
-    "@nestjs/swagger": "^11.4.2"
+    "@nestjs/platform-express": "^11.1.19"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
