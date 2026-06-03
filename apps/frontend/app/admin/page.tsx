@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuthStore } from "@/store/authStore";
 import { apiListReports, apiReviewReport, apiBanUser, apiUnbanUser, apiPromoteToModerator, apiUnpromoteModerator, apiAdjustPenaltyPoints } from "@/lib/api/admin";
-import { apiGetUserByUsername } from "@/lib/api/auth";
+import { apiGetUserByUsername, apiSearchUsers } from "@/lib/api/auth";
 
 type ModerationAction = {
   id: string;
@@ -460,8 +460,10 @@ function ReportsTab({ isAdmin, showToast }: { isAdmin: boolean; showToast: (msg:
 
 function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => void }) {
   const [username, setUsername] = useState("");
+  const [suggestions, setSuggestions] = useState<any[]>([]);
   const [result, setResult] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
+  const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [points, setPoints] = useState(0);
@@ -470,13 +472,34 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
     confirmColor: string; onConfirm: () => void;
   } | null>(null);
 
-  const handleSearch = async () => {
-    if (!username.trim()) return;
-    setLoading(true);
+  useEffect(() => {
+    if (username.trim().length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    const timeout = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const data = await apiSearchUsers(username.trim());
+        setSuggestions(data);
+      } catch {
+        setSuggestions([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [username]);
+
+  const handleSelectUser = async (u: any) => {
+    setUsername(u.username);
+    setSuggestions([]);
     setError(null);
     setResult(null);
+    setLoading(true);
     try {
-      const data = await apiGetUserByUsername(username.trim());
+      const data = await apiGetUserByUsername(u.username);
       if (!data) throw new Error('User not found');
       setResult(data);
     } catch (err: any) {
@@ -509,22 +532,68 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
   return (
     <div className="flex flex-col gap-4">
       {confirmModal && <ConfirmModal {...confirmModal} onClose={() => setConfirmModal(null)} />}
+      <div
+        className="relative"
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget)) {
+            setSuggestions([]);
+          }
+        }}
+      >
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              placeholder="Search by username (min. 2 characters)..."
+              value={username}
+              onChange={(e) => {
+                setUsername(e.target.value);
+                if (result) setResult(null);
+                setError(null);
+              }}
+              onKeyDown={(e) => { if (e.key === 'Escape') setSuggestions([]); }}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {searching && (
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">...</span>
+            )}
+          </div>
+        </div>
 
-      <div className="flex gap-2">
-        <input
-          type="text"
-          placeholder="Search by username..."
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
-          className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <button onClick={handleSearch} className="px-4 py-2 rounded-lg bg-blue-500 text-white text-sm hover:bg-blue-600 cursor-pointer transition">
-          Search
-        </button>
+        {/* Dropdown suggestions */}
+        {suggestions.length > 0 && (
+          <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
+            {suggestions.map((u) => (
+              <button
+                key={u.id}
+                onMouseDown={(e) => e.preventDefault()} // ← empêche le blur de l'input avant le click
+                onClick={() => handleSelectUser(u)}
+                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition cursor-pointer text-left"
+              >
+                <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold overflow-hidden flex-shrink-0">
+                  {u.profile?.avatarUrl
+                    ? <img src={u.profile.avatarUrl} className="w-full h-full object-cover" />
+                    : u.username.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium text-gray-900">{u.username}</span>
+                  {u.profile?.displayName && u.profile.displayName !== u.username && (
+                    <span className="text-xs text-gray-400">{u.profile.displayName}</span>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Aucun résultat */}
+        {username.trim().length >= 2 && !searching && suggestions.length === 0 && !result && (
+          <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg px-4 py-3">
+            <p className="text-sm text-gray-400">No users found for "{username}"</p>
+          </div>
+        )}
       </div>
-
-      {loading && <p className="text-sm text-gray-500">Searching...</p>}
+      {loading && <p className="text-sm text-gray-500">Loading...</p>}
       {error && <p className="text-sm text-red-500">{error}</p>}
 
       {result && (
@@ -552,6 +621,7 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
               </span>
             </div>
           </div>
+
           <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
             <span className="text-xs text-gray-500 font-medium">Penalty points</span>
             <span className={`text-sm font-bold ml-auto ${penaltyColor(result.penaltyPoints ?? 0)}`}>
@@ -559,13 +629,15 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
             </span>
             {(result.penaltyPoints ?? 0) <= -400 && (
               <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">
-                ⚠ Ban imminent à -500
+                ⚠ Ban imminent at -500
               </span>
             )}
           </div>
+
           {result.profile?.bio && (
             <p className="text-xs text-gray-500 italic border-l-2 border-gray-200 pl-2">{result.profile.bio}</p>
           )}
+
           <div className="flex flex-wrap gap-2 border-t border-gray-100 pt-3">
             {!result.isBanned ? (
               <button
@@ -623,6 +695,7 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
               </button>
             )}
           </div>
+
           <div className="flex flex-col gap-2 border-t border-gray-100 pt-3">
             <p className="text-xs font-medium text-gray-700">Adjust penalty points</p>
             <div className="flex gap-2">
@@ -644,7 +717,7 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
                 onClick={() => handleAction(
                   () => apiAdjustPenaltyPoints(result.id, points, note || undefined),
                   'Penalty points updated',
-                  `${result.username} a été promu modérateur automatiquement !`
+                  `${result.username} has been automatically promoted to moderator!`
                 )}
                 className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 cursor-pointer transition"
               >
