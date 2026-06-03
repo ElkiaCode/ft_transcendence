@@ -6,7 +6,6 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { ChatGateway } from '../chat/chat.gateway';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { jest, describe, beforeEach, it, expect } from '@jest/globals';
-import { User, GlobalRole } from '@prisma/client';
 
 describe('RelationshipsService', () => {
   let service: RelationshipsService;
@@ -31,6 +30,13 @@ describe('RelationshipsService', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     prismaMock = mockDeep<PrismaService>();
+    prismaMock.$transaction.mockImplementation((promises) => {
+      if (Array.isArray(promises)) {
+        return Promise.all(promises);
+      }
+      return Promise.resolve(promises);
+    });
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RelationshipsService,
@@ -55,38 +61,19 @@ describe('RelationshipsService', () => {
     }).compile();
 
     service = module.get<RelationshipsService>(RelationshipsService);
-    // prisma = module.get<PrismaService>(PrismaService);
     notificationsService =
       module.get<NotificationsService>(NotificationsService);
     gateway = module.get<ChatGateway>(ChatGateway);
   });
 
-  const createMockUser = (overrides: Partial<User> = {}): User => {
-    const defaultUser: User = {
-      id: 'user-id',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      email: 'test@test.com',
-      username: 'testuser',
-      passwordHash: null,
-      globalRole: GlobalRole.USER,
-      isActive: true,
-      isBanned: false,
-      penaltyPoints: 0,
-      preferredLanguage: 'en',
-      ...overrides,
-    };
-    return { ...defaultUser, ...overrides };
-  };
-
   describe('sendFriendRequest', () => {
-    it('should throw BadRequest if user targets themselves', async () => {
+    it('Scenario 1: should throw BadRequest if user targets themselves', async () => {
       await expect(
         service.sendFriendRequest('user-1', 'user-1'),
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('should throw BadRequest if a block exists', async () => {
+    it('Scenario 2: should throw BadRequest if a block exists', async () => {
       prismaMock.user.findUnique.mockResolvedValueOnce(mockUser as any);
       prismaMock.user.findUnique.mockResolvedValueOnce(mockTarget as any);
 
@@ -107,7 +94,7 @@ describe('RelationshipsService', () => {
       );
     });
 
-    it('should successfully create a friend request and notify the user', async () => {
+    it('Scenario 3: should successfully create a friend request and notify the user', async () => {
       prismaMock.user.findUnique.mockResolvedValueOnce(mockUser as any);
       prismaMock.user.findUnique.mockResolvedValueOnce(mockTarget as any);
       prismaMock.block.findFirst.mockResolvedValue(null);
@@ -136,7 +123,7 @@ describe('RelationshipsService', () => {
   });
 
   describe('acceptFriendRequest', () => {
-    it('should throw NotFound if no pending request exists', async () => {
+    it('Scenario 1: should throw NotFound if no pending request exists', async () => {
       prismaMock.user.findUnique.mockResolvedValue(mockUser as any);
       prismaMock.block.findFirst.mockResolvedValue(null);
       prismaMock.friendship.findFirst.mockResolvedValue(null);
@@ -148,32 +135,54 @@ describe('RelationshipsService', () => {
   });
 
   describe('blockUser', () => {
-    it('should create a block and delete existing friendship in a transaction', async () => {
+    it('Scenario 1: should create a block and delete existing friendship in a transaction', async () => {
       prismaMock.user.findUnique.mockResolvedValueOnce(mockUser as any);
       prismaMock.user.findUnique.mockResolvedValueOnce(mockTarget as any);
 
       prismaMock.block.findUnique.mockResolvedValue(null); // No existing block
-      prismaMock.friendship.findFirst.mockResolvedValue({
-        id: 'f-1',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        requesterId: '',
-        addresseeId: '',
-        status: 'PENDING',
-      }); // Existing friendship
+      const mockFriendship = { id: 'f-1', status: 'PENDING' };
+      prismaMock.friendship.findFirst.mockResolvedValue(mockFriendship as any);
+      // prismaMock.friendship.findFirst.mockResolvedValue({
+      //   id: 'f-1',
+      //   createdAt: new Date(),
+      //   updatedAt: new Date(),
+      //   requesterId: '',
+      //   addresseeId: '',
+      //   status: 'PENDING',
+      // }); // Existing friendship
 
       const mockBlock = { id: 'b-1', blockerId: 'user-1', blockedId: 'user-2' };
       prismaMock.block.create.mockResolvedValue(mockBlock as any);
+      prismaMock.friendship.delete.mockResolvedValue(mockFriendship as any);
 
       const result = await service.blockUser('user-1', 'user-2');
 
       expect(prismaMock.$transaction).toHaveBeenCalled();
+      expect(prismaMock.block.create).toHaveBeenCalledWith({
+        data: { blockerId: 'user-1', blockedId: 'user-2' },
+      });
       expect(prismaMock.friendship.delete).toHaveBeenCalledWith({
         where: { id: 'f-1' },
       });
       expect(result.friendshipRemoved).toBe(true);
+      expect(result.block.id).toBe('b-1');
     });
   });
-
-  
 });
+// const createMockUser = (overrides: Partial<User> = {}): User => {
+//   const defaultUser: User = {
+//     id: 'user-id',
+//     createdAt: new Date(),
+//     updatedAt: new Date(),
+//     email: 'test@test.com',
+//     username: 'testuser',
+//     passwordHash: null,
+//     globalRole: GlobalRole.USER,
+//     isActive: true,
+//     isBanned: false,
+//     penaltyPoints: 0,
+//     preferredLanguage: 'en',
+//     ...overrides,
+//   };
+//   return { ...defaultUser, ...overrides };
+// };

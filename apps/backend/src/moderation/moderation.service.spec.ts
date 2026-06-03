@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
-import { User, GlobalRole, Report } from '@prisma/client';;
+import { User, GlobalRole } from '@prisma/client';
 import {
   jest,
   describe,
@@ -19,9 +19,7 @@ describe('ModerationService', () => {
   let service: ModerationService;
   let notificationsMock: DeepMockProxy<NotificationsService>;
   let prismaMock: DeepMockProxy<PrismaService>;
-  let notificationsService: NotificationsService;
   let chatGateway: ChatGateway;
-  let mockTransactionClient: any;
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -43,8 +41,6 @@ describe('ModerationService', () => {
       ],
     }).compile();
     service = module.get<ModerationService>(ModerationService);
-    notificationsService =
-      module.get<NotificationsService>(NotificationsService);
     chatGateway = module.get<ChatGateway>(ChatGateway);
     jest.spyOn(service as any, 'notifyModerators');
   });
