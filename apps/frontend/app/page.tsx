@@ -41,12 +41,14 @@ function GroupMenuModal({
   onRename,
   onLeave,
   onClose,
+  isOwner, 
 }: {
   onInvite: () => void;
   onMembers: () => void;
   onRename: () => void;
   onLeave: () => void;
   onClose: () => void;
+  isOwner: boolean; 
 }) {
   return (
     <div className="fixed inset-0 z-40" onClick={onClose}>
@@ -60,9 +62,11 @@ function GroupMenuModal({
         <button onClick={onMembers} className="text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition">
           View members
         </button>
-        <button onClick={onRename} className="text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition">
-          Rename group
-        </button>
+        {isOwner && (
+          <button onClick={onRename} className="text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition">
+            Rename group
+          </button>
+        )}
         <button onClick={onLeave} className="text-left px-4 py-2 text-sm text-red-500 hover:bg-gray-100 transition">
           Leave group
         </button>
