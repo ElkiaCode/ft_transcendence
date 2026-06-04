@@ -5,8 +5,8 @@
 
 generator client {
   provider     = "prisma-client-js"
-  output       = "../src/generated/prisma"
-  moduleFormat = "cjs"
+//   output       = "../src/generated/prisma"
+//   moduleFormat = "cjs"
 }
 
 datasource db {
@@ -178,7 +178,7 @@ model Conversation {
   title     String?
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
-
+  participantHash String?    @unique
   participants ConversationParticipant[]
   messages     Message[]
 }
@@ -189,7 +189,7 @@ model ConversationParticipant {
   userId         String
   role           ConversationRole @default(MEMBER)
   joinedAt       DateTime         @default(now())
-
+  leftAt         DateTime?    // If null, participant is currently in the room
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 

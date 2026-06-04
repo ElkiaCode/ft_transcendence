@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ChatGateway } from '../chat/chat.gateway';
@@ -15,27 +16,16 @@ import { AdminService } from './admin.service';
 
 describe('AdminService', () => {
   let service: AdminService;
-  let prisma: PrismaService;
-  // let notificationsService: NotificationsService;
+  let prismaMock: DeepMockProxy<PrismaService>;
   let chatGateway: ChatGateway;
 
   beforeEach(async () => {
+    jest.clearAllMocks();
+    prismaMock = mockDeep<PrismaService>();
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AdminService,
-        {
-          provide: PrismaService,
-          useValue: {
-            $transaction: jest.fn((input) => Promise.all(input)),
-            user: {
-              findUnique: jest.fn(),
-              update: jest.fn(),
-            },
-            refreshToken: {
-              updateMany: jest.fn(),
-            },
-          },
-        },
+        { provide: PrismaService, useValue: prismaMock },
         {
           provide: NotificationsService,
           useValue: {
@@ -53,9 +43,7 @@ describe('AdminService', () => {
     }).compile();
 
     service = module.get<AdminService>(AdminService);
-    prisma = module.get<PrismaService>(PrismaService);
     chatGateway = module.get<ChatGateway>(ChatGateway);
-    // Mock the private notifyUser method to avoid dependency issues
     jest
       .spyOn(service as any, 'notifyUser')
       .mockResolvedValue({ body: 'mocked' });
@@ -69,7 +57,7 @@ describe('AdminService', () => {
     });
 
     it('Scenario 2 - should throw NotFoundException if targetUser not found', async () => {
-      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(null); //nothing found ind DB
+      prismaMock.user.findUnique.mockResolvedValue(null); //nothing found ind DB
       await expect(service.banUser('targetUser', 'actorUser')).rejects.toThrow(
         new NotFoundException('User to ban does not exist'),
       );
@@ -81,7 +69,7 @@ describe('AdminService', () => {
         username: 'userBanned',
         isBanned: true,
       };
-      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(mockUser as any);
+      prismaMock.user.findUnique.mockResolvedValue(mockUser as any);
       await expect(service.banUser(mockUser.id, 'actorUser')).rejects.toThrow(
         new BadRequestException('User already banned'),
       );
@@ -93,7 +81,7 @@ describe('AdminService', () => {
         username: 'userBanned',
         isBanned: true,
       };
-      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(mockUser as any);
+      prismaMock.user.findUnique.mockResolvedValue(mockUser as any);
       await expect(service.banUser(mockUser.id, 'actorUser')).rejects.toThrow(
         new BadRequestException('User already banned'),
       );
@@ -110,18 +98,22 @@ describe('AdminService', () => {
         isBanned: false,
         profile: { displayName: 'Victim' },
       };
-
-      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(mockUser as any);
-      jest.spyOn(prisma.user, 'update').mockResolvedValue({
+      const updatedUserMock = {
         ...mockUser,
         isBanned: true,
         isActive: false,
-      } as any);
+      };
+      prismaMock.user.findUnique.mockResolvedValue(mockUser as any);
+      prismaMock.$transaction.mockResolvedValue([
+        updatedUserMock, // This is what [updateUser] will receive
+        { id: 'refreshToken1', userId: 'targetId' } // This is for the second op in the transaction
+      ]);
+
 
       const result = await service.banUser(targetId, actorId);
 
       expect(result.message).toBe('user banned');
-      expect(prisma.$transaction).toHaveBeenCalled();
+      expect(prismaMock.$transaction).toHaveBeenCalled();
       expect(chatGateway.emitModerationBanAndDisconnect).toHaveBeenCalledWith(targetId, expect.anything());
     });
   });
@@ -134,7 +126,7 @@ describe('AdminService', () => {
     });
 
     it('Scenario 2 - should throw NotFoundException if targetUser not found', async () => {
-      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(null); //nothing found ind DB
+      prismaMock.user.findUnique.mockResolvedValue(null); //nothing found ind DB
       await expect(
         service.unbanUser('targetUser', 'actorUser'),
       ).rejects.toThrow(new NotFoundException('user to unban does not exist'));
@@ -146,7 +138,7 @@ describe('AdminService', () => {
         username: 'userNotBanned',
         isBanned: false,
       };
-      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(mockUser as any);
+      prismaMock.user.findUnique.mockResolvedValue(mockUser as any);
       await expect(service.unbanUser(mockUser.id, 'actorUser')).rejects.toThrow(
         new BadRequestException('user is not banned'),
       );
@@ -165,8 +157,8 @@ describe('AdminService', () => {
         profile: { displayName: 'Victim' },
       };
 
-      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(mockUser as any);
-      jest.spyOn(prisma.user, 'update').mockResolvedValue({
+      prismaMock.user.findUnique.mockResolvedValue(mockUser as any);
+      prismaMock.user.update.mockResolvedValue({
         ...mockUser,
         isBanned: false,
         isActive: true,
@@ -180,14 +172,14 @@ describe('AdminService', () => {
 
   describe('promoteUserToModerator', () => {
     it('Scenario 1 - should throw NotFoundException if targetUser not found', async () => {
-      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(null); //nothing found ind DB
+      prismaMock.user.findUnique.mockResolvedValue(null); //nothing found ind DB
       await expect(
         service.promoteUserToModerator('targetUser', 'admin'),
       ).rejects.toThrow(new NotFoundException('user does not exist'));
     });
 
     it('Scenario 2 - should throw BadRequestException if targetUser is not an USER not found', async () => {
-      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue({
+      prismaMock.user.findUnique.mockResolvedValue({
         globalRole: 'MODERATOR',
       } as any);
 
@@ -197,7 +189,7 @@ describe('AdminService', () => {
     });
 
     it('Scenario 3 - should throw BadRequest if user is banned', async () => {
-      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue({ 
+      prismaMock.user.findUnique.mockResolvedValue({ 
         globalRole: 'USER',
         isBanned: true
       } as any);
@@ -209,10 +201,8 @@ describe('AdminService', () => {
 
     it('Scenario 4 - should successfully promote a USER to MODERATOR', async () => {
       const mockUser = { id: 'u1', globalRole: 'USER', isBanned: false };
-      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(mockUser as any);
-      jest
-        .spyOn(prisma.user, 'update')
-        .mockResolvedValue({ ...mockUser, globalRole: 'MODERATOR' } as any);
+      prismaMock.user.findUnique.mockResolvedValue(mockUser as any);
+      prismaMock.user.update.mockResolvedValue({ ...mockUser, globalRole: 'MODERATOR' } as any);
 
       const result = await service.promoteUserToModerator('u1', 'admin');
 
@@ -222,14 +212,14 @@ describe('AdminService', () => {
 
   describe('unpromoteModeratorToUser', () => {
     it('Scenario 1 - should throw NotFoundException if targetUser not found', async () => {
-      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(null); //nothing found ind DB
+      prismaMock.user.findUnique.mockResolvedValue(null); //nothing found ind DB
       await expect(
         service.unpromoteModeratorToUser('targetUser', 'admin'),
       ).rejects.toThrow(new NotFoundException('user does not exist'));
     });
 
     it('Scenario 2 - should throw BadRequestException if targetUser is not a MODERATOR not found', async () => {
-      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue({
+      prismaMock.user.findUnique.mockResolvedValue({
         globalRole: 'USER',
       } as any);
 
@@ -239,7 +229,7 @@ describe('AdminService', () => {
     });
 
     it('Scenario 3 - should throw BadRequest if user is banned', async () => {
-      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue({ 
+      prismaMock.user.findUnique.mockResolvedValue({ 
         globalRole: 'MODERATOR',
         isBanned: true
       } as any);
@@ -251,10 +241,8 @@ describe('AdminService', () => {
 
     it('Scenario 4 - should successfully unpromote a MODERATOR to USER', async () => {
       const mockUser = { id: 'u1', globalRole: 'MODERATOR', isBanned: false };
-      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(mockUser as any);
-      jest
-        .spyOn(prisma.user, 'update')
-        .mockResolvedValue({ ...mockUser, globalRole: 'USER' } as any);
+      prismaMock.user.findUnique.mockResolvedValue(mockUser as any);
+      prismaMock.user.update.mockResolvedValue({ ...mockUser, globalRole: 'USER' } as any);
 
       const result = await service.unpromoteModeratorToUser('u1', 'admin');
 
