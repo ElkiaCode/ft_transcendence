@@ -15,11 +15,6 @@ const httpsAgent = new https.Agent({
   rejectUnauthorized: false
 });
 
-  
-  // const conversationId = `room-${index % 25}`;
-
-  // console.log(`[User ${index}] Attempting to register/login...`);
-
 async function simulateUserPair(index: number) {
   try {
     // 1. Setup two users: User A and User B
@@ -76,7 +71,7 @@ async function simulateUserPair(index: number) {
     const tokenA = loginA.data.accessToken;
     const tokenB = loginB.data.accessToken;
     const cuidB = loginB.data.user.id;
-
+    let messagesSent = 0;
     // 4. Create/Get the Direct Conversation via HTTP
     // (Assuming you have an endpoint that calls chatService.createOrGetDirectConversation)
     const convRes = await axios.post(`${API_URL}/chat/direct/${cuidB}`, {}, { 
@@ -94,17 +89,37 @@ async function simulateUserPair(index: number) {
       
       console.log(`✅ User ${index} connected to Conv: ${conversationId}. Waiting for handshake to finish...`);
       
+      socketA.emit('chat.joinConversation', { conversationId });
       // 5. Send Message (Using 'conversationId' and 'content' keys)
       socketA.emit('chat.sendMessage', {
         conversationId: conversationId,
-        content: `Hi User ${index + 1}, I am User ${index}. Let's test concurrency!`
-      });
-      socketB.emit('chat.sendMessage', {
-        conversationId: conversationId,
-        content: `Hi User ${index}, I am User ${index + 1}. That's a good idea!`
+        content: `Hi User ${index + 1}, I am User ${index}. Do you want we test concurrency?`
       });
     });
-    let messagesSent = 0;
+
+    // User B: The "Responder"
+    socketB.on('connect', () => {
+
+      console.log(`✅ User ${index + 1} connected to Conv: ${conversationId}. Waiting for handshake to finish...`);
+      
+      socketB.emit('chat.joinConversation', { conversationId });
+      // User B does NOTHING until they hear a message
+      socketB.on('chat.message.created', (msg) => {
+        // Ensure User B doesn't reply to their own messages
+        if (msg.senderId !== cuidB && messagesSent == 0) { 
+          console.log(`🤖 User ${index + 1} received question, typing reply...`);
+          
+          // Add a small delay to simulate typing
+          setTimeout(() => {
+            socketB.emit('chat.sendMessage', {
+              conversationId,
+              content: `Hi User ${index}, I am User ${index + 1}. That's a really good idea!`
+            });
+          }, 1000); 
+        }
+      });
+    });
+    
     const interval = setInterval(() => {
       socketA.emit('chat.sendMessage', {
         conversationId: conversationId, // Use the Conversation CUID, not User CUID
