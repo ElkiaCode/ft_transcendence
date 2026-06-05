@@ -104,7 +104,8 @@ export async function addFriendRequest(userId: string) {
   });
   const data = await res.json();
   if (!res.ok) {
-    throw new Error(data.message || 'Error sending friend request');
+    if (data.message?.toLowerCase().includes('already')) return data;
+      throw new Error(data.message || 'Error sending friend request');
   }
   return data;
 }
