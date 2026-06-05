@@ -1,12 +1,17 @@
 {
   "dependencies": {
-    "@nestjs/platform-express": "^11.1.19"
+    "@nestjs/platform-express": "^11.1.19",
+    "next": "^16.2.7",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/node": "^25.9.1",
-    "@types/react": "^19.2.14",
+    "@types/react": "^19.2.16",
     "@types/react-dom": "^19.2.3",
-    "jest-mock-extended": "^2.0.4"
+    "jest-mock-extended": "^2.0.4",
+    "typescript": "^6.0.3"
   }
 }
