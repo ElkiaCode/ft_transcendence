@@ -80,7 +80,7 @@ export class ChatController {
     @CurrentUser() user: JwtPayload,
     @Body() dto: CreateGroupConversationDto,
   ) {
-    const result = await this.chatService.createGroupeConversation(
+    const result = await this.chatService.createGroupConversation(
       user.sub,
       dto,
     );
