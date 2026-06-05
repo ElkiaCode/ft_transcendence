@@ -1,7 +1,8 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
-    "moduleResolution": "node",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "allowJs": true,
     "esModuleInterop": true,
     "isolatedModules": true,
     "declaration": true,
@@ -13,16 +14,18 @@
     "types": ["jest", "node"],
     "sourceMap": true,
     "outDir": "./dist",
-    "baseUrl": ".",
+    "baseUrl": "./",
     "incremental": true,
     "skipLibCheck": true,
     "strictNullChecks": true,
     "forceConsistentCasingInFileNames": true,
-    "noImplicitAny": false,
+    "noImplicitAny": false, // Temporary fix to see if red lines vanish
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
     "paths": {
       "@/*": ["src/*"]
-    }
+    },
+  // "include": ["src/**/*"],
+  // "exclude": ["node_modules", "dist"]
   }
 }

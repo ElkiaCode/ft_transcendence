@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { addFriendRequest, apiSearchUsers, blockUser, unblockUser } from "@/lib/api/auth";
 import { apiAddMessageReaction, apiCreateGroupConversation, apiGetConversations, apiGetGroupMembers, apiGetMessages, apiInviteGroupMembers, apiLeaveGroupConversation, apiRemoveGroupMember, apiRenameGroupConversation, apiReportMessage, createOrGetDirectConversation } from "@/lib/api/chat";
 import { useAuthStore } from "@/store/authStore";
@@ -30,10 +30,111 @@ interface Conversation {
 
 type ReactionType = 'THUMBS_UP' | 'HEART';
 
+type MembershipPeriod = {
+  joinedAt: Date;
+  leftAt: Date | null; // null means they are currently in the group
+};
+
+type Message = {
+  id: string;
+  senderId: string;
+  text: string;
+  createdAt: Date;
+  type: 'user' | 'system'; // 'system' for "X joined the chat"
+};
+
 const reactionIcons: Record<ReactionType, string> = {
   THUMBS_UP: '/reaction-thumbs-up.svg',
   HEART: '/reaction-heart.svg',
 };
+
+const currentUserId = "user_123";
+
+export default function GroupChatPage({ params }: { params: { groupId: string } }) {
+  const [messages, setMessages] = useState<Message[]>([]);
+  
+  // This would come from your Auth context or a specific Group Member API call
+  const userMemberships: MembershipPeriod[] = [
+    { 
+      joinedAt: new Date('2026-06-01T10:00:00Z'), 
+      leftAt: new Date('2026-06-05T15:00:00Z') 
+    },
+    { 
+      joinedAt: new Date('2026-11-01T09:00:00Z'), 
+      leftAt: null // Currently active
+    }
+  ];
+
+  // GDPR Filter Logic
+  const filteredMessages = useMemo(() => {
+    return messages.filter((msg) => {
+      const msgTime = new Date(msg.createdAt).getTime();
+      
+      // Check if the message timestamp falls within ANY of the user's membership periods
+      return userMemberships.some(period => {
+        const joinTime = new Date(period.joinedAt).getTime();
+        const leaveTime = period.leftAt ? new Date(period.leftAt).getTime() : Infinity;
+        
+        return msgTime >= joinTime && msgTime <= leaveTime;
+      });
+    });
+  }, [messages, userMemberships]);
+
+  return (
+    <div className="flex flex-col h-screen bg-gray-50">
+      {/* Header */}
+      <div className="p-4 border-b bg-white">
+        <h1 className="text-xl font-bold">Group Chat</h1>
+        <p className="text-xs text-gray-500">GDPR Protected: Viewing authorized history only</p>
+      </div>
+
+      {/* Message Area */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {filteredMessages.map((msg) => (
+          <div 
+            key={msg.id} 
+            className={`flex ${msg.senderId === currentUserId ? 'justify-end' : 'justify-start'}`}
+          >
+            {msg.type === 'system' ? (
+              <div className="w-full text-center text-xs text-gray-400 my-2">
+                {msg.text}
+              </div>
+            ) : (
+              <div className={`max-w-xs p-3 rounded-lg ${
+                msg.senderId === currentUserId 
+                  ? 'bg-blue-600 text-white rounded-br-none' 
+                  : 'bg-white border text-gray-800 rounded-bl-none'
+              }`}>
+                <p className="text-sm">{msg.text}</p>
+                <span className="text-[10px] opacity-70 block mt-1">
+                  {new Date(msg.createdAt).toLocaleTimeString()}
+                </span>
+              </div>
+            )}
+          </div>
+        ))}
+        {filteredMessages.length === 0 && (
+          <div className="text-center text-gray-400 mt-10">
+            No message history available for your membership periods.
+          </div>
+        )}
+      </div>
+
+      {/* Input Area */}
+      <div className="p-4 bg-white border-t">
+        <div className="flex gap-2">
+          <input 
+            className="flex-1 border rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Type a message..."
+          />
+          <button className="bg-blue-600 text-white px-6 py-2 rounded-full hover:bg-blue-700 transition">
+            Send
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function GroupMenuModal({
   onInvite,
@@ -1339,7 +1440,6 @@ const handleReport = async (messageId: string, _userId: string, reason: string) 
           onBlock={(id) => { blockUser(id); setMenu(null); }}
           onUnblock={(id) => { unblockUser(id); setMenu(null); }}
           onPromote={(id) => { apiPromoteUser(id).catch(console.error); setMenu(null); }}
-          //onPromote={(id) => { console.log('promote', id); setMenu(null); }}
           onViewProfile={(username) => { router.push(`/profils/${username}`); setMenu(null); }}
         />
       )}
@@ -1425,10 +1525,10 @@ const handleReport = async (messageId: string, _userId: string, reason: string) 
   );
 }
 
-export default function Home() {
-  return (
-    <div className="flex flex-col h-full bg-gray-100">
-      <Section />
-    </div>
-  );
-}
+// export default function Home() {
+//   return (
+//     <div className="flex flex-col h-full bg-gray-100">
+//       <Section />
+//     </div>
+//   );
+// }

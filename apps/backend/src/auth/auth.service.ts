@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -7,7 +11,10 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { DEFAULT_REFRESH_DAYS } from './constants/auth.constants';
 import type { JwtPayload } from './types/jwt-payload.type';
-import { generateRefreshToken, hashRefreshToken } from './utils/refresh-token.util';
+import {
+  generateRefreshToken,
+  hashRefreshToken,
+} from './utils/refresh-token.util';
 
 @Injectable()
 export class AuthService {
@@ -20,7 +27,9 @@ export class AuthService {
   getRefreshTokenDays(): number {
     const raw = this.configService.get<string>('JWT_REFRESH_DAYS');
     const parsed = Number(raw);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_REFRESH_DAYS;
+    return Number.isFinite(parsed) && parsed > 0
+      ? parsed
+      : DEFAULT_REFRESH_DAYS;
   }
 
   getRefreshTokenMaxAgeMs(): number {
@@ -35,7 +44,7 @@ export class AuthService {
     const email = dto.email.trim().toLowerCase();
     const username = dto.username.trim();
 
-    const existingUserByEmail = await this.prisma.user.findUnique({
+    const existingUserByEmail = await this.prisma.client.user.findUnique({
       where: { email },
     });
 
@@ -43,7 +52,7 @@ export class AuthService {
       throw new BadRequestException('email already in use');
     }
 
-    const existingUserByUsername = await this.prisma.user.findUnique({
+    const existingUserByUsername = await this.prisma.client.user.findUnique({
       where: { username },
     });
 
@@ -53,7 +62,7 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
 
-    const user = await this.prisma.user.create({
+    const user = await this.prisma.client.user.create({
       data: {
         email,
         username,
@@ -88,7 +97,7 @@ export class AuthService {
   async login(dto: LoginDto) {
     const email = (dto.email ?? '').trim().toLowerCase();
 
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.client.user.findUnique({
       where: { email },
       include: {
         profile: true,
@@ -139,7 +148,7 @@ export class AuthService {
 
     const tokenHash = hashRefreshToken(rawRefreshToken);
 
-    const storedToken = await this.prisma.refreshToken.findUnique({
+    const storedToken = await this.prisma.client.refreshToken.findUnique({
       where: { tokenHash },
       include: {
         user: {
@@ -187,12 +196,12 @@ export class AuthService {
     const newExpiresAt = this.getRefreshTokenExpiresAt();
     const accessToken = await this.signAccessToken(payload);
 
-    await this.prisma.$transaction([
-      this.prisma.refreshToken.update({
+    await this.prisma.client.$transaction([
+      this.prisma.client.refreshToken.update({
         where: { id: storedToken.id },
         data: { revokedAt: new Date() },
       }),
-      this.prisma.refreshToken.create({
+      this.prisma.client.refreshToken.create({
         data: {
           userId: storedToken.userId,
           tokenHash: newRefreshTokenHash,
@@ -215,7 +224,7 @@ export class AuthService {
 
     const tokenHash = hashRefreshToken(rawRefreshToken);
 
-    await this.prisma.refreshToken.updateMany({
+    await this.prisma.client.refreshToken.updateMany({
       where: {
         tokenHash,
         revokedAt: null,
@@ -263,7 +272,7 @@ export class AuthService {
     const user42 = await userResponse.json();
 
     // 3. Chercher ou créer le user en DB
-    let user = await this.prisma.user.findFirst({
+    let user = await this.prisma.client.user.findFirst({
       where: {
         oauthAccounts: {
           some: {
@@ -276,7 +285,7 @@ export class AuthService {
     });
 
     if (!user) {
-      user = await this.prisma.user.create({
+      user = await this.prisma.client.user.create({
         data: {
           email: user42.email,
           username: user42.login,
@@ -326,7 +335,7 @@ export class AuthService {
     const tokenHash = hashRefreshToken(refreshToken);
     const expiresAt = this.getRefreshTokenExpiresAt();
 
-    await this.prisma.refreshToken.create({
+    await this.prisma.client.refreshToken.create({
       data: {
         userId,
         tokenHash,
@@ -343,7 +352,7 @@ export class AuthService {
   private toPublicUser(user: any) {
     const authProviders = [
       ...(user.passwordHash ? ['LOCAL'] : []),
-      ...((user.oauthAccounts ?? []).map((account: any) => account.provider)),
+      ...(user.oauthAccounts ?? []).map((account: any) => account.provider),
     ];
 
     return {

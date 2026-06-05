@@ -5,8 +5,10 @@
 
 generator client {
   provider     = "prisma-client-js"
-//   output       = "../src/generated/prisma"
-//   moduleFormat = "cjs"
+  previewFeatures = ["driverAdapters"]
+  engineType = "library"
+  // output       = "../src/generated/client" //prisma"
+  moduleFormat = "cjs"
 }
 
 datasource db {

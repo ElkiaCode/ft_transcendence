@@ -3,9 +3,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 // import type { Prisma } from '../generated/prisma';
 
-type NotificationType = 'MESSAGE' | 'MODERATION' | 'SYSTEM';
+export type NotificationType = 'MESSAGE' | 'MODERATION' | 'SYSTEM';
 
-type NotificationContext = {
+export type NotificationContext = {
   actorId?: string;
   entityType?: string;
   entityId?: string;
@@ -13,7 +13,7 @@ type NotificationContext = {
   metadata?: Prisma.InputJsonValue;
 };
 
-type NotificationInput = NotificationContext & {
+export type NotificationInput = NotificationContext & {
   type: NotificationType;
   title: string;
   body?: string;
@@ -30,7 +30,7 @@ export class NotificationsService {
     body?: string,
     context: NotificationContext = {},
   ) {
-    return this.prisma.notification.create({
+    return this.prisma.client.notification.create({
       data: {
         userId,
         type,
@@ -76,7 +76,7 @@ export class NotificationsService {
   }
 
   async listMine(userId: string) {
-    return this.prisma.notification.findMany({
+    return this.prisma.client.notification.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
       take: 100,
@@ -84,7 +84,7 @@ export class NotificationsService {
   }
 
   async markAsRead(userId: string, notificationId: string) {
-    const updated = await this.prisma.notification.updateMany({
+    const updated = await this.prisma.client.notification.updateMany({
       where: {
         id: notificationId,
         userId,
@@ -102,7 +102,7 @@ export class NotificationsService {
   }
 
   async markAllAsRead(userId: string) {
-    await this.prisma.notification.updateMany({
+    await this.prisma.client.notification.updateMany({
       where: {
         userId,
         isRead: false,

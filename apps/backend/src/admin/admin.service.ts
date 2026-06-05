@@ -5,7 +5,11 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChatGateway } from '../chat/chat.gateway';
-import { NotificationsService } from '../notifications/notifications.service';
+import { Notification } from '@prisma/client';
+import {
+  NotificationInput,
+  NotificationsService,
+} from '../notifications/notifications.service';
 
 @Injectable()
 export class AdminService {
@@ -17,13 +21,13 @@ export class AdminService {
 
   private async notifyUser(
     userId: string,
-    input: Parameters<NotificationsService['createFromInput']>[1],
-  ) {
-    const notification = await this.notificationsService.createFromInput(
+    input: NotificationInput,
+  ): Promise<Notification> {
+    const notification = (await this.notificationsService.createFromInput(
       userId,
       input,
-    );
-    await this.chatGateway.emitNotificationCreated(userId, notification);
+    )) as unknown as Notification;
+    this.chatGateway.emitNotificationCreated(userId, notification);
     return notification;
   }
 
@@ -32,7 +36,7 @@ export class AdminService {
       throw new BadRequestException('User cannot ban himself...');
     }
 
-    const isTargetUserExist = await this.prisma.user.findUnique({
+    const isTargetUserExist = await this.prisma.client.user.findUnique({
       where: { id: targetUserId },
       include: { profile: true },
     });
@@ -45,13 +49,13 @@ export class AdminService {
       throw new BadRequestException('User already banned');
     }
 
-    const [updateUser] = await this.prisma.$transaction([
-      this.prisma.user.update({
+    const [updateUser] = await this.prisma.client.$transaction([
+      this.prisma.client.user.update({
         where: { id: targetUserId },
         data: { isBanned: true, isActive: false },
         include: { profile: true },
       }),
-      this.prisma.refreshToken.updateMany({
+      this.prisma.client.refreshToken.updateMany({
         where: { userId: targetUserId, revokedAt: null },
         data: { revokedAt: new Date() },
       }),
@@ -100,7 +104,7 @@ export class AdminService {
       throw new BadRequestException('user cannot unban himself...');
     }
 
-    const banUser = await this.prisma.user.findUnique({
+    const banUser = await this.prisma.client.user.findUnique({
       where: { id: targetUserId },
       include: { profile: true },
     });
@@ -113,7 +117,7 @@ export class AdminService {
       throw new BadRequestException('user is not banned');
     }
 
-    const updateUser = await this.prisma.user.update({
+    const updateUser = await this.prisma.client.user.update({
       where: { id: targetUserId },
       data: { isBanned: false, isActive: true },
       include: { profile: true },
@@ -153,12 +157,7 @@ export class AdminService {
   }
 
   async promoteUserToModerator(targetUserId: string, actorUserId: string) {
-    //As admin, this corner case is not possible (as not user)
-    // if (targetUserId == actorUserId) {
-    //     throw new BadRequestException("cannot promote yourself");
-    // }
-
-    const promoteUser = await this.prisma.user.findUnique({
+    const promoteUser = await this.prisma.client.user.findUnique({
       where: { id: targetUserId },
       include: { profile: true },
     });
@@ -175,7 +174,7 @@ export class AdminService {
       throw new BadRequestException('user is banned');
     }
 
-    const updateUser = await this.prisma.user.update({
+    const updateUser = await this.prisma.client.user.update({
       where: { id: targetUserId },
       data: { isBanned: false, isActive: true, globalRole: 'MODERATOR' },
       include: { profile: true },
@@ -215,12 +214,7 @@ export class AdminService {
   }
 
   async unpromoteModeratorToUser(targetUserId: string, actorUserId: string) {
-    //As admin, this corner case is not possible (as not moderator)
-    // if (targetUserId == actorUserId) {
-    //     throw new BadRequestException("cannot promote yourself");
-    // }
-
-    const unpromoteModerator = await this.prisma.user.findUnique({
+    const unpromoteModerator = await this.prisma.client.user.findUnique({
       where: { id: targetUserId },
       include: { profile: true },
     });
@@ -237,7 +231,7 @@ export class AdminService {
       throw new BadRequestException('user is banned');
     }
 
-    const updateUser = await this.prisma.user.update({
+    const updateUser = await this.prisma.client.user.update({
       where: { id: targetUserId },
       data: { isBanned: false, isActive: true, globalRole: 'USER' },
       include: { profile: true },

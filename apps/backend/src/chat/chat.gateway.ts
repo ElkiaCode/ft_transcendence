@@ -91,7 +91,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         secret: this.configService.getOrThrow('JWT_ACCESS_SECRET'),
       });
       // Fetch User
-      const user = await this.prisma.user.findUnique({
+      const user = await this.prisma.client.user.findUnique({
         where: { id: payload.sub },
       });
       if (!user || !user.isActive || user.isBanned) {
@@ -167,7 +167,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       throw new WsException('missing authenticated user');
     }
 
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.client.user.findUnique({
       where: { id: socketUser.sub },
     });
 
@@ -231,12 +231,13 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {
     const socketUser = await this.getLiveSocketUserOrThrow(client);
 
-    const membership = await this.prisma.conversationParticipant.findFirst({
-      where: {
-        conversationId: body.conversationId,
-        userId: socketUser.sub,
-      },
-    });
+    const membership =
+      await this.prisma.client.conversationParticipant.findFirst({
+        where: {
+          conversationId: body.conversationId,
+          userId: socketUser.sub,
+        },
+      });
 
     if (!membership) {
       throw new WsException('not a participant');
@@ -257,7 +258,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {
     const user = await this.getLiveSocketUserOrThrow(client);
 
-    await this.prisma.conversationParticipant.update({
+    await this.prisma.client.conversationParticipant.update({
       where: {
         conversationId_userId: {
           conversationId: body.conversationId,
