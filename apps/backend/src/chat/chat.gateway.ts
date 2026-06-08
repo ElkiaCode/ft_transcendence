@@ -21,6 +21,31 @@ type SocketUser = {
   role: 'USER' | 'MODERATOR' | 'ADMIN';
 };
 
+interface CustomSocketData {
+  user: SocketUser;
+}
+
+// Define a custom Socket type that uses our data interface
+type AuthenticatedSocket = Socket<any, any, any, CustomSocketData>;
+
+interface JwtPayload {
+  sub: string;
+  username: string;
+  role: 'USER' | 'MODERATOR' | 'ADMIN';
+}
+
+// Define what your sendMessage returns so we don't use 'any'
+interface ChatMessageResult {
+  id: string;
+  content: string;
+  banAnnouncementMessage?: any; // Replace 'any' with your actual Message type
+  moderationWarning?: {
+    isBanned: boolean;
+    banReason?: string;
+    penaltyPoints?: number;
+  };
+}
+
 @WebSocketGateway({
   namespace: '/chat',
   cors: {
@@ -30,7 +55,7 @@ type SocketUser = {
 })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
-  server: Server;
+  server!: Server;
   private readonly connectedUsers = new Map<string, Set<string>>();
 
   constructor(
@@ -41,40 +66,57 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly notificationsService: NotificationsService,
   ) {}
 
-  async handleConnection(client: Socket) {
+  afterInit(server: Server) {
+    server.use((socket, next) => {
+      this.authenticateSocket(socket as AuthenticatedSocket)
+        .then(() => next())
+        .catch((err: unknown) => {
+          if (err instanceof Error) {
+            return next(err);
+          }
+          next(new Error('Authentication error'));
+        });
+    });
+  }
+
+  private async authenticateSocket(socket: AuthenticatedSocket) {
+    const token = socket.handshake.auth?.['token'] as string | undefined;
+    if (!token) {
+      throw new Error('Authentication error: Missing token');
+    }
+
     try {
-      const token = client.handshake.auth?.token;
-
-      if (!token) {
-        throw new WsException('missing token');
-      }
-
-      const payload = await this.jwtService.verifyAsync<SocketUser & { sub: string }>(token, {
-        secret: this.configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
+      // Verify JWT
+      const payload = await this.jwtService.verifyAsync<JwtPayload>(token, {
+        secret: this.configService.getOrThrow('JWT_ACCESS_SECRET'),
       });
-
+      // Fetch User
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
       });
-
       if (!user || !user.isActive || user.isBanned) {
-        throw new WsException('unauthorized');
+        throw new Error('Authentication error: Unauthorized');
       }
-
-      client.data.user = {
+      // 2. SET THE USER HERE (Guaranteed to be ready for events)
+      socket.data.user = {
         sub: user.id,
         username: user.username,
         role: user.globalRole,
-      } satisfies SocketUser;
-
-      await client.join(`user:${user.id}`);
-      this.addConnectedUser(user.id, client.id);
+      } as SocketUser;
     } catch {
-      client.disconnect();
+      throw new Error('Authentication error: Invalid token');
     }
   }
 
-  async handleDisconnect(client: Socket) {
+  async handleConnection(client: AuthenticatedSocket) {
+    const user = client.data.user; //no more linting error since AuthenticatedSocket
+    if (user) {
+      await client.join(`user:${user.sub}`);
+      this.addConnectedUser(user.sub, client.id);
+    }
+  }
+
+  handleDisconnect(client: AuthenticatedSocket) {
     const socketUser = client.data.user as SocketUser | undefined;
 
     if (!socketUser) {
@@ -118,7 +160,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
-  private async getLiveSocketUserOrThrow(client: Socket) {
+  private async getLiveSocketUserOrThrow(client: AuthenticatedSocket) {
     const socketUser = client.data.user as SocketUser | undefined;
 
     if (!socketUser) {
@@ -144,27 +186,35 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return socketUser;
   }
 
-  async emitMessageCreated(conversationId: string, message: unknown) {
-    this.server.to(`conversation:${conversationId}`).emit('chat.message.created', message);
+  emitMessageCreated(conversationId: string, message: unknown) {
+    this.server
+      .to(`conversation:${conversationId}`)
+      .emit('chat.message.created', message);
   }
 
-  async emitMessageUpdated(conversationId: string, message: unknown) {
-    this.server.to(`conversation:${conversationId}`).emit('chat.message.updated', message);
+  emitMessageUpdated(conversationId: string, message: unknown) {
+    this.server
+      .to(`conversation:${conversationId}`)
+      .emit('chat.message.updated', message);
   }
 
-  async emitMessageDeleted(conversationId: string, message: unknown) {
-    this.server.to(`conversation:${conversationId}`).emit('chat.message.deleted', message);
+  emitMessageDeleted(conversationId: string, message: unknown) {
+    this.server
+      .to(`conversation:${conversationId}`)
+      .emit('chat.message.deleted', message);
   }
 
-  async emitConversationRead(conversationId: string, payload: unknown) {
-    this.server.to(`conversation:${conversationId}`).emit('chat.conversation.read', payload);
+  emitConversationRead(conversationId: string, payload: unknown) {
+    this.server
+      .to(`conversation:${conversationId}`)
+      .emit('chat.conversation.read', payload);
   }
 
-  async emitNotificationCreated(userId: string, notification: unknown) {
+  emitNotificationCreated(userId: string, notification: unknown) {
     this.server.to(`user:${userId}`).emit('notification.created', notification);
   }
 
-  async emitModerationWarning(userId: string, warning: unknown) {
+  emitModerationWarning(userId: string, warning: unknown) {
     this.server.to(`user:${userId}`).emit('chat.moderation.warning', warning);
   }
 
@@ -176,7 +226,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('chat.joinConversation')
   async joinConversation(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() body: { conversationId: string },
   ) {
     const socketUser = await this.getLiveSocketUserOrThrow(client);
@@ -202,10 +252,20 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('chat.leaveConversation')
   async leaveConversation(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() body: { conversationId: string },
   ) {
-    await this.getLiveSocketUserOrThrow(client);
+    const user = await this.getLiveSocketUserOrThrow(client);
+
+    await this.prisma.conversationParticipant.update({
+      where: {
+        conversationId_userId: {
+          conversationId: body.conversationId,
+          userId: user.sub,
+        },
+      },
+      data: { leftAt: new Date() },
+    });
 
     await client.leave(`conversation:${body.conversationId}`);
 
@@ -214,47 +274,43 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('chat.sendMessage')
   async sendMessage(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() body: { conversationId: string; content: string },
   ) {
     const socketUser = await this.getLiveSocketUserOrThrow(client);
 
-    if (typeof body?.conversationId !== 'string' || typeof body?.content !== 'string') {
+    if (
+      typeof body?.conversationId !== 'string' ||
+      typeof body?.content !== 'string'
+    ) {
       throw new WsException('invalid message payload');
     }
 
-    const message = await this.chatService.sendMessage(
+    const message = (await this.chatService.sendMessage(
       socketUser.sub,
       body.conversationId,
       body.content,
-    );
+    )) as unknown as ChatMessageResult;
 
-    await this.emitMessageCreated(body.conversationId, message);
-    /*await this.emitNotificationCreated(body.conversationId, {
-      id: message.id,
-      type: 'message',
-      content: `New message from ${socketUser.username}`,
-      link: `/chat/${body.conversationId}`,
-    });*/
+    console.log(`📩 Message received from ${client.id}:`, body);
 
-    if ((message as any).banAnnouncementMessage) {
-      await this.emitMessageCreated(
+    this.emitMessageCreated(body.conversationId, message);
+
+    if (message.banAnnouncementMessage) {
+      this.emitMessageCreated(
         body.conversationId,
-        (message as any).banAnnouncementMessage,
+        message.banAnnouncementMessage,
       );
     }
 
-    if ((message as any).moderationWarning) {
-      await this.emitModerationWarning(
-        socketUser.sub,
-        (message as any).moderationWarning,
-      );
+    if (message.moderationWarning) {
+      this.emitModerationWarning(socketUser.sub, message.moderationWarning);
 
-      if ((message as any).moderationWarning.isBanned) {
+      if (message.moderationWarning.isBanned) {
         await this.emitModerationBanAndDisconnect(socketUser.sub, {
           message: 'Your account was banned by automatic moderation.',
-          reason: (message as any).moderationWarning.banReason ?? 'harmful message',
-          penaltyPoints: (message as any).moderationWarning.penaltyPoints,
+          reason: message.moderationWarning.banReason ?? 'harmful message',
+          penaltyPoints: message.moderationWarning.penaltyPoints,
         });
       }
     }
@@ -278,7 +334,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     );
 
     for (const notification of notifications) {
-      await this.emitNotificationCreated(notification.userId, notification);
+      this.emitNotificationCreated(notification.userId, notification);
     }
 
     return {
@@ -289,8 +345,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('chat.editMessage')
   async editMessage(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() body: { conversationId: string; messageId: string; content: string },
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody()
+    body: { conversationId: string; messageId: string; content: string },
   ) {
     const socketUser = await this.getLiveSocketUserOrThrow(client);
 
@@ -309,7 +366,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       body.content,
     );
 
-    await this.emitMessageUpdated(body.conversationId, message);
+    this.emitMessageUpdated(body.conversationId, message);
 
     return {
       ok: true,
@@ -319,12 +376,15 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('chat.deleteMessage')
   async deleteMessage(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() body: { conversationId: string; messageId: string },
   ) {
     const socketUser = await this.getLiveSocketUserOrThrow(client);
 
-    if (typeof body?.conversationId !== 'string' || typeof body?.messageId !== 'string') {
+    if (
+      typeof body?.conversationId !== 'string' ||
+      typeof body?.messageId !== 'string'
+    ) {
       throw new WsException('invalid delete payload');
     }
 
@@ -334,7 +394,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       body.messageId,
     );
 
-    await this.emitMessageDeleted(body.conversationId, message);
+    this.emitMessageDeleted(body.conversationId, message);
 
     return {
       ok: true,
@@ -344,7 +404,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('chat.markRead')
   async markRead(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() body: { conversationId: string; messageId?: string },
   ) {
     const socketUser = await this.getLiveSocketUserOrThrow(client);
@@ -359,7 +419,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       typeof body.messageId === 'string' ? body.messageId : undefined,
     );
 
-    await this.emitConversationRead(body.conversationId, {
+    this.emitConversationRead(body.conversationId, {
       userId: socketUser.sub,
       conversationId: body.conversationId,
       messageId: body.messageId ?? null,
@@ -374,7 +434,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('chat.typing.start')
   async startTyping(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() body: { conversationId: string },
   ) {
     const socketUser = await this.getLiveSocketUserOrThrow(client);
@@ -383,7 +443,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       throw new WsException('invalid typing payload');
     }
 
-    await this.chatService.ensureConversationMembership(socketUser.sub, body.conversationId);
+    await this.chatService.ensureConversationMembership(
+      socketUser.sub,
+      body.conversationId,
+    );
 
     client.to(`conversation:${body.conversationId}`).emit('chat.typing', {
       conversationId: body.conversationId,
@@ -397,7 +460,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('chat.typing.stop')
   async stopTyping(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() body: { conversationId: string },
   ) {
     const socketUser = await this.getLiveSocketUserOrThrow(client);
@@ -406,7 +469,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       throw new WsException('invalid typing payload');
     }
 
-    await this.chatService.ensureConversationMembership(socketUser.sub, body.conversationId);
+    await this.chatService.ensureConversationMembership(
+      socketUser.sub,
+      body.conversationId,
+    );
 
     client.to(`conversation:${body.conversationId}`).emit('chat.typing', {
       conversationId: body.conversationId,
@@ -419,7 +485,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('presence.list')
-  async listPresence(@ConnectedSocket() client: Socket) {
+  async listPresence(@ConnectedSocket() client: AuthenticatedSocket) {
     await this.getLiveSocketUserOrThrow(client);
 
     return {
@@ -428,10 +494,46 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('user.joinOwnRoom')
-  async joinOwnRoom(@ConnectedSocket() client: Socket) {
+  async joinOwnRoom(@ConnectedSocket() client: AuthenticatedSocket) {
     const socketUser = await this.getLiveSocketUserOrThrow(client);
     await client.join(`user:${socketUser.sub}`);
     return { ok: true };
   }
-
 }
+
+// async handleConnection(client: Socket) {
+//   console.log('New connection attempt...');
+//   try {
+//     const token = client.handshake.auth?.token;
+
+//     if (!token) {
+//       throw new WsException('missing token');
+//     }
+
+//     const payload = await this.jwtService.verifyAsync<
+//       SocketUser & { sub: string }
+//     >(token, {
+//       secret: this.configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
+//     });
+
+//     const user = await this.prisma.user.findUnique({
+//       where: { id: payload.sub },
+//     });
+
+//     if (!user || !user.isActive || user.isBanned) {
+//       throw new WsException('unauthorized');
+//     }
+
+//     client.data.user = {
+//       sub: user.id,
+//       username: user.username,
+//       role: user.globalRole,
+//     } satisfies SocketUser;
+
+//     await client.join(`user:${user.id}`);
+//     this.addConnectedUser(user.id, client.id);
+//   } catch (err) {
+//     console.error('❌ Connection Auth Failed:', err.message);
+//     client.disconnect();
+//   }
+// }

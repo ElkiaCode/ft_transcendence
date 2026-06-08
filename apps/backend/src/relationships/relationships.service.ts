@@ -23,7 +23,7 @@ export class RelationshipsService {
       userId,
       input,
     );
-    await this.chatGateway.emitNotificationCreated(userId, notification);
+    this.chatGateway.emitNotificationCreated(userId, notification);
     return notification;
   }
 

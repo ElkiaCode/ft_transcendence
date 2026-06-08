@@ -7,14 +7,17 @@ def test_unit():
     guillaume   = User("guillaume.roustan1@gmail.com", "laGuigue06", "pass1234")
     yann        = User("yann@gmail.com", "MegaYann", "pass1234")
     clement     = User("clem@gmail.com", "SuperClem", "pass1234")
-
+    patsy        = User("patsy@gmail.com", "patsy", "pass1234")
+    
     clement.register()
     yann.register()
     guillaume.register()
+    patsy.register()
 
     clement.login()
     yann.login()
     guillaume.login()
+    patsy.login()
 
     User.promoteAdmin(clement)
 

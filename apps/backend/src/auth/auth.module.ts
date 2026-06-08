@@ -8,20 +8,21 @@ import { RolesGuard } from './guards/roles.guard';
 
 @Module({
   imports: [
-    ConfigModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         secret: configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
         signOptions: {
-          expiresIn: '15m',
+          expiresIn: configService.getOrThrow<string>(
+            'JWT_ACCESS_EXPIRES_IN',
+          ) as any,
         },
       }),
     }),
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, RolesGuard],
-  exports: [AuthService, RolesGuard, JwtModule]
+  exports: [AuthService, RolesGuard, JwtModule],
 })
 export class AuthModule {}

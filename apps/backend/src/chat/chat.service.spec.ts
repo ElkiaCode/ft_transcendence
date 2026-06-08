@@ -8,81 +8,80 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 
 describe('ChatService', () => {
   let service: ChatService;
   let prisma: PrismaService;
   let autoModerationService: AutoModerationService;
+  // These represent the 'tx' client inside the transaction
+  let mockTick: any;
+  // These represent 'this.prisma' outside the transaction
+  let mockPrisma: any;
 
   beforeEach(async () => {
+    jest.clearAllMocks();
     // 1. Define what the 'tx' (transaction client) looks like for callbacks
-    const mockTick = {
+    mockTick = {
       conversationParticipant: {
-        delete: jest.fn().mockResolvedValue({}),
-        update: jest.fn().mockResolvedValue({}),
-        createMany: jest.fn().mockResolvedValue({}),
+        delete: jest.fn(),
+        update: jest.fn(),
+        createMany: jest.fn(),
       },
       conversation: {
-        update: jest.fn().mockResolvedValue({}),
+        create: jest.fn(),
+        findFirst: jest.fn(),
+        findUnique: jest.fn(),
+        createMany: jest.fn(),
+        update: jest.fn(),
       },
-      message: { create: jest.fn().mockResolvedValue({}) },
-      user: { update: jest.fn().mockResolvedValue({}) },
-        messageRead: { createMany: jest.fn().mockResolvedValue({}) }, // For transactions
-      // messageReaction: { findUnique: jest.fn(), create: jest.fn() },
+      message: { create: jest.fn() },
+      user: { update: jest.fn() },
+      messageRead: { createMany: jest.fn() }, // For transactions
     };
+    mockPrisma = {
+      $transaction: jest.fn((input: any) => {
+        if (typeof input === 'function')
+          return input(mockTick) as Promise<unknown>;
+        if (Array.isArray(input)) {
+          return Promise.all(input);
+        }
+        return Promise.resolve(input);
+      }),
+      conversation: {
+        findUnique: jest.fn(),
+        findFirst: jest.fn(),
+        findMany: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+      },
+      conversationParticipant: {
+        findFirst: jest.fn(),
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+        count: jest.fn(),
+        createMany: jest.fn(),
+        delete: jest.fn(),
+      },
+      user: { findUnique: jest.fn(), findMany: jest.fn() },
+      block: { findFirst: jest.fn() },
+      message: {
+        create: jest.fn(),
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+        update: jest.fn(),
+      },
+      messageReaction: { findUnique: jest.fn(), create: jest.fn() },
+      messageRead: { createMany: jest.fn() },
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ChatService,
+        { provide: PrismaService, useValue: mockPrisma },
         {
-          provide: PrismaService,
-          useValue: {
-            // 2. The Smart Mock logic
-            $transaction: jest.fn((input) => {
-              // If it's a callback: $transaction(async (tx) => { ... })
-              if (typeof input === 'function') {
-                return input(mockTick);
-              }
-              // If it's an array: $transaction([p1, p2])
-              return Promise.all(input);
-            }),
-            // 3. Keep your standard mocks here for non-transaction calls
-            user: {
-              findUnique: jest.fn(),
-              findMany: jest.fn(),
-              update: jest.fn(),
-            },
-            block: {
-              findFirst: jest.fn(),
-            },
-            conversation: {
-              findFirst: jest.fn(),
-              findMany: jest.fn(),
-              findUnique: jest.fn(),
-              create: jest.fn(),
-              update: jest.fn(),
-            },
-            message: {
-              findUnique: jest.fn(),
-              findMany: jest.fn(),
-              create: jest.fn(),
-              update: jest.fn(),
-            },
-            messageRead: {
-              createMany: jest.fn().mockResolvedValue({ count: 0 })
-            },
-            conversationParticipant: {
-              findFirst: jest.fn(),
-              findUnique: jest.fn(),
-              findMany: jest.fn(),
-              delete: jest.fn(),
-              count: jest.fn(),
-              createMany: jest.fn(),
-            },
-            messageReaction: {
-              findUnique: jest.fn(),
-              create: jest.fn(),
-            },
-          },
+          provide: AutoModerationService,
+          useValue: { moderateText: jest.fn() },
         },
         {
           provide: AutoModerationService,
@@ -99,7 +98,9 @@ describe('ChatService', () => {
 
     service = module.get<ChatService>(ChatService);
     prisma = module.get<PrismaService>(PrismaService);
-    autoModerationService = module.get<AutoModerationService>(AutoModerationService);
+    autoModerationService = module.get<AutoModerationService>(
+      AutoModerationService,
+    );
   });
 
   describe('markConversationRead', () => {
@@ -115,7 +116,7 @@ describe('ChatService', () => {
         .mockResolvedValue(undefined);
     });
 
-    it('should mark messages as read', async () => {
+    it('Scenario 1: should mark messages as read', async () => {
       jest
         .spyOn(prisma.message, 'findMany')
         .mockResolvedValue([{ id: 'm1' }] as any);
@@ -129,7 +130,7 @@ describe('ChatService', () => {
       expect(result.readCount).toBe(1);
     });
 
-    it('should return 0 if no messages are found to read', async () => {
+    it('Scenario 2: should return 0 if no messages are found to read', async () => {
       jest.spyOn(prisma.message, 'findMany').mockResolvedValue([]);
       const result = await service.markConversationRead(userId, convId);
       expect(result.readCount).toBe(0);
@@ -152,7 +153,7 @@ describe('ChatService', () => {
       const contentEmpty = ' ';
 
       await expect(
-        service.sendMessage(userId, convId, contentEmpty)
+        service.sendMessage(userId, convId, contentEmpty),
       ).rejects.toThrow(new BadRequestException('message content is empty'));
       // Verification: Ensure the AI moderation and Prisma were NEVER called
       expect(autoModerationService.analyze).not.toHaveBeenCalled();
@@ -176,13 +177,12 @@ describe('ChatService', () => {
 
     it('Scenario 3: Moderation BLOCK (Bad content)', async () => {
       // 1. Mock AI: BLOCK the message
-      (service['autoModerationService'].analyze as jest.Mock).mockResolvedValue(
-      {
+      jest.spyOn(autoModerationService, 'analyze').mockResolvedValue({
         action: 'BLOCK',
         severity: 'HIGH',
         categories: ['Hate'],
         penaltyPointsToSubtract: 100,
-      } as any,);
+      } as any);
 
       jest
         .spyOn(autoModerationService, 'applyBlockedMessage')
@@ -199,7 +199,11 @@ describe('ChatService', () => {
         .mockResolvedValue({ id: 'sys-1', content: 'placeholder' } as any);
       jest.spyOn(prisma.conversation, 'update').mockResolvedValue({} as any);
 
-      const result = await service.sendMessage(userId, convId, 'bad word');
+      const result = (await service.sendMessage(
+        userId,
+        convId,
+        'bad word',
+      )) as any;
       expect(result.moderationWarning.message).toContain('deleted');
     });
 
@@ -239,7 +243,11 @@ describe('ChatService', () => {
       jest.spyOn(prisma.conversation, 'update').mockResolvedValue({} as any);
 
       // 4. Act
-      const result = await service.sendMessage(userId, convId, content);
+      const result = (await service.sendMessage(
+        userId,
+        convId,
+        content,
+      )) as any;
 
       // 5. Assert
       expect(result.moderationWarning.message).toContain('flagged');
@@ -264,7 +272,7 @@ describe('ChatService', () => {
         .mockResolvedValue(undefined);
     });
 
-    it('should throw BadRequest if user reacts to their own message', async () => {
+    it('Scenario 1: should throw BadRequest if user reacts to their own message', async () => {
       jest.spyOn(prisma.message, 'findUnique').mockResolvedValue({
         senderId: userId, // Same as actor
         conversationId: convId,
@@ -277,22 +285,28 @@ describe('ChatService', () => {
       );
     });
 
-    it('should return early if reaction already exists', async () => {
+    it('Scenario 2: should return early if reaction already exists', async () => {
       jest.spyOn(prisma.message, 'findUnique').mockResolvedValue({
         senderId: senderId,
         conversationId: convId,
       } as any);
 
       // Mock existing reaction in the transaction
-      // (Note: ensure your smart $transaction mock is working)
       const tx = {
         messageReaction: {
-          findUnique: jest.fn().mockResolvedValue({ id: 'existing' }),
+          // We define the implementation directly. This forces the return type to NOT be never.
+          findUnique: jest
+            .fn()
+            .mockImplementation(async () =>
+              Promise.resolve({ id: 'existing' }),
+            ),
         },
-      };
+      } as any;
+
       jest
         .spyOn(prisma, '$transaction')
-        .mockImplementation((cb: any) => cb(tx));
+        // Tell TS the callback returns a Promise to satisfy the unsafe-return rule
+        .mockImplementation(async (cb: (arg: any) => Promise<any>) => cb(tx));
 
       const result = await service.addMessageReaction(
         userId,
@@ -303,7 +317,7 @@ describe('ChatService', () => {
       expect(result.pointsAwarded).toBe(0);
     });
 
-    it('should promote sender to MODERATOR if points reach 500', async () => {
+    it('Scenario 3: should promote sender to MODERATOR if points reach 500', async () => {
       const mockSender = {
         id: senderId,
         penaltyPoints: 495,
@@ -317,24 +331,33 @@ describe('ChatService', () => {
         sender: mockSender,
       } as any);
 
-      // Setup transaction mock
       const tx = {
-        messageReaction: { 
-          findUnique: jest.fn().mockResolvedValue(null),
-          create: jest.fn().mockResolvedValue({}),
+        messageReaction: {
+          findUnique: jest.fn().mockImplementation(() => Promise.resolve(null)),
+          create: jest.fn().mockImplementation(() => Promise.resolve({})),
         },
         user: {
-          // First update adds points (495 + 5 = 500)
-          // Second update changes role
           update: jest
             .fn()
-            .mockResolvedValueOnce({ ...mockSender, penaltyPoints: 500 }) 
-            .mockResolvedValueOnce({ ...mockSender, penaltyPoints: 500, globalRole: 'MODERATOR' }),
+            .mockImplementationOnce(() =>
+              Promise.resolve({ ...mockSender, penaltyPoints: 500 }),
+            )
+            .mockImplementationOnce(() =>
+              Promise.resolve({
+                ...mockSender,
+                penaltyPoints: 500,
+                globalRole: 'MODERATOR',
+              }),
+            ),
         },
-      };
+      } as any;
+
       jest
         .spyOn(prisma, '$transaction')
-        .mockImplementation((cb: any) => cb(tx));
+        .mockImplementation(async (cb: (arg: any) => Promise<any>) => {
+          const result = await cb(tx);
+          return result as unknown;
+        });
 
       const result = await service.addMessageReaction(
         userId,
@@ -366,7 +389,7 @@ describe('ChatService', () => {
         .mockResolvedValue(undefined);
     });
 
-    it('should throw Forbidden if trying to delete someone else message', async () => {
+    it('Scenario 1: should throw Forbidden if trying to delete someone else message', async () => {
       jest.spyOn(prisma.message, 'findUnique').mockResolvedValue({
         senderId: 'other-user',
         conversationId: convId,
@@ -377,7 +400,7 @@ describe('ChatService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('should successfully soft-delete the message', async () => {
+    it('Scenario 2: should successfully soft-delete the message', async () => {
       jest.spyOn(prisma.message, 'findUnique').mockResolvedValue({
         senderId: userId,
         conversationId: convId,
@@ -390,9 +413,11 @@ describe('ChatService', () => {
 
       await service.deleteMessage(userId, convId, msgId);
 
-      expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({
+      expect(updateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
           data: { content: null, deletedAt: expect.any(Date) },
-      }));
+        }),
+      );
     });
   });
 
@@ -420,7 +445,7 @@ describe('ChatService', () => {
       jest.spyOn(prisma.message, 'findUnique').mockResolvedValue(null);
 
       await expect(
-        service.editMessage(userId, conversationId, messageId, validContent)
+        service.editMessage(userId, conversationId, messageId, validContent),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -501,8 +526,8 @@ describe('ChatService', () => {
       // Verify Prisma was called with the trimmed content
       expect(prisma.message.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: { content: 'Clean content', isEdited: true }
-        })
+          data: { content: 'Clean content', isEdited: true },
+        }),
       );
     });
   });
@@ -518,7 +543,7 @@ describe('ChatService', () => {
         .mockResolvedValue({
           conversationId,
           userId,
-      });
+        });
     });
     it('Scenario 1: should format a member list correctly', async () => {
       const mockDbResult = [
@@ -575,7 +600,7 @@ describe('ChatService', () => {
           userId,
         });
     });
-    it('should list up to 100 messages with sender, reads, and reactions', async () => {
+    it('Scenario 1: should list up to 100 messages with sender, reads, and reactions', async () => {
       // 1. Arrange: Create a mock result that matches your Prisma "include" structure
       const mockMessages = [
         {
@@ -615,14 +640,14 @@ describe('ChatService', () => {
       });
     });
 
-    it('should throw ForbiddenException if user is not a member (Security check)', async () => {
+    it('Scenario 2: should throw ForbiddenException if user is not a member (Security check)', async () => {
       // Override the beforeEach mock to simulate a permission failure
       jest
         .spyOn(service as any, 'ensureConversationMembership')
         .mockRejectedValue(new ForbiddenException('you are not a participant'));
 
       await expect(
-        service.listMessages(userId, conversationId)
+        service.listMessages(userId, conversationId),
       ).rejects.toThrow(ForbiddenException);
 
       // Ensure the database is NEVER queried if permission is denied
@@ -631,8 +656,7 @@ describe('ChatService', () => {
   });
 
   describe('listMyConversations', () => {
-
-    it('should format a DIRECT conversation correctly', async () => {
+    it('Scenario 1: should format a DIRECT conversation correctly', async () => {
       const mockDbResult = [
         {
           id: '1',
@@ -644,7 +668,7 @@ describe('ChatService', () => {
               user: { username: 'Yann', profile: { avatarUrl: 'img.png' } },
             },
           ],
-          messages: [{ content: 'Hi!' }]
+          messages: [{ content: 'Hi!' }],
         },
       ];
 
@@ -659,7 +683,7 @@ describe('ChatService', () => {
       expect(result[0].lastMessage).toBe('Hi!');
     });
 
-    it('should format a GROUP conversation correctly', async () => {
+    it('Scenario 2: should format a GROUP conversation correctly', async () => {
       const mockDbResult = [
         {
           id: '1',
@@ -671,7 +695,7 @@ describe('ChatService', () => {
               user: { username: 'Yann', profile: { avatarUrl: 'img.png' } },
             },
           ],
-          messages: [{ content: 'Hi!' }]
+          messages: [{ content: 'Hi!' }],
         },
       ];
 
@@ -800,8 +824,8 @@ describe('ChatService', () => {
         .spyOn(prisma.conversationParticipant, 'findUnique')
         .mockResolvedValue({
           role: 'MEMBER',
-          conversation: { type: 'GROUP' }
-      } as any);
+          conversation: { type: 'GROUP' },
+        } as any);
 
       // Only 1 person in the list
       jest
@@ -818,12 +842,12 @@ describe('ChatService', () => {
         .spyOn(prisma.conversationParticipant, 'findUnique')
         .mockResolvedValue({
           role: 'MEMBER',
-          conversation: { type: 'GROUP', title: 'Test Room' }
-      } as any);
+          conversation: { type: 'GROUP', title: 'Test Room' },
+        } as any);
 
       jest.spyOn(prisma.conversationParticipant, 'findMany').mockResolvedValue([
         { userId: 'owner-id', joinedAt: new Date(100) },
-        { userId, joinedAt: new Date(200) }
+        { userId, joinedAt: new Date(200) },
       ] as any);
 
       const result = await service.leaveConversation(userId, convId);
@@ -839,15 +863,15 @@ describe('ChatService', () => {
         .spyOn(prisma.conversationParticipant, 'findUnique')
         .mockResolvedValue({
           role: 'OWNER',
-          conversation: { type: 'GROUP', title: 'Owner Room' }
-      } as any);
+          conversation: { type: 'GROUP', title: 'Owner Room' },
+        } as any);
 
       // 2. Participants list (ordered by joinedAt)
       // index 0 is owner (leaving), index 1 is the oldest remaining
       const mockParticipants = [
         { userId, joinedAt: new Date(100) },
         { userId: otherUserId, joinedAt: new Date(200) },
-        { userId: 'newbie-id', joinedAt: new Date(300) }
+        { userId: 'newbie-id', joinedAt: new Date(300) },
       ];
       jest
         .spyOn(prisma.conversationParticipant, 'findMany')
@@ -926,7 +950,7 @@ describe('ChatService', () => {
       jest.spyOn(prisma.conversationParticipant, 'count').mockResolvedValue(1);
 
       await expect(
-        service.removeUserFromGroup(actorId, convId, targetId)
+        service.removeUserFromGroup(actorId, convId, targetId),
       ).rejects.toThrow(
         new BadRequestException('cannot remove the last participant'),
       );
@@ -970,7 +994,7 @@ describe('ChatService', () => {
       const invalidDto = { userIds: ['   ', 'actor-id'] }; // Spaces and the actor himself
 
       await expect(
-        service.inviteUsers(actorId, conversationId, invalidDto)
+        service.inviteUsers(actorId, conversationId, invalidDto),
       ).rejects.toThrow(new BadRequestException('no valid users to invite'));
     });
 
@@ -1038,7 +1062,7 @@ describe('ChatService', () => {
       };
 
       await expect(
-        service.createGroupConversation(actorId, invalidDto)
+        service.createGroupConversation(actorId, invalidDto),
       ).rejects.toThrow(
         new BadRequestException(
           'a group conversation must contain at least 2 other users',
@@ -1082,7 +1106,7 @@ describe('ChatService', () => {
               ],
             },
           }),
-        })
+        }),
       );
     });
 
@@ -1096,7 +1120,7 @@ describe('ChatService', () => {
         .mockRejectedValue(new BadRequestException('User is banned'));
 
       await expect(
-        service.createGroupConversation(actorId, validDto)
+        service.createGroupConversation(actorId, validDto),
       ).rejects.toThrow(BadRequestException);
     });
   });
@@ -1107,6 +1131,7 @@ describe('ChatService', () => {
     const mockConversation = {
       id: 'conv-id',
       type: 'DIRECT',
+      participantHash: 'DM_user-1_user-2',
       participants: [],
     };
 
@@ -1119,11 +1144,7 @@ describe('ChatService', () => {
     });
 
     it('Scenario 1: should return existing conversation if found', async () => {
-      // 1. Arrange: findFirst returns a conversation
-      jest
-        .spyOn(prisma.conversation, 'findFirst')
-        .mockResolvedValue(mockConversation as any);
-      const createSpy = jest.spyOn(prisma.conversation, 'create');
+      mockTick.conversation.findUnique.mockResolvedValue(mockConversation);
 
       // 2. Act
       const result = await service.createOrGetDirectConversation(
@@ -1133,18 +1154,15 @@ describe('ChatService', () => {
 
       // 3. Assert
       expect(result).toEqual(mockConversation);
-      expect(prisma.conversation.findFirst).toHaveBeenCalled();
+      expect(mockTick.conversation.findUnique).toHaveBeenCalled();
       // CRITICAL: Ensure create was NOT called because it already existed
-      expect(createSpy).not.toHaveBeenCalled();
+      expect(mockTick.conversation.create).not.toHaveBeenCalled();
     });
 
     it('Scenario 2: should create a new conversation if none exists', async () => {
-      // 1. Arrange: findFirst returns null, create returns a new conv
-      jest.spyOn(prisma.conversation, 'findFirst').mockResolvedValue(null);
-      jest
-        .spyOn(prisma.conversation, 'create')
-        .mockResolvedValue(mockConversation as any);
-
+      // 1. Arrange: findUnique returns null, create returns a new conversation
+      mockTick.conversation.findUnique.mockResolvedValue(null);
+      mockTick.conversation.create.mockResolvedValue(mockConversation);
       // 2. Act
       const result = await service.createOrGetDirectConversation(
         actorId,
@@ -1153,11 +1171,12 @@ describe('ChatService', () => {
 
       // 3. Assert
       expect(result).toEqual(mockConversation);
-      expect(prisma.conversation.findFirst).toHaveBeenCalled();
-      expect(prisma.conversation.create).toHaveBeenCalledWith(
+      expect(mockTick.conversation.findUnique).toHaveBeenCalled();
+      expect(mockTick.conversation.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             type: 'DIRECT',
+            participantHash: 'DM_user-1_user-2',
             participants: expect.anything(),
           }),
         }),
@@ -1166,13 +1185,39 @@ describe('ChatService', () => {
 
     it('Scenario 3: should throw if validation fails', async () => {
       // 1. Arrange: Mock the validation to FAIL
-      jest.spyOn(service as any, 'ensureCanDirectMessage')
-        .mockRejectedValue(new ForbiddenException('Blocked'));
+      mockTick.conversation.findUnique.mockRejectedValue(
+        new ForbiddenException('Blocked'),
+      );
 
       // 2. Act & Assert
       await expect(
         service.createOrGetDirectConversation(actorId, targetId),
       ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('Scenario 4: should handle P2002 race condition by retrying findUnique', async () => {
+      mockTick.conversation.findUnique.mockResolvedValueOnce(null); // First check: not found
+
+      // 2. Create an error that mimics Prisma's structure
+      // We use 'Object.create' to trick the 'instanceof' check
+      const p2002Error = Object.create(
+        Prisma.PrismaClientKnownRequestError.prototype,
+      );
+      p2002Error.code = 'P2002';
+      p2002Error.message = 'Unique constraint failed';
+      mockTick.conversation.create.mockRejectedValue(p2002Error);
+
+      // Second check (the 'catch' block recovery)
+      const finalConv = { id: 'cuid_recovered' };
+      mockPrisma.conversation.findUnique.mockResolvedValue(finalConv);
+
+      const result = await service.createOrGetDirectConversation('A', 'B');
+      expect(result).toEqual(finalConv);
+      expect(mockPrisma.conversation.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { participantHash: 'DM_A_B' },
+        }),
+      );
     });
   });
 
@@ -1193,7 +1238,7 @@ describe('ChatService', () => {
       const mockUser = {
         conversationId: 'conv-123',
         userId: 'User1',
-      }
+      };
       jest
         .spyOn(prisma.conversationParticipant, 'findFirst')
         .mockResolvedValue(mockUser as any);
