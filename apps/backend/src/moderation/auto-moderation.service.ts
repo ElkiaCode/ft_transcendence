@@ -28,7 +28,8 @@ type OpenAiModerationResult = {
 @Injectable()
 export class AutoModerationService {
   private readonly logger = new Logger(AutoModerationService.name);
-  private readonly openAiModerationModel = process.env.OPENAI_MODERATION_MODEL ?? 'omni-moderation-latest';
+  private readonly openAiModerationModel =
+    process.env.OPENAI_MODERATION_MODEL ?? 'omni-moderation-latest';
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -48,7 +49,10 @@ export class AutoModerationService {
     }
 
     const matches = [...dictionaryResult.matches, ...openAiMatches];
-    const severity = matches.reduce((total, match) => total + match.severity, 0);
+    const severity = matches.reduce(
+      (total, match) => total + match.severity,
+      0,
+    );
     const categories = [...new Set(matches.map((match) => match.category))];
     const action = this.actionForSeverity(severity);
 
@@ -176,7 +180,10 @@ export class AutoModerationService {
   }
 
   private shouldUseOpenAi() {
-    return Boolean(process.env.OPENAI_API_KEY) && process.env.AUTO_MODERATION_USE_OPENAI !== 'false';
+    return (
+      Boolean(process.env.OPENAI_API_KEY) &&
+      process.env.AUTO_MODERATION_USE_OPENAI !== 'false'
+    );
   }
 
   private normalizeText(input: string) {

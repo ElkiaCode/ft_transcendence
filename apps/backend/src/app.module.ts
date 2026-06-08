@@ -11,6 +11,7 @@ import { RelationshipsModule } from './relationships/relationships.module';
 import { ChatModule } from './chat/chat.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ModerationModule } from './moderation/moderation.module';
+import { join } from 'path';
 
 @Module({
   imports: [
@@ -22,7 +23,13 @@ import { ModerationModule } from './moderation/moderation.module';
     ChatModule,
     NotificationsModule,
     ModerationModule,
-    ConfigModule.forRoot({ isGlobal: true})
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: [
+        join(process.cwd(), '.env'),
+        join(process.cwd(), '../../.env'),
+      ],
+    }),
   ],
   controllers: [AppController, HealthController],
   providers: [AppService],

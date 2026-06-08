@@ -41,12 +41,14 @@ function GroupMenuModal({
   onRename,
   onLeave,
   onClose,
+  isOwner, 
 }: {
   onInvite: () => void;
   onMembers: () => void;
   onRename: () => void;
   onLeave: () => void;
   onClose: () => void;
+  isOwner: boolean; 
 }) {
   return (
     <div className="fixed inset-0 z-40" onClick={onClose}>
@@ -54,15 +56,19 @@ function GroupMenuModal({
         className="absolute right-4 top-12 bg-white rounded-lg shadow-lg w-44 flex flex-col overflow-hidden border border-gray-200"
         onClick={(e) => e.stopPropagation()}
       >
-        <button onClick={onInvite} className="text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition">
-          Add members
-        </button>
+        {isOwner && (
+          <button onClick={onInvite} className="text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition">
+            Add members
+          </button>
+        )}
         <button onClick={onMembers} className="text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition">
           View members
         </button>
-        <button onClick={onRename} className="text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition">
-          Rename group
-        </button>
+        {isOwner && (
+          <button onClick={onRename} className="text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition">
+            Rename group
+          </button>
+        )}
         <button onClick={onLeave} className="text-left px-4 py-2 text-sm text-red-500 hover:bg-gray-100 transition">
           Leave group
         </button>
@@ -118,7 +124,7 @@ function InviteMembersModal({
                   onClick={() => toggleUser(user)}
                   className={`flex items-center gap-3 p-2 cursor-pointer transition ${isSelected ? 'ColorsS' : 'hover:bg-gray-100'}`}
                 >
-                  <div className="w-8 h-8 ColorsS rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
+                  <div className="w-8 h-8 ColorsS rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0">
                     {user.profile?.avatarUrl ? (
                       <img src={user.profile.avatarUrl} alt={user.username} className="w-full h-full object-cover rounded-full" />
                     ) : (
@@ -178,7 +184,7 @@ function MembersModal({
         <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
           {members.map((member) => (
             <div key={member.userId} className="flex items-center gap-3 p-2 rounded-lg">
-              <div className="w-8 h-8 ColorsS rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0 overflow-hidden">
+              <div className="w-8 h-8 ColorsS rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0 overflow-hidden">
                 {member.user.avatarUrl ? (
                   <img src={member.user.avatarUrl} alt={member.user.username} className="w-full h-full object-cover" />
                 ) : (
@@ -330,7 +336,7 @@ function CreateGroupModal({
                     isSelected ? 'ColorsS' : 'hover:bg-gray-100'
                   }`}
                 >
-                  <div className="w-8 h-8 ColorsS rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
+                  <div className="w-8 h-8 ColorsS rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0">
                     {user.profile?.avatarUrl ? (
                       <img src={user.profile.avatarUrl} alt={user.username} className="w-full h-full object-cover rounded-full" />
                     ) : (
@@ -589,7 +595,7 @@ function SearchDropdown({
           onClick={() => onSelectUser(user)}
           className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-300 cursor-pointer"
         >
-          <div className="w-10 h-10 ColorsS rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center text-white font-medium">
+          <div className="w-10 h-10 ColorsS rounded-full shrink-0 overflow-hidden flex items-center justify-center text-white font-medium">
             {user.profile?.avatarUrl ? (
               <img src={user.profile.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
             ) : (
@@ -653,7 +659,7 @@ function UserContextMenu({
         onClick={() => onViewProfile(user.username)}
         className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition"
       >
-        <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
+        <span className="w-2.5 h-2.5 mr-3 shrink-0 rounded-full bg-pink-500"></span>
         View Profile
      </button>
       <button
@@ -661,7 +667,7 @@ function UserContextMenu({
         onClick={() => onAddFriend(user.id)}
         className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition"
       >
-        <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
+        <span className="w-2.5 h-2.5 mr-3 shrink-0 rounded-full bg-pink-500"></span>
         Add friend
       </button>
       <button
@@ -669,7 +675,7 @@ function UserContextMenu({
         onClick={() => onBlock(user.id)}
         className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition"
       >
-        <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
+        <span className="w-2.5 h-2.5 mr-3 shrink-0 rounded-full bg-pink-500"></span>
         Block User
       </button>
       <button
@@ -677,7 +683,7 @@ function UserContextMenu({
         onClick={() => onUnblock(user.id)}
         className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition"
       >
-        <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
+        <span className="w-2.5 h-2.5 mr-3 shrink-0 rounded-full bg-pink-500"></span>
         Unblock User
       </button>
       {isAdmin && (
@@ -686,7 +692,7 @@ function UserContextMenu({
             onClick={() => onPromote(user.id)}
             className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition"
           >
-            <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
+            <span className="w-2.5 h-2.5 mr-3 shrink-0 rounded-full bg-pink-500"></span>
             Promote to Moderator
         </button>
       )}
@@ -771,7 +777,7 @@ function ChatPanel({
                     {!isMe && (
                       <span className="text-xs text-gray-500 mb-1 ml-1">{msg.sender.username}</span>
                     )}
-                    <div className={`px-3 py-2 rounded-lg text-sm font-bold break-words overflow-hidden ${isMe ? "ColorsS text-white" : "bg-gray-300 text-black"} ${isDeleted ? "italic opacity-70" : ""}`}>
+                    <div className={`px-3 py-2 rounded-lg text-sm font-bold wrap-break-word overflow-hidden ${isMe ? "ColorsS text-white" : "bg-gray-300 text-black"} ${isDeleted ? "italic opacity-70" : ""}`}>
                       {isDeleted ? "Message deleted" : msg.content}
                     </div>
                     {!isMe && !isDeleted && (
@@ -851,7 +857,9 @@ function ChatPanel({
 function Section() {
   const socketRef = useRef<Socket | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const user = useAuthStore((state) => state.user);
+  const user = useAuthStore((state: any) => state.user);
+  const currentUserId = user?.id;
+  
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const router = useRouter();
   //const [messages, setMessages] = useState<any[]>([]);
@@ -872,6 +880,8 @@ function Section() {
   const [inviteModal, setInviteModal] = useState(false);
   const [membersModal, setMembersModal] = useState(false);
   const [members, setMembers] = useState<GroupMember[]>([]);
+  const currentUserRole = members?.find((m) => m.userId === user?.id)?.role;
+  const isOwner = currentUserRole === 'OWNER';
   const [renameModal, setRenameModal] = useState(false);
   const [leaveModal, setLeaveModal] = useState(false);
 
@@ -1001,6 +1011,13 @@ function Section() {
       }
     };
     fetchMessages();
+    if (selectedConv.type === 'group') {
+      apiGetGroupMembers(selectedConv.id)
+        .then((data) => setMembers(data))
+        .catch((err) => console.error("Failed to load members for role check:", err));
+    } else {
+      setMembers([]); // Clear members if it's a direct chat
+    }
   }, [selectedConv]);
 
   useEffect(() => {
@@ -1108,7 +1125,7 @@ function Section() {
 
   const handleReact = async (message: ChatMessage, type: ReactionType) => {
     if (!selectedConv || !user?.id || message.sender.id === user.id || message.deletedAt) return;
-    const currentUserId = user.id;
+    // const currentUserId = user.id;
 
     try {
       const result = await apiAddMessageReaction(selectedConv.id, message.id, type);
@@ -1312,7 +1329,9 @@ const handleReport = async (messageId: string, _userId: string, reason: string) 
     console.error("Failed to report:", err);
   }
 };
-
+  console.log("DEBUG ROLE:", {
+    members, userId: user?.id, role: currentUserRole
+  });
   return (
     <section className="flex flex-1 h-full relative overflow-hidden">
       <SidebarSearch
@@ -1378,6 +1397,7 @@ const handleReport = async (messageId: string, _userId: string, reason: string) 
           onRename={() => { setRenameModal(true); setGroupMenuOpen(false); }}
           onLeave={() => { setLeaveModal(true); setGroupMenuOpen(false); }}
           onClose={() => setGroupMenuOpen(false)}
+          isOwner={isOwner} 
         />
       )}
       {inviteModal && (

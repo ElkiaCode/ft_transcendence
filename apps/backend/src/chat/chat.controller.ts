@@ -76,7 +76,7 @@ export class ChatController {
   }
 
   @Post('group')
-  async createGroupeConversation(
+  async createGroupConversation(
     @CurrentUser() user: JwtPayload,
     @Body() dto: CreateGroupConversationDto,
   ) {

@@ -16,7 +16,10 @@ type NotificationCreateArgs = {
 };
 
 describe('NotificationsService', () => {
-  const notificationCreate = jest.fn<Promise<unknown>, [NotificationCreateArgs]>();
+  const notificationCreate = jest.fn<
+    Promise<unknown>,
+    [NotificationCreateArgs]
+  >();
   const prisma = {
     notification: {
       create: notificationCreate,
@@ -32,7 +35,7 @@ describe('NotificationsService', () => {
     service = new NotificationsService(prisma);
   });
 
-  it('creates a notification with structured action context', async () => {
+  it('Scenario 1: creates a notification with structured action context', async () => {
     const createdNotification = {
       id: 'notification-1',
       userId: 'user-1',
@@ -76,7 +79,7 @@ describe('NotificationsService', () => {
     });
   });
 
-  it('creates one structured notification for each recipient', async () => {
+  it('Scenario 2: creates one structured notification for each recipient', async () => {
     notificationCreate
       .mockResolvedValueOnce({ id: 'notification-1', userId: 'user-1' })
       .mockResolvedValueOnce({ id: 'notification-2', userId: 'user-2' });

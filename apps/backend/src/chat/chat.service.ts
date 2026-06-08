@@ -8,6 +8,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { InviteUsersDto } from './dto/invite-users.dto';
 import { CreateGroupConversationDto } from './dto/create-group-conversation.dto';
 import { AutoModerationService } from '../moderation/auto-moderation.service';
+import { Prisma } from '@prisma/client';
+// import { Prisma } from 'src/generated/prisma';
 
 @Injectable()
 export class ChatService {
@@ -139,11 +141,6 @@ export class ChatService {
         'You can only invite users to a group conversation',
       );
     }
-
-    /*if (membership.role !== 'OWNER' && membership.role !== 'ADMIN') {
-      throw new ForbiddenException('only room owner or admin can invite users');
-    }*/
-
     return membership;
   }
 
@@ -261,55 +258,65 @@ export class ChatService {
     actorUserId: string,
     targetUserId: string,
   ) {
+    // 1. Safety check
     await this.ensureCanDirectMessage(actorUserId, targetUserId);
-
-    const existing = await this.prisma.conversation.findFirst({
-      where: {
-        type: 'DIRECT',
-        AND: [
-          { participants: { some: { userId: actorUserId } } },
-          { participants: { some: { userId: targetUserId } } },
-        ],
-      },
-      include: {
-        participants: {
-          include: {
-            user: {
-              include: {
-                profile: true,
-              },
+    // 2. Normalize the ID order to create a unique key
+    const [minId, maxId] = [actorUserId, targetUserId].sort();
+    const hash = `DM_${minId}_${maxId}`;
+    // 3. deepInclude definition
+    const deepInclude = {
+      participants: {
+        include: {
+          user: {
+            include: {
+              profile: true,
             },
           },
         },
       },
-    });
+    };
+    // 4. Use of a transaction to prevent double-creation during concurrent requests
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        //4.1. Check if it exists within the transaction
+        const existing = await tx.conversation.findUnique({
+          where: { participantHash: hash },
+          include: deepInclude,
+        });
 
-    if (existing) {
-      return existing;
+        if (existing) return existing;
+
+        //4.2. If not, create it
+        return await tx.conversation.create({
+          data: {
+            type: 'DIRECT',
+            participantHash: hash,
+            participants: {
+              create: [
+                { userId: actorUserId, role: 'OWNER' },
+                { userId: targetUserId, role: 'OWNER' },
+              ],
+            },
+          },
+          include: deepInclude,
+        });
+      });
+    } catch (error) {
+      // 4.3. Check if the error is a Unique Constraint Violation (P2002)
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2002') {
+          // RACE CONDITION DETECTED:
+          // Another request created the conversation between Step 1 and Step 2.
+          // Simply fetch the one that was just created by the other request.
+          return this.prisma.conversation.findUnique({
+            where: { participantHash: hash },
+            include: deepInclude,
+          });
+        }
+      }
+      // If it's another type of error, throw it so the Controller/Interceptor handles it
+      throw error;
     }
-
-    return this.prisma.conversation.create({
-      data: {
-        type: 'DIRECT',
-        participants: {
-          create: [
-            { userId: actorUserId, role: 'OWNER' },
-            { userId: targetUserId, role: 'OWNER' },
-          ],
-        },
-      },
-      include: {
-        participants: {
-          include: {
-            user: {
-              include: {
-                profile: true,
-              },
-            },
-          },
-        },
-      },
-    });
   }
 
   async createGroupConversation(
@@ -331,6 +338,7 @@ export class ChatService {
       data: {
         type: 'GROUP',
         title: dto.title?.trim() || null,
+        participantHash: null,
         participants: {
           create: [
             {
@@ -472,11 +480,11 @@ export class ChatService {
         },
       });
 
-    if (!actorMembership) {
+    if (!targetMembership) {
       throw new NotFoundException('target user is not in this conversation');
     }
 
-    if (actorMembership.role === 'OWNER' && actorMembership.role !== 'OWNER') {
+    if (targetMembership.role === 'OWNER' && actorMembership.role !== 'OWNER') {
       throw new ForbiddenException(
         'only the room owner can remove another user',
       );
