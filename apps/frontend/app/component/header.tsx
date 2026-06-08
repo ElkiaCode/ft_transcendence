@@ -103,7 +103,7 @@ function Notify() {
         </button>
       ) : null}
       {openMenuId === 'N' && (
-        <div className="absolute top-full mt-2 w-80 bg-white border border-gray-200 rounded shadow-lg z-10 right-0 p-2 flex flex-col gap-2 text-sm text-gray-700">
+        <div className="absolute top-full mt-2 w-80 bg-white border border-gray-200 rounded shadow-lg z-50 right-0 p-2 flex flex-col gap-2 text-sm text-gray-700">
           <div className="max-h-60 overflow-y-auto">
             {notifications.length === 0 ? (
               <div className="px-4 py-3 text-sm text-gray-600">
