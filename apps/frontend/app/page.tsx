@@ -528,7 +528,7 @@ function SidebarSearch({
         <img src="/addGroup.png" alt="Add Group" className="h-full w-full" />
       </button>
       </div>
-      <div className="flex flex-col gap-2 overflow-y-autoconst router = useRouter(); flex-1">
+      <div className="flex flex-col gap-2 overflow-y-autoconst flex-1 relative">
         <h3 className="text-sm font-bold text-gray-700 px-2 text-center">Chat</h3>
         {conversations.map((conv) => (
           <div

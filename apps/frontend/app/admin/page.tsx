@@ -559,14 +559,12 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
             )}
           </div>
         </div>
-
-        {/* Dropdown suggestions */}
         {suggestions.length > 0 && (
           <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
             {suggestions.map((u) => (
               <button
                 key={u.id}
-                onMouseDown={(e) => e.preventDefault()} // ← empêche le blur de l'input avant le click
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => handleSelectUser(u)}
                 className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition cursor-pointer text-left"
               >
@@ -585,8 +583,6 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
             ))}
           </div>
         )}
-
-        {/* Aucun résultat */}
         {username.trim().length >= 2 && !searching && suggestions.length === 0 && !result && (
           <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg px-4 py-3">
             <p className="text-sm text-gray-400">No users found for "{username}"</p>
@@ -643,7 +639,7 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
               <button
                 onClick={() => setConfirmModal({
                   title: 'Ban user',
-                  description: `Are you sure you want to ban ${result.username}? They will no longer be able to access the platform.`,
+                  description: `Are you sure you want to ban ${result.username}? He will no longer be able to access the platform.`,
                   confirmLabel: 'Ban',
                   confirmColor: 'bg-red-500 hover:bg-red-600',
                   onConfirm: () => handleAction(() => apiBanUser(result.id), `${result.username} has been banned`),
