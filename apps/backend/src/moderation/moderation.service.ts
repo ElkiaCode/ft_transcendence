@@ -23,7 +23,7 @@ export class ModerationService {
       userId,
       input,
     );
-    await this.chatGateway.emitNotificationCreated(userId, notification);
+    this.chatGateway.emitNotificationCreated(userId, notification);
     return notification;
   }
 
@@ -31,7 +31,7 @@ export class ModerationService {
     input: Parameters<NotificationsService['createFromInput']>[1],
     excludeUserId?: string,
   ) {
-    const recipients = await this.prisma.user.findMany({
+    const recipients = await this.prisma.client.user.findMany({
       where: {
         globalRole: { in: ['ADMIN', 'MODERATOR'] },
         isActive: true,
@@ -47,7 +47,7 @@ export class ModerationService {
       );
 
     for (const notification of notifications) {
-      await this.chatGateway.emitNotificationCreated(
+      this.chatGateway.emitNotificationCreated(
         notification.userId,
         notification,
       );
@@ -72,7 +72,7 @@ export class ModerationService {
         throw new BadRequestException('cannot report yourself');
       }
 
-      const targetUser = await this.prisma.user.findUnique({
+      const targetUser = await this.prisma.client.user.findUnique({
         where: { id: targetUserId },
       });
 
@@ -80,7 +80,7 @@ export class ModerationService {
         throw new NotFoundException('target user not found');
       }
 
-      const report = await this.prisma.report.create({
+      const report = await this.prisma.client.report.create({
         data: {
           creatorId,
           targetType: 'USER',
@@ -114,7 +114,7 @@ export class ModerationService {
         throw new BadRequestException('targetMessageId is required');
       }
 
-      const targetMessage = await this.prisma.message.findUnique({
+      const targetMessage = await this.prisma.client.message.findUnique({
         where: { id: targetMessageId },
       });
 
@@ -122,7 +122,7 @@ export class ModerationService {
         throw new NotFoundException('target message not found');
       }
 
-      const report = await this.prisma.report.create({
+      const report = await this.prisma.client.report.create({
         data: {
           creatorId,
           targetType: 'MESSAGE',
@@ -155,7 +155,7 @@ export class ModerationService {
   }
 
   async listReports() {
-    return this.prisma.report.findMany({
+    return this.prisma.client.report.findMany({
       include: {
         creator: {
           include: { profile: true },
@@ -183,7 +183,7 @@ export class ModerationService {
     note?: string,
     penaltyPointsToSubtract = 0,
   ) {
-    const report = await this.prisma.report.findUnique({
+    const report = await this.prisma.client.report.findUnique({
       where: { id: reportId },
       include: {
         targetMessage: {
@@ -204,7 +204,7 @@ export class ModerationService {
         ? -penaltyPointsToSubtract
         : 0;
 
-    const result = await this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.client.$transaction(async (tx) => {
       const moderationAction = await tx.moderationAction.create({
         data: {
           reportId,
@@ -321,7 +321,7 @@ export class ModerationService {
       );
     }
 
-    const targetUser = await this.prisma.user.findUnique({
+    const targetUser = await this.prisma.client.user.findUnique({
       where: { id: targetUserId },
       select: {
         id: true,
@@ -333,7 +333,7 @@ export class ModerationService {
       throw new NotFoundException('target user not found');
     }
 
-    const result = await this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.client.$transaction(async (tx) => {
       const updatedUser = await tx.user.update({
         where: { id: targetUserId },
         data: {

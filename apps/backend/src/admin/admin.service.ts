@@ -23,10 +23,10 @@ export class AdminService {
     userId: string,
     input: NotificationInput,
   ): Promise<Notification> {
-    const notification = (await this.notificationsService.createFromInput(
+    const notification = this.notificationsService.createFromInput(
       userId,
       input,
-    )) as unknown as Notification;
+    );
     this.chatGateway.emitNotificationCreated(userId, notification);
     return notification;
   }

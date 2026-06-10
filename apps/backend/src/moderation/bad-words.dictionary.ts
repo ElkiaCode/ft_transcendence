@@ -1,6 +1,3 @@
-import { hasSubscribers } from "diagnostics_channel";
-import { Server } from "http";
-
 export type BadWordRule = {
   value: string;
   severity: number;

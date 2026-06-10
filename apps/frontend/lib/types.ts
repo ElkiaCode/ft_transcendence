@@ -70,6 +70,7 @@ export type ChatMessage = {
   content: string | null;
   type?: 'TEXT' | 'SYSTEM';
   isEdited?: boolean;
+  createdAt: string;
   deletedAt?: string | null;
   reads?: MessageRead[];
   reactions?: MessageReaction[];
@@ -79,7 +80,8 @@ export type GroupMember = {
   id?: string;
   userId: string;
   role: 'OWNER' | 'ADMIN' | 'MEMBER' | string;
-  joinedAt?: string;
+  joinedAt: string;
+  leftAt?: string | null; 
   user: {
     id: string;
     username: string;

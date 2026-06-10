@@ -4,5 +4,5 @@ export class RenameConversationDto {
   @IsString()
   @MinLength(1)
   @MaxLength(100)
-  title: string;
+  title!: string;
 }

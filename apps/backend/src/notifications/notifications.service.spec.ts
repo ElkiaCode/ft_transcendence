@@ -89,7 +89,7 @@ describe('NotificationsService', () => {
       title: 'New message',
       body: 'hello',
       actorId: 'sender-1',
-      entityType: 'message',
+      entityType: 'CONVERSATION',
       entityId: 'message-1',
       action: 'message_created',
       metadata: {

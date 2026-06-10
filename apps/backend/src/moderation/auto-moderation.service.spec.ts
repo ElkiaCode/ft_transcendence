@@ -109,7 +109,7 @@ describe('AutoModerationService', () => {
       const userId = 'user123';
       // THE FIX: Explicitly mock the return value here
       // Cast to 'any' to avoid the "type never" / "argument not assignable" errors
-      jest.spyOn(prisma.user, 'update').mockResolvedValue({
+      jest.spyOn(prisma.client.user, 'update').mockResolvedValue({
         id: userId,
         penaltyPoints: 10,
         isBanned: false,
@@ -123,7 +123,7 @@ describe('AutoModerationService', () => {
         updatedAt: new Date(),
       });
 
-      jest.spyOn(prisma.report, 'create').mockResolvedValue({
+      jest.spyOn(prisma.client.report, 'create').mockResolvedValue({
         id: 'report-1',
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -151,7 +151,7 @@ describe('AutoModerationService', () => {
       );
 
       expect(result.report.id).toBe('report-1');
-      expect(prisma.user.update).toHaveBeenCalled();
+      expect(prisma.client.user.update).toHaveBeenCalled();
     });
 
     it('Scenario 2 - should create a USER report when userId is provided', async () => {
@@ -179,7 +179,7 @@ describe('AutoModerationService', () => {
         resultMock,
         '',
       );
-      expect(prisma.report.create).toHaveBeenCalledWith({
+      expect(prisma.client.report.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           targetType: 'USER',
           targetUserId: user.id,
@@ -197,7 +197,7 @@ describe('AutoModerationService', () => {
         matches: [],
         providerErrors: [],
       };
-      jest.spyOn(prisma.user, 'update').mockResolvedValue({
+      jest.spyOn(prisma.client.user, 'update').mockResolvedValue({
         id: 'user1',
         penaltyPoints: 10,
         createdAt: new Date(),
@@ -217,7 +217,7 @@ describe('AutoModerationService', () => {
         resultMock,
         '',
       );
-      expect(prisma.report.create).toHaveBeenCalled();
+      expect(prisma.client.report.create).toHaveBeenCalled();
     });
   });
 
@@ -239,7 +239,7 @@ describe('AutoModerationService', () => {
         resultMock,
       );
       expect(result).toBe(null);
-      expect(prisma.report.create).not.toHaveBeenCalled();
+      expect(prisma.client.report.create).not.toHaveBeenCalled();
     });
 
     it('Scenario 2 - should flag the message, and create a report', async () => {
@@ -253,7 +253,7 @@ describe('AutoModerationService', () => {
         providerErrors: [],
       };
       const userId = 'user123';
-      jest.spyOn(prisma.user, 'update').mockResolvedValue({
+      jest.spyOn(prisma.client.user, 'update').mockResolvedValue({
         id: userId,
         penaltyPoints: 10,
         isBanned: false,
@@ -267,7 +267,7 @@ describe('AutoModerationService', () => {
         updatedAt: new Date(),
       });
 
-      jest.spyOn(prisma.report, 'create').mockResolvedValue({
+      jest.spyOn(prisma.client.report, 'create').mockResolvedValue({
         id: 'report-1',
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -302,9 +302,9 @@ describe('AutoModerationService', () => {
       };
 
       jest
-        .spyOn(prisma.report, 'create')
+        .spyOn(prisma.client.report, 'create')
         .mockResolvedValue({ id: 'report-1' } as any);
-      jest.spyOn(prisma.user, 'update').mockResolvedValue({
+      jest.spyOn(prisma.client.user, 'update').mockResolvedValue({
         id: 'user1',
         penaltyPoints: 10,
         createdAt: new Date(),
@@ -323,7 +323,7 @@ describe('AutoModerationService', () => {
         'everything is bad',
         resultMock,
       );
-      expect(prisma.report.create).toHaveBeenCalledWith({
+      expect(prisma.client.report.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           targetType: 'MESSAGE',
           targetMessageId: 'mess123',

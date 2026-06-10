@@ -31,31 +31,31 @@ describe('AuthService', () => {
         {
           provide: PrismaService,
           useValue: {
-            $transaction: jest.fn((input) => Promise.all(input)),
+            $transaction: jest.fn<any>((input: any[]) => Promise.all(input)),
             user: {
-              findUnique: jest.fn(),
-              findFirst: jest.fn(),
-              create: jest.fn(),
+              findUnique: jest.fn<any>(),
+              findFirst: jest.fn<any>(),
+              create: jest.fn<any>(),
             },
             refreshToken: {
-              create: jest.fn(),
-              findUnique: jest.fn(),
-              update: jest.fn(),
-              updateMany: jest.fn(),
+              create: jest.fn<any>(),
+              findUnique: jest.fn<any>(),
+              update: jest.fn<any>(),
+              updateMany: jest.fn<any>(),
             },
           },
         },
         {
           provide: JwtService,
           useValue: {
-            signAsync: jest.fn().mockResolvedValue('mock-access-token'),
+            signAsync: jest.fn<any>().mockResolvedValue('mock-access-token'),
           },
         },
         {
           provide: ConfigService,
           useValue: {
-            get: jest.fn().mockReturnValue('7'), // 7 days for refresh
-            getOrThrow: jest.fn((key) => {
+            get: jest.fn<any>().mockReturnValue('7'), // 7 days for refresh
+            getOrThrow: jest.fn<any>((key: string) => {
               if (key === 'JWT_REFRESH_DAYS') return '7';
               return key;
             }),
@@ -68,7 +68,7 @@ describe('AuthService', () => {
     prisma = module.get<PrismaService>(PrismaService);
     jwtService = module.get<JwtService>(JwtService);
     // Mock global fetch for 42 OAuth
-    global.fetch = jest.fn();
+    global.fetch = jest.fn() as unknown as typeof fetch;
   });
 
   describe('register', () => {
@@ -296,11 +296,9 @@ describe('AuthService', () => {
       };
 
       jest
-        .spyOn(prisma.client.refreshToken, 'findUnique')
+        .mocked(prisma.client.refreshToken.findUnique)
         .mockResolvedValue(mockStoredToken as any);
-
-      // The refresh method uses a transaction to update the old token and create the new one
-      jest.spyOn(prisma, '$transaction').mockResolvedValue([] as any);
+      jest.mocked(prisma.client.$transaction).mockResolvedValue([]);
 
       const result = await service.refresh(rawToken);
 
@@ -344,28 +342,29 @@ describe('AuthService', () => {
   });
 
   describe('loginWith42', () => {
-    it('should throw Unauthorized if 42 token exchange fails', async () => {
-      (global.fetch as jest.Mock).mockResolvedValue({ ok: false });
+    it('Scenario 1 - should throw Unauthorized if 42 token exchange fails', async () => {
+      jest.mocked(global.fetch).mockResolvedValue({ ok: false } as Response);
       await expect(service.loginWith42('fake-code')).rejects.toThrow(
         'invalid 42 code',
       );
     });
 
-    it('Scenario 1 - should find existing user and return session', async () => {
+    it('Scenario 2 - should find existing user and return session', async () => {
+      const mockFetch = jest.mocked(global.fetch);
       // Mock Token Response
-      (global.fetch as jest.Mock)
+      mockFetch
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve({ access_token: 'at' }),
-        })
+        } as Response)
         // Mock User Info Response
         .mockResolvedValueOnce({
           ok: true,
           json: () =>
             Promise.resolve({ id: 42, email: 'marvin@42.fr', login: 'marvin' }),
-        });
+        } as Response);
 
-      jest.spyOn(prisma.client.user, 'findFirst').mockResolvedValue({
+      jest.mocked(prisma.client.user.findFirst).mockResolvedValue({
         id: 'user-42',
         isActive: true,
         isBanned: false,

@@ -50,7 +50,9 @@ function Notify() {
 
     const handleNotificationCreated = (notification: NotificationItem) => {
       setNotifications((prev) => {
+        // 1. Prevent duplicates
         if (prev.some((item) => item.id === notification.id)) return prev;
+        // 2. Creates notification
         return [notification, ...prev].slice(0, 100);
       });
     };

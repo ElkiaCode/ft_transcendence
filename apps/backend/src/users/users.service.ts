@@ -27,7 +27,7 @@ export class UsersService {
       userId,
       input,
     );
-    await this.chatGateway.emitNotificationCreated(userId, notification);
+    this.chatGateway.emitNotificationCreated(userId, notification);
     return notification;
   }
 
@@ -35,7 +35,7 @@ export class UsersService {
     input: Parameters<NotificationsService['createFromInput']>[1],
     excludeUserId?: string,
   ) {
-    const recipients = await this.prisma.user.findMany({
+    const recipients = await this.prisma.client.user.findMany({
       where: {
         globalRole: { in: ['ADMIN', 'MODERATOR'] },
         isActive: true,
@@ -51,7 +51,7 @@ export class UsersService {
       );
 
     for (const notification of notifications) {
-      await this.chatGateway.emitNotificationCreated(
+      this.chatGateway.emitNotificationCreated(
         notification.userId,
         notification,
       );
@@ -67,7 +67,7 @@ export class UsersService {
       return [];
     }
 
-    const users = await this.prisma.user.findMany({
+    const users = await this.prisma.client.user.findMany({
       where: {
         id: { not: currentUserId },
         isActive: true,
@@ -127,7 +127,7 @@ export class UsersService {
   }
 
   async getTopPositivePointUsers() {
-    const users = await this.prisma.user.findMany({
+    const users = await this.prisma.client.user.findMany({
       where: {
         penaltyPoints: { gt: 0 },
         isActive: true,
@@ -164,7 +164,7 @@ export class UsersService {
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.client.user.findUnique({
       where: { id: userId },
       include: {
         profile: true,
@@ -183,7 +183,7 @@ export class UsersService {
       throw new BadRequestException('User account is inactive');
     }
 
-    const profile = await this.prisma.profile.upsert({
+    const profile = await this.prisma.client.profile.upsert({
       where: { userId },
       update: {
         ...(dto.displayName !== undefined && { displayName: dto.displayName }),
@@ -211,11 +211,11 @@ export class UsersService {
     });
 
     return {
-        id: user.id,
-        email: user.email,
-        username: user.username,
-        penaltyPoints: user.penaltyPoints,
-        profile: user.profile
+      id: user.id,
+      email: user.email,
+      username: user.username,
+      penaltyPoints: user.penaltyPoints,
+      profile: user.profile
         ? {
             displayName: profile.displayName,
             bio: profile.bio,
@@ -226,7 +226,7 @@ export class UsersService {
   }
 
   async updateAvatar(userId: string, file: Express.Multer.File) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.client.user.findUnique({
       where: { id: userId },
       include: {
         profile: true,
@@ -261,7 +261,7 @@ export class UsersService {
 
     const avatarPath = `${process.env.API_URL || 'https://localhost:3001'}/uploads/${file.filename}`;
 
-    const profile = await this.prisma.profile.upsert({
+    const profile = await this.prisma.client.profile.upsert({
       where: { userId },
       update: {
         avatarUrl: avatarPath,
@@ -299,7 +299,7 @@ export class UsersService {
   }
 
   async getMe(userId: string) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.client.user.findUnique({
       where: { id: userId },
       include: {
         profile: true,
@@ -330,7 +330,7 @@ export class UsersService {
   }
 
   async exportMyData(userId: string) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.client.user.findUnique({
       where: { id: userId },
       select: {
         id: true,
@@ -381,7 +381,7 @@ export class UsersService {
       moderationReceived,
       moderationActionsPerformed,
     ] = await Promise.all([
-      this.prisma.friendship.findMany({
+      this.prisma.client.friendship.findMany({
         where: {
           OR: [{ requesterId: userId }, { addresseeId: userId }],
         },
@@ -413,7 +413,7 @@ export class UsersService {
         },
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.block.findMany({
+      this.prisma.client.block.findMany({
         where: { blockerId: userId },
         include: {
           blocked: {
@@ -425,7 +425,7 @@ export class UsersService {
         },
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.block.findMany({
+      this.prisma.client.block.findMany({
         where: { blockedId: userId },
         include: {
           blocker: {
@@ -437,7 +437,7 @@ export class UsersService {
         },
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.conversationParticipant.findMany({
+      this.prisma.client.conversationParticipant.findMany({
         where: { userId },
         include: {
           conversation: {
@@ -478,7 +478,7 @@ export class UsersService {
         },
         orderBy: { joinedAt: 'desc' },
       }),
-      this.prisma.message.findMany({
+      this.prisma.client.message.findMany({
         where: { senderId: userId },
         select: {
           id: true,
@@ -492,7 +492,7 @@ export class UsersService {
         },
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.messageRead.findMany({
+      this.prisma.client.messageRead.findMany({
         where: { userId },
         select: {
           id: true,
@@ -501,7 +501,7 @@ export class UsersService {
         },
         orderBy: { readAt: 'desc' },
       }),
-      this.prisma.messageReaction.findMany({
+      this.prisma.client.messageReaction.findMany({
         where: { userId },
         select: {
           id: true,
@@ -511,23 +511,23 @@ export class UsersService {
         },
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.notification.findMany({
+      this.prisma.client.notification.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.report.findMany({
+      this.prisma.client.report.findMany({
         where: { creatorId: userId },
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.report.findMany({
+      this.prisma.client.report.findMany({
         where: { targetUserId: userId },
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.moderationAction.findMany({
+      this.prisma.client.moderationAction.findMany({
         where: { targetUserId: userId },
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.moderationAction.findMany({
+      this.prisma.client.moderationAction.findMany({
         where: { moderatorId: userId },
         orderBy: { createdAt: 'desc' },
       }),
@@ -573,7 +573,7 @@ export class UsersService {
   }
 
   async eraseMyData(userId: string, dto: EraseMyDataDto) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.client.user.findUnique({
       where: { id: userId },
       include: {
         profile: true,
@@ -617,7 +617,7 @@ export class UsersService {
       userId,
     );
 
-    await this.prisma.user.delete({
+    await this.prisma.client.user.delete({
       where: { id: userId },
     });
 
@@ -625,7 +625,7 @@ export class UsersService {
   }
 
   async getMyFriends(userId: string) {
-    const friendships = await this.prisma.friendship.findMany({
+    const friendships = await this.prisma.client.friendship.findMany({
       where: {
         status: 'ACCEPTED',
         OR: [{ requesterId: userId }, { addresseeId: userId }],
@@ -656,7 +656,7 @@ export class UsersService {
   }
 
   async updatePassword(userId: string, dto: UpdatePasswordDto) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.client.user.findUnique({
       where: { id: userId },
     });
 
@@ -674,7 +674,7 @@ export class UsersService {
 
     const newHash = await bcrypt.hash(dto.newPassword, 12);
 
-    await this.prisma.user.update({
+    await this.prisma.client.user.update({
       where: { id: userId },
       data: { passwordHash: newHash },
     });
@@ -696,7 +696,7 @@ export class UsersService {
   }
 
   async getUserByUsername(username: string) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.client.user.findUnique({
       where: { username },
       include: { profile: true },
     });
@@ -706,20 +706,22 @@ export class UsersService {
     return {
       id: user.id,
       username: user.username,
-      globalRole: user.globalRole,      // ajouté
-      isBanned: user.isBanned,          // ajouté
-      isActive: user.isActive,          // ajouté
-      penaltyPoints: user.penaltyPoints, // ajouté
-      profile: user.profile ? {
-        displayName: user.profile.displayName,
-        bio: user.profile.bio,
-        avatarUrl: user.profile.avatarUrl,
-      } : null,
+      globalRole: user.globalRole,
+      isBanned: user.isBanned,
+      isActive: user.isActive,
+      penaltyPoints: user.penaltyPoints,
+      profile: user.profile
+        ? {
+            displayName: user.profile.displayName,
+            bio: user.profile.bio,
+            avatarUrl: user.profile.avatarUrl,
+          }
+        : null,
     };
   }
 
   async getMyPoints(userId: string) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.client.user.findUnique({
       where: { id: userId },
     });
     if (!user) throw new NotFoundException('User not found');

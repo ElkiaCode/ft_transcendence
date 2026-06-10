@@ -7,9 +7,11 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { InviteUsersDto } from './dto/invite-users.dto';
 import { CreateGroupConversationDto } from './dto/create-group-conversation.dto';
-import { AutoModerationService } from '../moderation/auto-moderation.service';
+import {
+  AutoModerationService,
+  ModerationApplyResult,
+} from '../moderation/auto-moderation.service';
 import { Prisma } from '@prisma/client';
-// import { Prisma } from 'src/generated/prisma';
 
 @Injectable()
 export class ChatService {
@@ -23,7 +25,7 @@ export class ChatService {
   ) {}
 
   private async ensureGroupConversationExists(conversationId: string) {
-    const conversation = await this.prisma.conversation.findUnique({
+    const conversation = await this.prisma.client.conversation.findUnique({
       where: { id: conversationId },
       include: {
         participants: true,
@@ -47,17 +49,18 @@ export class ChatService {
     actorUserId: string,
     conversationId: string,
   ) {
-    const membership = await this.prisma.conversationParticipant.findUnique({
-      where: {
-        conversationId_userId: {
-          conversationId,
-          userId: actorUserId,
+    const membership =
+      await this.prisma.client.conversationParticipant.findUnique({
+        where: {
+          conversationId_userId: {
+            conversationId,
+            userId: actorUserId,
+          },
         },
-      },
-      include: {
-        conversation: true,
-      },
-    });
+        include: {
+          conversation: true,
+        },
+      });
 
     if (!membership) {
       throw new ForbiddenException(
@@ -79,7 +82,7 @@ export class ChatService {
   }
 
   async ensureUsersCanBeAdded(actorUserId: string, targetUserIds: string[]) {
-    const users = await this.prisma.user.findMany({
+    const users = await this.prisma.client.user.findMany({
       where: { id: { in: targetUserIds } },
       select: {
         id: true,
@@ -102,7 +105,7 @@ export class ChatService {
         );
       }
 
-      const block = await this.prisma.block.findFirst({
+      const block = await this.prisma.client.block.findFirst({
         where: {
           OR: [
             { blockerId: actorUserId, blockedId: user.id },
@@ -125,10 +128,13 @@ export class ChatService {
     actorUserId: string,
     conversationId: string,
   ) {
-    const membership = await this.prisma.conversationParticipant.findUnique({
-      where: { conversationId_userId: { conversationId, userId: actorUserId } },
-      include: { conversation: true },
-    });
+    const membership =
+      await this.prisma.client.conversationParticipant.findUnique({
+        where: {
+          conversationId_userId: { conversationId, userId: actorUserId },
+        },
+        include: { conversation: true },
+      });
 
     if (!membership) {
       throw new ForbiddenException(
@@ -145,10 +151,14 @@ export class ChatService {
   }
 
   async getOtherParticipantIds(conversationId: string, currentUserId: string) {
-    const participants = await this.prisma.conversationParticipant.findMany({
-      where: { conversationId },
-      select: { userId: true },
-    });
+    const participants =
+      await this.prisma.client.conversationParticipant.findMany({
+        where: {
+          conversationId,
+          leftAt: null,
+        },
+        select: { userId: true },
+      });
 
     return participants
       .map((p) => p.userId)
@@ -156,7 +166,9 @@ export class ChatService {
   }
 
   private async ensureLiveSender(userId: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const user = await this.prisma.client.user.findUnique({
+      where: { id: userId },
+    });
 
     if (!user) {
       throw new NotFoundException('user not found');
@@ -174,7 +186,7 @@ export class ChatService {
   }
 
   private async ensureUserExists(userId: string) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.client.user.findUnique({
       where: { id: userId },
       select: {
         id: true,
@@ -202,7 +214,7 @@ export class ChatService {
     const [actor, target, block] = await Promise.all([
       this.ensureUserExists(actorUserId),
       this.ensureUserExists(targetUserId),
-      this.prisma.block.findFirst({
+      this.prisma.client.block.findFirst({
         where: {
           OR: [
             { blockerId: actorUserId, blockedId: targetUserId },
@@ -228,16 +240,16 @@ export class ChatService {
   }
 
   async ensureConversationMembership(userId: string, conversationId: string) {
-    const membership = await this.prisma.conversationParticipant.findFirst({
-      where: {
-        conversationId,
-        userId,
-      },
-    });
+    const membership =
+      await this.prisma.client.conversationParticipant.findUnique({
+        where: {
+          conversationId_userId: { conversationId, userId },
+        },
+      });
 
     if (!membership) {
       throw new ForbiddenException(
-        'you are not a participant of this conversation',
+        'you are not and were never a participant of this conversation',
       );
     }
 
@@ -277,7 +289,7 @@ export class ChatService {
     };
     // 4. Use of a transaction to prevent double-creation during concurrent requests
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      return await this.prisma.client.$transaction(async (tx) => {
         //4.1. Check if it exists within the transaction
         const existing = await tx.conversation.findUnique({
           where: { participantHash: hash },
@@ -308,7 +320,7 @@ export class ChatService {
           // RACE CONDITION DETECTED:
           // Another request created the conversation between Step 1 and Step 2.
           // Simply fetch the one that was just created by the other request.
-          return this.prisma.conversation.findUnique({
+          return this.prisma.client.conversation.findUnique({
             where: { participantHash: hash },
             include: deepInclude,
           });
@@ -334,7 +346,7 @@ export class ChatService {
     await this.ensureLiveSender(actorUserId);
     await this.ensureUsersCanBeAdded(actorUserId, targetUserIds);
 
-    const conversation = await this.prisma.conversation.create({
+    const conversation = await this.prisma.client.conversation.create({
       data: {
         type: 'GROUP',
         title: dto.title?.trim() || null,
@@ -390,24 +402,61 @@ export class ChatService {
 
     await this.ensureUsersCanBeAdded(actorUserId, normalizedUserIds);
 
-    const existingParticipants =
-      await this.prisma.conversationParticipant.findMany({
+    const existingRecords =
+      await this.prisma.client.conversationParticipant.findMany({
         where: {
           conversationId,
           userId: { in: normalizedUserIds },
         },
-        select: {
-          userId: true,
-        },
+        // select: {
+        //   userId: true,
+        // },
       });
 
-    const existingUserIds = new Set(existingParticipants.map((p) => p.userId));
+    const recordsMap = new Map(existingRecords.map((r) => [r.userId, r]));
+    const invitedUserIds: string[] = [];
 
-    const newUserIds = normalizedUserIds.filter(
-      (id) => !existingUserIds.has(id),
-    );
+    // Use a transaction to handle multiple users
+    await this.prisma.client.$transaction(async (tx) => {
+      for (const targetId of normalizedUserIds) {
+        const record = recordsMap.get(targetId);
 
-    if (newUserIds.length === 0) {
+        if (!record) {
+          // CASE A: User never been in the group. Create fresh.
+          await tx.conversationParticipant.create({
+            data: {
+              conversationId,
+              userId: targetId,
+              role: 'MEMBER',
+              joinedAt: new Date(),
+              leftAt: null,
+            },
+          });
+          invitedUserIds.push(targetId);
+        } else if (record.leftAt !== null) {
+          // CASE B: User was in the group but LEFT. Re-activate and RESET timeline.
+          await tx.conversationParticipant.update({
+            where: { id: record.id },
+            data: {
+              joinedAt: new Date(), // GDPR: Starts their view from now
+              leftAt: null, // Make them active again
+              role: 'MEMBER',
+            },
+          });
+          invitedUserIds.push(targetId);
+        }
+        // CASE C: record.leftAt === null
+        // Do nothing. They are already in the group.
+        // We DON'T update joinedAt here so we don't break their history.
+      }
+
+      await tx.conversation.update({
+        where: { id: conversationId },
+        data: { updatedAt: new Date() },
+      });
+    });
+
+    if (invitedUserIds.length === 0) {
       return {
         message: 'all selected users are already in the conversation',
         invitedCount: 0,
@@ -416,21 +465,7 @@ export class ChatService {
       };
     }
 
-    await this.prisma.$transaction([
-      this.prisma.conversationParticipant.createMany({
-        data: newUserIds.map((userId) => ({
-          conversationId,
-          userId,
-          role: 'MEMBER',
-        })),
-      }),
-      this.prisma.conversation.update({
-        where: { id: conversationId },
-        data: { updatedAt: new Date() },
-      }),
-    ]);
-
-    const conversation = await this.prisma.conversation.findUnique({
+    const conversation = await this.prisma.client.conversation.findUnique({
       where: { id: conversationId },
       include: {
         participants: {
@@ -447,8 +482,8 @@ export class ChatService {
 
     return {
       message: 'users invited successfully',
-      invitedCount: newUserIds.length,
-      invitedUserIds: newUserIds,
+      invitedCount: invitedUserIds.length,
+      invitedUserIds: invitedUserIds,
       conversation,
     };
   }
@@ -471,7 +506,7 @@ export class ChatService {
     }
 
     const targetMembership =
-      await this.prisma.conversationParticipant.findUnique({
+      await this.prisma.client.conversationParticipant.findUnique({
         where: {
           conversationId_userId: {
             conversationId,
@@ -491,7 +526,7 @@ export class ChatService {
     }
 
     const remainingParticipantsCount =
-      await this.prisma.conversationParticipant.count({
+      await this.prisma.client.conversationParticipant.count({
         where: { conversationId },
       });
 
@@ -499,16 +534,17 @@ export class ChatService {
       throw new BadRequestException('cannot remove the last participant');
     }
 
-    await this.prisma.$transaction([
-      this.prisma.conversationParticipant.delete({
+    await this.prisma.client.$transaction([
+      this.prisma.client.conversationParticipant.update({
         where: {
           conversationId_userId: {
             conversationId,
             userId: targetUserId,
           },
         },
+        data: { leftAt: new Date() },
       }),
-      this.prisma.conversation.update({
+      this.prisma.client.conversation.update({
         where: { id: conversationId },
         data: { updatedAt: new Date() },
       }),
@@ -525,17 +561,18 @@ export class ChatService {
   async leaveConversation(userId: string, conversationId: string) {
     await this.ensureLiveSender(userId);
 
-    const membership = await this.prisma.conversationParticipant.findUnique({
-      where: {
-        conversationId_userId: {
-          conversationId,
-          userId,
+    const membership =
+      await this.prisma.client.conversationParticipant.findUnique({
+        where: {
+          conversationId_userId: {
+            conversationId,
+            userId,
+          },
         },
-      },
-      include: {
-        conversation: true,
-      },
-    });
+        include: {
+          conversation: true,
+        },
+      });
 
     if (!membership) {
       throw new ForbiddenException(
@@ -549,10 +586,11 @@ export class ChatService {
       );
     }
 
-    const participants = await this.prisma.conversationParticipant.findMany({
-      where: { conversationId },
-      orderBy: { joinedAt: 'asc' },
-    });
+    const participants =
+      await this.prisma.client.conversationParticipant.findMany({
+        where: { conversationId },
+        orderBy: { joinedAt: 'asc' },
+      });
 
     if (participants.length <= 1) {
       throw new BadRequestException('Cannot leave the last participant');
@@ -564,14 +602,10 @@ export class ChatService {
     const nextOwnerId =
       previousRole === 'OWNER' ? otherParticipants[0]?.userId : null;
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.conversationParticipant.delete({
-        where: {
-          conversationId_userId: {
-            conversationId,
-            userId,
-          },
-        },
+    await this.prisma.client.$transaction(async (tx) => {
+      await tx.conversationParticipant.update({
+        where: { conversationId_userId: { conversationId, userId } },
+        data: { leftAt: new Date() }, // Mark the exit time
       });
 
       if (previousRole === 'OWNER') {
@@ -618,7 +652,7 @@ export class ChatService {
       throw new BadRequestException('conversation title cannot be empty');
     }
 
-    const conversation = await this.prisma.conversation.update({
+    const conversation = await this.prisma.client.conversation.update({
       where: { id: conversationId },
       data: {
         title: trimmedTitle,
@@ -633,10 +667,13 @@ export class ChatService {
   }
 
   async listMyConversations(userId: string) {
-    const conversations = await this.prisma.conversation.findMany({
+    const conversations = await this.prisma.client.conversation.findMany({
       where: {
         participants: {
-          some: { userId },
+          some: {
+            userId,
+            leftAt: null, // Only show conversations the user is currently IN
+          },
         },
       },
       include: {
@@ -661,76 +698,102 @@ export class ChatService {
     });
 
     return conversations.map((conv) => {
+      // 1. Find the specific membership for the current user to get their 'joinedAt'
+      const myMembership = conv.participants.find((p) => p.userId === userId);
+
       const otherUser = conv.participants.find(
         (p) => p.userId !== userId,
       )?.user;
 
       const lastMessage = conv.messages[0];
 
+      // 2. PRIVACY CHECK: Only show the last message content if it was sent
+      // after the user's most recent joinedAt date.
+      const isMessageVisible =
+        lastMessage &&
+        myMembership &&
+        lastMessage.createdAt >= myMembership.joinedAt;
+
       return {
         id: conv.id,
         type: conv.type === 'DIRECT' ? 'dm' : 'group',
-
         name:
           conv.type === 'DIRECT'
             ? otherUser?.username
             : (conv.title ?? 'Group chat'),
-
         avatarUrl:
           conv.type === 'DIRECT'
             ? (otherUser?.profile?.avatarUrl ?? null)
             : null,
-
-        lastMessage: lastMessage?.content ?? null,
-
+        lastMessage: isMessageVisible
+          ? (lastMessage.content ?? 'Message deleted')
+          : null,
         unreadCount: 0,
       };
     });
   }
 
   async listMessages(userId: string, conversationId: string) {
-    await this.ensureConversationMembership(userId, conversationId);
+    // 1. Get the membership record (including those who left)
+    const membership = await this.ensureConversationMembership(
+      userId,
+      conversationId,
+    );
 
-    return this.prisma.message.findMany({
-      where: { conversationId },
-      include: {
-        sender: {
-          include: { profile: true },
-        },
-        reads: {
-          include: {
-            user: {
-              include: { profile: true },
-            },
+    // 2. Filter messages by the time the user was actually in the group
+    return this.prisma.client.message
+      .findMany({
+        where: {
+          conversationId,
+          createdAt: {
+            gte: membership.joinedAt,
+            // If leftAt is null, they are still in the group (use current date)
+            ...(membership.leftAt ? { lte: membership.leftAt } : {}),
           },
-          orderBy: { readAt: 'asc' },
         },
-        reactions: {
-          include: {
-            user: {
-              include: { profile: true },
-            },
+        include: {
+          sender: {
+            include: { profile: true },
           },
-          orderBy: { createdAt: 'asc' },
+          reads: {
+            include: {
+              user: {
+                include: { profile: true },
+              },
+            },
+            orderBy: { readAt: 'asc' },
+          },
+          reactions: {
+            include: {
+              user: {
+                include: { profile: true },
+              },
+            },
+            orderBy: { createdAt: 'asc' },
+          },
         },
-      },
-      orderBy: { createdAt: 'asc' },
-      take: 100,
-    });
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      })
+      .then((msgs) => msgs.reverse());
   }
 
   async listMembers(userId: string, conversationId: string) {
     await this.ensureConversationMembership(userId, conversationId);
 
-    const participants = await this.prisma.conversationParticipant.findMany({
-      where: { conversationId },
-      include: {
-        user: {
-          include: { profile: true },
+    const participants =
+      await this.prisma.client.conversationParticipant.findMany({
+        where: {
+          conversationId,
+          leftAt: null,
         },
-      },
-      orderBy: { joinedAt: 'asc' },
-    });
+        include: {
+          user: {
+            include: { profile: true },
+          },
+        },
+        orderBy: { joinedAt: 'asc' },
+      });
 
     return participants.map((participant) => ({
       id: participant.id,
@@ -756,7 +819,7 @@ export class ChatService {
     await this.ensureLiveSender(userId);
     await this.ensureConversationMembership(userId, conversationId);
 
-    const message = await this.prisma.message.findUnique({
+    const message = await this.prisma.client.message.findUnique({
       where: { id: messageId },
     });
 
@@ -780,7 +843,7 @@ export class ChatService {
       throw new BadRequestException('message content is empty');
     }
 
-    return this.prisma.message.update({
+    return this.prisma.client.message.update({
       where: { id: messageId },
       data: {
         content: trimmed,
@@ -816,7 +879,7 @@ export class ChatService {
     await this.ensureLiveSender(userId);
     await this.ensureConversationMembership(userId, conversationId);
 
-    const message = await this.prisma.message.findUnique({
+    const message = await this.prisma.client.message.findUnique({
       where: { id: messageId },
     });
 
@@ -834,7 +897,7 @@ export class ChatService {
 
     await this.ensureLastMessage(conversationId, messageId, 'delete');
 
-    return this.prisma.message.update({
+    return this.prisma.client.message.update({
       where: { id: messageId },
       data: {
         content: null,
@@ -871,7 +934,7 @@ export class ChatService {
     await this.ensureLiveSender(userId);
     await this.ensureConversationMembership(userId, conversationId);
 
-    const message = await this.prisma.message.findUnique({
+    const message = await this.prisma.client.message.findUnique({
       where: { id: messageId },
       include: {
         sender: {
@@ -899,7 +962,7 @@ export class ChatService {
       throw new BadRequestException('you cannot react to your own message');
     }
 
-    const result = await this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.client.$transaction(async (tx) => {
       const existingReaction = await tx.messageReaction.findUnique({
         where: {
           messageId_userId_type: {
@@ -988,7 +1051,7 @@ export class ChatService {
     messageId: string,
     action: 'edit' | 'delete',
   ) {
-    const lastMessage = await this.prisma.message.findFirst({
+    const lastMessage = await this.prisma.client.message.findFirst({
       where: {
         conversationId,
         deletedAt: null,
@@ -1018,7 +1081,7 @@ export class ChatService {
     let createdBeforeOrAt: Date | undefined;
 
     if (messageId) {
-      const message = await this.prisma.message.findUnique({
+      const message = await this.prisma.client.message.findUnique({
         where: { id: messageId },
         select: {
           conversationId: true,
@@ -1033,7 +1096,7 @@ export class ChatService {
       createdBeforeOrAt = message.createdAt;
     }
 
-    const messages = await this.prisma.message.findMany({
+    const messages = await this.prisma.client.message.findMany({
       where: {
         conversationId,
         senderId: { not: userId },
@@ -1053,7 +1116,7 @@ export class ChatService {
       };
     }
 
-    const result = await this.prisma.messageRead.createMany({
+    const result = await this.prisma.client.messageRead.createMany({
       data: messages.map((message) => ({
         messageId: message.id,
         userId,
@@ -1080,7 +1143,7 @@ export class ChatService {
     const moderationResult = await this.autoModerationService.analyze(trimmed);
 
     if (moderationResult.action === 'BLOCK') {
-      const message = await this.prisma.message.create({
+      const message = await this.prisma.client.message.create({
         data: {
           conversationId,
           senderId: userId,
@@ -1096,17 +1159,20 @@ export class ChatService {
         },
       });
 
-      const moderation = await this.autoModerationService.applyBlockedMessage(
-        userId,
-        trimmed,
-        moderationResult,
-        message.id,
-      );
+      const moderation: ModerationApplyResult =
+        await this.autoModerationService.applyBlockedMessage(
+          userId,
+          trimmed,
+          moderationResult,
+          message.id,
+        );
+
       const banReason = this.buildAutomaticBanReason(
         moderationResult.categories,
       );
+
       const banAnnouncementMessage = moderation.penalty.isBanned
-        ? await this.prisma.message.create({
+        ? await this.prisma.client.message.create({
             data: {
               conversationId,
               senderId: userId,
@@ -1123,7 +1189,7 @@ export class ChatService {
           })
         : null;
 
-      await this.prisma.conversation.update({
+      await this.prisma.client.conversation.update({
         where: { id: conversationId },
         data: { updatedAt: new Date() },
       });
@@ -1144,7 +1210,7 @@ export class ChatService {
       };
     }
 
-    const message = await this.prisma.message.create({
+    const message = await this.prisma.client.message.create({
       data: {
         conversationId,
         senderId: userId,
@@ -1159,23 +1225,24 @@ export class ChatService {
     });
 
     if (moderationResult.action === 'REPORT') {
-      const moderation = await this.autoModerationService.applyFlaggedMessage(
-        userId,
-        message.id,
-        trimmed,
-        moderationResult,
-      );
+      const moderationFlaggedMessage =
+        (await this.autoModerationService.applyFlaggedMessage(
+          userId,
+          message.id,
+          trimmed,
+          moderationResult,
+        )) as unknown as ModerationApplyResult;
 
-      if (moderation) {
+      if (moderationFlaggedMessage) {
         const banReason = this.buildAutomaticBanReason(
           moderationResult.categories,
         );
-        const banAnnouncementMessage = moderation.penalty.isBanned
-          ? await this.prisma.message.create({
+        const banAnnouncementMessage = moderationFlaggedMessage.penalty.isBanned
+          ? await this.prisma.client.message.create({
               data: {
                 conversationId,
                 senderId: userId,
-                content: `automatic moderation ${sender.username} is now bann cause: ${banReason}`,
+                content: `automatic moderation ${sender.username} is now banned cause: ${banReason}`,
                 type: 'SYSTEM',
               },
               include: {
@@ -1188,7 +1255,7 @@ export class ChatService {
             })
           : null;
 
-        await this.prisma.conversation.update({
+        await this.prisma.client.conversation.update({
           where: { id: conversationId },
           data: { updatedAt: new Date() },
         });
@@ -1199,9 +1266,10 @@ export class ChatService {
             message: 'Your message was flagged by automatic moderation.',
             severity: moderationResult.severity,
             penaltyPointsToSubtract: moderationResult.penaltyPointsToSubtract,
-            penaltyPoints: moderation.penalty.penaltyPoints,
-            pointsLeftBeforeBan: moderation.penalty.pointsLeftBeforeBan,
-            isBanned: moderation.penalty.isBanned,
+            penaltyPoints: moderationFlaggedMessage.penalty.penaltyPoints,
+            pointsLeftBeforeBan:
+              moderationFlaggedMessage.penalty.pointsLeftBeforeBan,
+            isBanned: moderationFlaggedMessage.penalty.isBanned,
             banReason,
             categories: moderationResult.categories,
           },
@@ -1210,7 +1278,7 @@ export class ChatService {
       }
     }
 
-    await this.prisma.conversation.update({
+    await this.prisma.client.conversation.update({
       where: { id: conversationId },
       data: { updatedAt: new Date() },
     });

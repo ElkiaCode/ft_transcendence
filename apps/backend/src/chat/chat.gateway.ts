@@ -102,7 +102,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         sub: user.id,
         username: user.username,
         role: user.globalRole,
-      } as SocketUser;
+      };
     } catch {
       throw new Error('Authentication error: Invalid token');
     }
@@ -501,40 +501,3 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return { ok: true };
   }
 }
-
-// async handleConnection(client: Socket) {
-//   console.log('New connection attempt...');
-//   try {
-//     const token = client.handshake.auth?.token;
-
-//     if (!token) {
-//       throw new WsException('missing token');
-//     }
-
-//     const payload = await this.jwtService.verifyAsync<
-//       SocketUser & { sub: string }
-//     >(token, {
-//       secret: this.configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
-//     });
-
-//     const user = await this.prisma.user.findUnique({
-//       where: { id: payload.sub },
-//     });
-
-//     if (!user || !user.isActive || user.isBanned) {
-//       throw new WsException('unauthorized');
-//     }
-
-//     client.data.user = {
-//       sub: user.id,
-//       username: user.username,
-//       role: user.globalRole,
-//     } satisfies SocketUser;
-
-//     await client.join(`user:${user.id}`);
-//     this.addConnectedUser(user.id, client.id);
-//   } catch (err) {
-//     console.error('❌ Connection Auth Failed:', err.message);
-//     client.disconnect();
-//   }
-// }

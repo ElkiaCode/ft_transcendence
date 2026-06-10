@@ -16,6 +16,39 @@ import {
   hashRefreshToken,
 } from './utils/refresh-token.util';
 
+interface FortyTwoTokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  scope: string;
+  created_at: number;
+}
+
+interface FortyTwoUserResponse {
+  id: number;
+  email: string;
+  login: string;
+  displayname: string;
+  image?: {
+    link: string | null;
+  };
+}
+
+interface UserForPublic {
+  id: string;
+  email: string;
+  username: string;
+  globalRole: string;
+  preferredLanguage: string;
+  passwordHash?: string | null;
+  oauthAccounts?: Array<{ provider: string }>;
+  profile?: {
+    displayName: string;
+    bio?: string | null;
+    avatarUrl?: string | null;
+  } | null;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -41,7 +74,7 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto) {
-    const email = dto.email.trim().toLowerCase();
+    const email = (dto.email ?? '').trim().toLowerCase();
     const username = dto.username.trim();
 
     const existingUserByEmail = await this.prisma.client.user.findUnique({
@@ -95,7 +128,8 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const email = (dto.email ?? '').trim().toLowerCase();
+    const { password, email: rawEmail } = dto;
+    const email = (rawEmail ?? '').trim().toLowerCase();
 
     const user = await this.prisma.client.user.findUnique({
       where: { email },
@@ -108,7 +142,7 @@ export class AuthService {
       throw new UnauthorizedException('invalid credentials');
     }
 
-    if (!dto.password) {
+    if (!password) {
       throw new BadRequestException('Password is required');
     }
     const passwordOk = await bcrypt.compare(dto.password, user.passwordHash);
@@ -236,7 +270,7 @@ export class AuthService {
   }
 
   async loginWith42(code: string) {
-    // 1. Échanger le code contre un token 42
+    // 1. replace the code by a 42 token
     const params = new URLSearchParams({
       grant_type: 'authorization_code',
       client_id: this.configService.getOrThrow('FORTYTWO_CLIENT_ID'),
@@ -257,10 +291,10 @@ export class AuthService {
       throw new UnauthorizedException('invalid 42 code');
     }
 
-    const tokenData = await tokenResponse.json();
+    const tokenData = (await tokenResponse.json()) as FortyTwoTokenResponse;
     const accessToken42 = tokenData.access_token;
 
-    // 2. Récupérer les infos du user depuis l'API 42
+    // 2. Retrieve infos from user within 42 API
     const userResponse = await fetch('https://api.intra.42.fr/v2/me', {
       headers: { Authorization: `Bearer ${accessToken42}` },
     });
@@ -269,9 +303,9 @@ export class AuthService {
       throw new UnauthorizedException('failed to fetch 42 user');
     }
 
-    const user42 = await userResponse.json();
+    const user42 = (await userResponse.json()) as FortyTwoUserResponse;
 
-    // 3. Chercher ou créer le user en DB
+    // 3. Search or create the user in DB
     let user = await this.prisma.client.user.findFirst({
       where: {
         oauthAccounts: {
@@ -309,7 +343,7 @@ export class AuthService {
     if (!user.isActive) throw new UnauthorizedException('account is inactive');
     if (user.isBanned) throw new UnauthorizedException('account is banned');
 
-    // 4. Créer notre propre session JWT
+    // 4. Create JWT user session
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
@@ -349,11 +383,18 @@ export class AuthService {
     };
   }
 
-  private toPublicUser(user: any) {
-    const authProviders = [
-      ...(user.passwordHash ? ['LOCAL'] : []),
-      ...(user.oauthAccounts ?? []).map((account: any) => account.provider),
-    ];
+  private toPublicUser(user: UserForPublic) {
+    const authProviders: string[] = [];
+
+    if (user.passwordHash) {
+      authProviders.push('LOCAL');
+    }
+
+    if (user.oauthAccounts && Array.isArray(user.oauthAccounts)) {
+      user.oauthAccounts.forEach((acc) => {
+        authProviders.push(acc.provider);
+      });
+    }
 
     return {
       id: user.id,
@@ -361,12 +402,13 @@ export class AuthService {
       username: user.username,
       globalRole: user.globalRole,
       preferredLanguage: user.preferredLanguage,
-      authProviders: [...new Set(authProviders)],
+      // Use Set to remove duplicates (e.g. if logic changes later)
+      authProviders: Array.from(new Set(authProviders)),
       profile: user.profile
         ? {
             displayName: user.profile.displayName,
-            bio: user.profile.bio,
-            avatarUrl: user.profile.avatarUrl,
+            bio: user.profile.bio ?? null,
+            avatarUrl: user.profile.avatarUrl ?? null,
           }
         : null,
     };

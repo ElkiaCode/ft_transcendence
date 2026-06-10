@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Patch, Post, Param, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Patch,
+  Post,
+  Param,
+  UseGuards,
+} from '@nestjs/common';
 import { ModerationService } from './moderation.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -15,10 +23,7 @@ export class ModerationController {
   constructor(private readonly moderationService: ModerationService) {}
 
   @Post('reports')
-  createReport(
-    @CurrentUser() user: JwtPayload,
-    @Body() dto: CreateReportDto,
-  ) {
+  createReport(@CurrentUser() user: JwtPayload, @Body() dto: CreateReportDto) {
     return this.moderationService.createReport(
       user.sub,
       dto.targetType,

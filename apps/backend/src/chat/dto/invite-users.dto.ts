@@ -5,5 +5,5 @@ export class InviteUsersDto {
   @ArrayMinSize(1)
   @ArrayUnique()
   @IsString({ each: true })
-  userIds: string[];
+  userIds!: string[];
 }

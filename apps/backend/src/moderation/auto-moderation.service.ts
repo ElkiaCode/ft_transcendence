@@ -25,6 +25,23 @@ type OpenAiModerationResult = {
   category_scores?: Record<string, number>;
 };
 
+export interface ModerationPenalty {
+  penaltyPoints: number;
+  pointsLeftBeforeBan: number;
+  isBanned: boolean;
+}
+
+export interface ModerationApplyResult {
+  report: any;
+  penalty: ModerationPenalty;
+}
+
+interface OpenAiModerationResponse {
+  id: string;
+  model: string;
+  results: OpenAiModerationResult[];
+}
+
 @Injectable()
 export class AutoModerationService {
   private readonly logger = new Logger(AutoModerationService.name);
@@ -42,7 +59,8 @@ export class AutoModerationService {
       try {
         openAiMatches = await this.analyzeWithOpenAi(content);
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'OpenAI moderation failed';
+        const message =
+          error instanceof Error ? error.message : 'OpenAI moderation failed';
         providerErrors.push(message);
         this.logger.warn(`OpenAI moderation unavailable: ${message}`);
       }
@@ -72,13 +90,13 @@ export class AutoModerationService {
     content: string,
     result: AutoModerationResult,
     messageId?: string,
-  ) {
+  ): Promise<ModerationApplyResult> {
     const penaltyResult = await this.applyPenaltyAndAutoBan(
       userId,
       result.penaltyPointsToSubtract,
     );
 
-    const report = await this.prisma.report.create({
+    const report = await this.prisma.client.report.create({
       data: {
         creatorId: null,
         targetType: messageId ? 'MESSAGE' : 'USER',
@@ -109,7 +127,7 @@ export class AutoModerationService {
       result.penaltyPointsToSubtract,
     );
 
-    const report = await this.prisma.report.create({
+    const report = await this.prisma.client.report.create({
       data: {
         creatorId: null,
         targetType: 'MESSAGE',
@@ -124,7 +142,9 @@ export class AutoModerationService {
     };
   }
 
-  private analyzeWithDictionary(content: string): Pick<AutoModerationResult, 'matches'> {
+  private analyzeWithDictionary(
+    content: string,
+  ): Pick<AutoModerationResult, 'matches'> {
     const normalized = this.normalizeText(content);
 
     return {
@@ -139,7 +159,9 @@ export class AutoModerationService {
     };
   }
 
-  private async analyzeWithOpenAi(content: string): Promise<AutoModerationResult['matches']> {
+  private async analyzeWithOpenAi(
+    content: string,
+  ): Promise<AutoModerationResult['matches']> {
     const apiKey = process.env.OPENAI_API_KEY;
 
     if (!apiKey) {
@@ -162,8 +184,8 @@ export class AutoModerationService {
       throw new Error(`OpenAI moderation returned ${response.status}`);
     }
 
-    const data = await response.json();
-    const result = data.results?.[0] as OpenAiModerationResult | undefined;
+    const data = (await response.json()) as OpenAiModerationResponse;
+    const result = data.results?.[0];
 
     if (!result?.flagged || !result.categories) {
       return [];
@@ -175,7 +197,10 @@ export class AutoModerationService {
         provider: 'openai',
         value: category,
         category,
-        severity: this.openAiSeverity(category, result.category_scores?.[category] ?? 0),
+        severity: this.openAiSeverity(
+          category,
+          result.category_scores?.[category] ?? 0,
+        ),
       }));
   }
 
@@ -239,12 +264,18 @@ export class AutoModerationService {
     };
 
     const baseSeverity = baseSeverityByCategory[category] ?? 100;
-    return Math.max(baseSeverity, Math.round(baseSeverity * Math.max(score, 0.5)));
+    return Math.max(
+      baseSeverity,
+      Math.round(baseSeverity * Math.max(score, 0.5)),
+    );
   }
 
-  private async applyPenaltyAndAutoBan(userId: string, penaltyPointsToSubtract: number) {
+  private async applyPenaltyAndAutoBan(
+    userId: string,
+    penaltyPointsToSubtract: number,
+  ): Promise<ModerationPenalty> {
     if (penaltyPointsToSubtract <= 0) {
-      const user = await this.prisma.user.findUnique({
+      const user = await this.prisma.client.user.findUnique({
         where: { id: userId },
         select: {
           penaltyPoints: true,
@@ -259,7 +290,7 @@ export class AutoModerationService {
       };
     }
 
-    const updatedUser = await this.prisma.user.update({
+    const updatedUser = await this.prisma.client.user.update({
       where: { id: userId },
       data: {
         penaltyPoints: {
@@ -281,15 +312,15 @@ export class AutoModerationService {
       };
     }
 
-    await this.prisma.$transaction([
-      this.prisma.user.update({
+    await this.prisma.client.$transaction([
+      this.prisma.client.user.update({
         where: { id: userId },
         data: {
           isBanned: true,
           isActive: false,
         },
       }),
-      this.prisma.refreshToken.updateMany({
+      this.prisma.client.refreshToken.updateMany({
         where: {
           userId,
           revokedAt: null,
@@ -315,7 +346,8 @@ export class AutoModerationService {
     const matches = result.matches
       .map((match) => `${match.provider}:${match.category}:${match.value}`)
       .join(', ');
-    const preview = content.length > 160 ? `${content.slice(0, 160)}...` : content;
+    const preview =
+      content.length > 160 ? `${content.slice(0, 160)}...` : content;
 
     return `[AUTO] ${label}; action=${result.action}; severity=${result.severity}; penalty=${result.penaltyPointsToSubtract}; matches=${matches}; content="${preview}"`;
   }
