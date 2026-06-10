@@ -105,7 +105,7 @@ function Notify() {
         </button>
       ) : null}
       {openMenuId === 'N' && (
-        <div className="absolute top-full mt-2 w-80 bg-white border border-gray-200 rounded shadow-lg z-10 right-0 p-2 flex flex-col gap-2 text-sm text-gray-700">
+        <div className="absolute top-full mt-2 w-80 bg-white border border-gray-200 rounded shadow-lg z-50 right-0 p-2 flex flex-col gap-2 text-sm text-gray-700">
           <div className="max-h-60 overflow-y-auto">
             {notifications.length === 0 ? (
               <div className="px-4 py-3 text-sm text-gray-600">
@@ -122,7 +122,7 @@ function Notify() {
                 >
                   <div>{notif.title}</div>
                   {notif.body && (
-                    <div className="text-xs text-gray-500 break-words">{notif.body}</div>
+                    <div className="text-xs text-gray-500 wrap-break-word">{notif.body}</div>
                   )}
                   <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-400">
                     {notif.type && <span>{notif.type.toLowerCase()}</span>}
@@ -202,7 +202,7 @@ function FriendInterface({ user }: { user: AppUser | null }) {
         </button>
       ) : null}
       {openMenuId === 'friends' && (
-        <div className="absolute top-full mt-2 w-128 bg-white border border-gray-200 rounded shadow-lg z-10 left-0 p-2 flex flex-col gap-2 text-sm text-gray-700">
+        <div className="absolute top-full mt-2 w-lg bg-white border border-gray-200 rounded shadow-lg z-10 left-0 p-2 flex flex-col gap-2 text-sm text-gray-700">
           {loading && (
             <div className="px-4 py-3 text-sm text-gray-600">Loading...</div>
           )}
@@ -220,7 +220,7 @@ function FriendInterface({ user }: { user: AppUser | null }) {
                   {friends.map((friend) => (
                     <div key={friend.id} className="px-4 py-3 text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-3">
                       <div
-                        className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${isOnline(friend.id) ? "bg-green-500" : "bg-gray-300"}`}
+                        className={`w-2.5 h-2.5 rounded-full shrink-0 ${isOnline(friend.id) ? "bg-green-500" : "bg-gray-300"}`}
                         aria-label={isOnline(friend.id) ? "Online" : "Offline"}
                         title={isOnline(friend.id) ? "Online" : "Offline"}
                       />
