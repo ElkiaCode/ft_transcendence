@@ -86,7 +86,10 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const email = (dto.email ?? '').trim().toLowerCase();
+    if (!dto.email) {
+      throw new BadRequestException('email is required');
+    } 
+    const email = dto.email.trim().toLowerCase();
 
     const user = await this.prisma.user.findUnique({
       where: { email },
@@ -99,11 +102,10 @@ export class AuthService {
       throw new UnauthorizedException('invalid credentials');
     }
 
-    if (!dto.password) {
-      throw new BadRequestException('Password is required');
-    }
-    const passwordOk = await bcrypt.compare(dto.password, user.passwordHash);
-
+if (!dto.password) {
+  throw new BadRequestException('password is required');
+}
+const passwordOk = await bcrypt.compare(dto.password, user.passwordHash);
     if (!passwordOk) {
       throw new UnauthorizedException('invalid credentials');
     }

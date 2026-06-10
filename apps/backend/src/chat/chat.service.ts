@@ -1071,6 +1071,28 @@ export class ChatService {
     const sender = await this.ensureLiveSender(userId);
     await this.ensureConversationMembership(userId, conversationId);
 
+    const conversation = await this.prisma.conversation.findUnique({
+        where: { id: conversationId },
+        select: { type: true },
+      });
+
+      if (conversation?.type === 'DIRECT') {
+        const otherIds = await this.getOtherParticipantIds(conversationId, userId);
+        if (otherIds.length > 0) {
+          const block = await this.prisma.block.findFirst({
+            where: {
+              OR: [
+                { blockerId: userId,        blockedId: otherIds[0] },
+                { blockerId: otherIds[0],   blockedId: userId },
+              ],
+            },
+          });
+          if (block) {
+            throw new ForbiddenException('messaging is blocked between these users');
+          }
+        }
+      }
+
     const trimmed = content.trim();
 
     if (!trimmed) {
