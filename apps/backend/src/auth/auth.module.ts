@@ -16,7 +16,7 @@ import { RolesGuard } from './guards/roles.guard';
         signOptions: {
           expiresIn: configService.getOrThrow<string>(
             'JWT_ACCESS_EXPIRES_IN',
-          ) as any,
+          ) as unknown as number,
         },
       }),
     }),

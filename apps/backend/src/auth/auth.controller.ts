@@ -101,10 +101,7 @@ export class AuthController {
   }
 
   @Get('42/callback')
-  async loginWith42(
-    @Query('code') code: string,
-    @Res() response: Response,
-  ) {
+  async loginWith42(@Query('code') code: string, @Res() response: Response) {
     if (!code) throw new BadRequestException('missing code');
 
     const result = await this.authService.loginWith42(code);
@@ -114,6 +111,6 @@ export class AuthController {
       result.refreshToken,
       this.authService.getRefreshTokenDays(),
     );
-    return response.redirect('https://localhost/'); // Changer pour ne pas avoir localhost  
+    return response.redirect('https://localhost/'); // TODO: Changer pour ne pas avoir localhost
   }
 }

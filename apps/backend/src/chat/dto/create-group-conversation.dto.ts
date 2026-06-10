@@ -1,4 +1,12 @@
-import { ArrayMinSize, ArrayUnique, IsArray, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  ArrayMinSize,
+  ArrayUnique,
+  IsArray,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export class CreateGroupConversationDto {
   @IsOptional()
@@ -10,5 +18,5 @@ export class CreateGroupConversationDto {
   @ArrayMinSize(2)
   @ArrayUnique()
   @IsString({ each: true })
-  userIds: string[];
+  userIds!: string[];
 }

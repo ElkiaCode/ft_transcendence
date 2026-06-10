@@ -28,7 +28,7 @@ export class RelationshipsService {
   }
 
   private async ensureUserExists(userId: string) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.client.user.findUnique({
       where: { id: userId },
       select: { id: true, username: true, isActive: true, isBanned: true },
     });
@@ -65,7 +65,7 @@ export class RelationshipsService {
   }
 
   private async findBlockBetweenUsers(userA: string, userB: string) {
-    return this.prisma.block.findFirst({
+    return this.prisma.client.block.findFirst({
       where: {
         OR: [
           { blockerId: userA, blockedId: userB },
@@ -76,7 +76,7 @@ export class RelationshipsService {
   }
 
   private async findFriendshipBetweenUsers(userA: string, userB: string) {
-    return this.prisma.friendship.findFirst({
+    return this.prisma.client.friendship.findFirst({
       where: {
         OR: [
           { requesterId: userA, addresseeId: userB },
@@ -114,7 +114,7 @@ export class RelationshipsService {
       );
     }
 
-    const friendship = await this.prisma.friendship.create({
+    const friendship = await this.prisma.client.friendship.create({
       data: {
         requesterId: actorUserId,
         addresseeId: targetUserId,
@@ -169,7 +169,7 @@ export class RelationshipsService {
       );
     }
 
-    const friendship = await this.prisma.friendship.findFirst({
+    const friendship = await this.prisma.client.friendship.findFirst({
       where: {
         requesterId: requesterUserId,
         addresseeId: actorUserId,
@@ -181,7 +181,7 @@ export class RelationshipsService {
       throw new NotFoundException('pending friend request not found');
     }
 
-    const updatedFriendship = await this.prisma.friendship.update({
+    const updatedFriendship = await this.prisma.client.friendship.update({
       where: { id: friendship.id },
       data: { status: 'ACCEPTED' },
     });
@@ -227,7 +227,7 @@ export class RelationshipsService {
 
     const actor = await this.ensureUserExists(actorUserId);
 
-    await this.prisma.friendship.delete({
+    await this.prisma.client.friendship.delete({
       where: { id: friendship.id },
     });
 
@@ -256,7 +256,7 @@ export class RelationshipsService {
   }
 
   async getIncomingFriendRequests(userId: string) {
-    const request = await this.prisma.friendship.findMany({
+    const request = await this.prisma.client.friendship.findMany({
       where: {
         status: 'PENDING',
         addresseeId: userId,
@@ -283,7 +283,7 @@ export class RelationshipsService {
   }
 
   async getOutGoingFriendRequests(userId: string) {
-    const request = await this.prisma.friendship.findMany({
+    const request = await this.prisma.client.friendship.findMany({
       where: {
         status: 'PENDING',
         requesterId: userId,
@@ -312,7 +312,7 @@ export class RelationshipsService {
   async blockUser(actorUserId: string, targetUserId: string) {
     await this.ensureUsersCanInteract(actorUserId, targetUserId);
 
-    const existingBlock = await this.prisma.block.findUnique({
+    const existingBlock = await this.prisma.client.block.findUnique({
       where: {
         blockerId_blockedId: {
           blockerId: actorUserId,
@@ -330,8 +330,8 @@ export class RelationshipsService {
       targetUserId,
     );
 
-    const [block] = await this.prisma.$transaction([
-      this.prisma.block.create({
+    const [block] = await this.prisma.client.$transaction([
+      this.prisma.client.block.create({
         data: {
           blockerId: actorUserId,
           blockedId: targetUserId,
@@ -339,7 +339,7 @@ export class RelationshipsService {
       }),
       ...(friendship
         ? [
-            this.prisma.friendship.delete({
+            this.prisma.client.friendship.delete({
               where: { id: friendship.id },
             }),
           ]
@@ -360,7 +360,7 @@ export class RelationshipsService {
   async unblockUser(actorUserId: string, targetUserId: string) {
     await this.ensureUsersCanInteract(actorUserId, targetUserId);
 
-    const block = await this.prisma.block.findUnique({
+    const block = await this.prisma.client.block.findUnique({
       where: {
         blockerId_blockedId: {
           blockerId: actorUserId,
@@ -373,7 +373,7 @@ export class RelationshipsService {
       throw new NotFoundException('block not found');
     }
 
-    await this.prisma.block.delete({
+    await this.prisma.client.block.delete({
       where: {
         blockerId_blockedId: {
           blockerId: actorUserId,

@@ -1,8 +1,19 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { addFriendRequest, apiSearchUsers, blockUser, unblockUser } from "@/lib/api/auth";
-import { apiAddMessageReaction, apiCreateGroupConversation, apiGetConversations, apiGetGroupMembers, apiGetMessages, apiInviteGroupMembers, apiLeaveGroupConversation, apiRemoveGroupMember, apiRenameGroupConversation, apiReportMessage, createOrGetDirectConversation } from "@/lib/api/chat";
+import { 
+  apiAddMessageReaction, 
+  apiCreateGroupConversation, 
+  apiGetConversations, 
+  apiGetGroupMembers, 
+  apiGetMessages, 
+  apiInviteGroupMembers, 
+  apiLeaveGroupConversation, 
+  apiRemoveGroupMember, 
+  apiRenameGroupConversation, 
+  apiReportMessage, 
+  createOrGetDirectConversation } from "@/lib/api/chat";
 import { useAuthStore } from "@/store/authStore";
 import { Socket } from "socket.io-client";
 import { getChatSocket, resetChatSocket } from "@/lib/socket/chat-socket";
@@ -547,7 +558,7 @@ function SidebarSearch({
             >
               <div className="w-10 h-10 ColorsS rounded-full flex items-center justify-center text-white font-bold overflow-hidden">
                 {conv.avatarUrl
-                  ? <img src={conv.avatarUrl} className="w-full h-full object-cover" />
+                  ? <img src={conv.avatarUrl} alt={`${conv.name} avatar`} className="w-full h-full object-cover" />
                   : (conv.name ?? '?').charAt(0).toUpperCase()
                 }
               </div>
@@ -857,7 +868,7 @@ function ChatPanel({
 function Section() {
   const socketRef = useRef<Socket | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const user = useAuthStore((state: any) => state.user);
+  const user = useAuthStore((state) => state.user);
   const currentUserId = user?.id;
   
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -884,6 +895,10 @@ function Section() {
   const isOwner = currentUserRole === 'OWNER';
   const [renameModal, setRenameModal] = useState(false);
   const [leaveModal, setLeaveModal] = useState(false);
+  const membersRef = useRef<GroupMember[]>([]);
+  const selectedConvRef = useRef<Conversation | null>(null);
+  const userIdRef = useRef(currentUserId);
+  const convTypeRef = useRef(selectedConv?.type);
 
   const handleOpenMembers = async () => {
     if (!selectedConv) return;
@@ -992,40 +1007,70 @@ function Section() {
     fetchConversations();
   }, [user]);
 
-  useEffect(() => {
-    if (!selectedConv) return;
-	    const fetchMessages = async () => {
-	      try {
-	        const data = await apiGetMessages(selectedConv.id);
-	        setMessages(data);
-          const lastMessage = data[data.length - 1];
-          if (lastMessage && socketRef.current) {
-            socketRef.current.emit('chat.markRead', {
-              conversationId: selectedConv.id,
-              messageId: lastMessage.id,
-            });
-          }
-	      } catch (err) {
-	        console.error(err);
-	        setMessages([]);
-      }
-    };
-    fetchMessages();
-    if (selectedConv.type === 'group') {
-      apiGetGroupMembers(selectedConv.id)
-        .then((data) => setMembers(data))
-        .catch((err) => console.error("Failed to load members for role check:", err));
-    } else {
-      setMembers([]); // Clear members if it's a direct chat
-    }
-  }, [selectedConv]);
+  const convId = selectedConv?.id;
+  const convType = selectedConv?.type;
 
   useEffect(() => {
-    if (!bottomRef.current) return;
-    setTimeout(() => {
-      bottomRef.current?.scrollIntoView({ behavior: "auto" });
-    }, 0);
-  }, [messages, selectedConv]);
+    if (!convId || !currentUserId) { return; }
+    const fetchData = async () => {
+      try {
+        // 1. Fetch both Messages and Members at the same time (faster)
+        // We use Promise.all to wait for both to finish
+        const [rawMessages, groupMembers] = await Promise.all([
+          apiGetMessages(convId),
+          convType === 'group' 
+            ? apiGetGroupMembers(convId) 
+            : Promise.resolve([]) // If it's a DM, we don't need group members
+        ]);
+
+        // 2. update the members and messages state
+        setMembers(groupMembers);
+        setMessages(rawMessages);
+        
+        // 3. Socket Read Receipt
+        const lastMessage = rawMessages[rawMessages.length - 1];
+        if (lastMessage && socketRef.current) {
+          socketRef.current.emit('chat.markRead', {
+            conversationId: convId,
+            messageId: lastMessage.id,
+          });
+        }
+
+      } catch (err) {
+        console.error("Failed to load chat data:", err);
+      }
+    };
+    fetchData();
+    // // CLEANUP: Reset messages when switching conversations to avoid "flicker"
+    return () => {
+      setMessages([]);
+      setMembers([]);
+    }  
+  }, [convId, currentUserId, convType]);
+
+  const filteredMessages = useMemo(() => {
+    // 1. Safety check: if no conversation selected, or messages haven't loaded, return empty
+    if (!selectedConv || !messages.length) return [];
+
+    // 2. If it's a Direct Conversation, show all messages
+    if (selectedConv.type !== 'group') return messages;
+
+    // 3. Find membership dates
+    const myMembership = members.find((m) => m.userId === currentUserId);
+    if (!myMembership) return [];
+    // Use a fallback for joinedAt if for some reason it's missing
+    const joinTime = new Date(myMembership.joinedAt ?? 0).getTime();
+    // If leftAt is null, they are still in the group (Infinity)
+    const leaveTime = myMembership.leftAt 
+      ? new Date(myMembership.leftAt).getTime() 
+      : Infinity;
+
+    // 4. Return only the authorized messages
+    return messages.filter((msg) => {
+      const msgTime = new Date(msg.createdAt ?? 0).getTime();
+      return msgTime >= joinTime && msgTime <= leaveTime;
+    });
+  }, [messages, members, currentUserId, selectedConv]);
 
   useEffect(() => {
     if (!user) {
@@ -1124,14 +1169,14 @@ function Section() {
   };
 
   const handleReact = async (message: ChatMessage, type: ReactionType) => {
+    // Ensure we have a user and it's not his own message
     if (!selectedConv || !user?.id || message.sender.id === user.id || message.deletedAt) return;
-    // const currentUserId = user.id;
 
     try {
       const result = await apiAddMessageReaction(selectedConv.id, message.id, type);
 
-      setMessages((prev) =>
-        prev.map((item) => {
+      setMessages((prev): ChatMessage[]  =>
+        prev.map((item): ChatMessage => {
           if (item.id !== message.id) return item;
 
           const reactions = item.reactions ?? [];
@@ -1147,10 +1192,10 @@ function Section() {
               ...reactions,
               {
                 ...(result.reaction as MessageReaction),
-                userId: currentUserId,
-              },
+                userId: currentUserId as string,
+              } as MessageReaction,
             ],
-          };
+          } as ChatMessage;
         }),
       );
     } catch (err) {
@@ -1158,29 +1203,74 @@ function Section() {
     }
   };
 
-useEffect(() => {
-  if (!user) return;
+  useEffect(() => {
+    membersRef.current = members;
+  }, [members]);
 
-  const token = useAuthStore.getState().accessToken;
-  const socket = getChatSocket(token);
-  if (!socket) return;
-  socketRef.current = socket;
+  useEffect(() => {
+    selectedConvRef.current = selectedConv;
+  }, [selectedConv]);
 
-  socket.on('chat.message.created', (msg: ChatMessage) => {
-    setMessages((prev) => [...prev, msg]);
-    setConversations((prev) => {
-      const updated = prev.map((c) =>
-        c.id === msg.conversationId
-          ? { ...c, lastMessage: msg.content }
-          : c
-      );
-      const idx = updated.findIndex((c) => c.id === msg.conversationId);
-      if (idx > 0) {
-        const [conv] = updated.splice(idx, 1);
-        updated.unshift(conv);
-      }
-      return updated;
-    });
+  useEffect(() => {
+      userIdRef.current = currentUserId;
+      convTypeRef.current = selectedConv?.type;
+    }, [currentUserId, selectedConv?.type]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const token = useAuthStore.getState().accessToken;
+    const socket = getChatSocket(token);
+    if (!socket) return;
+    socketRef.current = socket;
+
+    socket.on('chat.message.created', (msg: ChatMessage) => {
+      // 1. Update Messages with GDPR Filter
+      setMessages((prev): ChatMessage[] => {
+        const myMembership = membersRef.current.find((m) => m.userId === userIdRef.current);
+
+        // GDPR Filter for real-time messages
+        if (myMembership && convTypeRef.current === 'group') {
+          const joinTime = new Date(myMembership.joinedAt ?? 0).getTime();
+          const msgTime = new Date(msg.createdAt ?? 0).getTime();
+          const leaveTime = myMembership.leftAt 
+          ? new Date(myMembership.leftAt).getTime() 
+          : Infinity;
+            // If message is before we joined, or we have already left the group, ignore it
+            if (msgTime < joinTime || msgTime > leaveTime) {
+              console.log("Unauthorized message hidden due to membership window");
+              return prev;
+            }
+        }
+        // authorized: return the new array
+        return [...prev, msg];
+      });
+      // 2. Update Sidebar and Notifications
+      setConversations((prev) => {
+        const updated = prev.map((c) => {
+          // Only update if we are currently looking at the conversation the message belongs to
+          if (c.id === msg.conversationId) {
+            // If this is NOT the current conversation, increment unread count (Notification)
+            const isNotCurrent = selectedConvRef.current?.id !== msg.conversationId;
+            return { 
+              ...c, 
+              lastMessage: msg.content,
+              unreadCount: isNotCurrent ? (c.unreadCount ?? 0) + 1 : c.unreadCount
+            };
+          }
+          return c;
+        });
+        const idx = updated.findIndex((c) => c.id === msg.conversationId);
+        if (idx > 0) {
+          const [conv] = updated.splice(idx, 1);
+          updated.unshift(conv);
+        }
+        return updated;
+      });
+    return () => {
+      socket.off('chat.message.created');
+      // ... any other socket.off calls you have ...
+    };
   });
 
   socket.on('chat.message.updated', (msg: ChatMessage) => {
@@ -1430,19 +1520,19 @@ const handleReport = async (messageId: string, _userId: string, reason: string) 
       )}
       <ChatPanel
         selectedConv={selectedConv}
-	        messages={messages}
-	        messageInput={messageInput}
-	        currentUserId={user?.id}
-          typingUsers={Object.values(typingUsers)}
-          onlineCount={onlineUserIds.size}
-	        bottomRef={bottomRef}
-	        onInputChange={handleInputChange}
-          onSend={handleSend}
-          onEditMessage={handleEditMessage}
-          onDeleteMessage={handleDeleteMessage}
-          onReact={handleReact}
-          onReport={(messageId, userId) => setReportModal({ messageId, userId })}
-          onOpenGroupMenu={() => setGroupMenuOpen(true)}
+        messages={filteredMessages}
+        messageInput={messageInput}
+        currentUserId={user?.id}
+        typingUsers={Object.values(typingUsers)}
+        onlineCount={onlineUserIds.size}
+        bottomRef={bottomRef}
+        onInputChange={handleInputChange}
+        onSend={handleSend}
+        onEditMessage={handleEditMessage}
+        onDeleteMessage={handleDeleteMessage}
+        onReact={handleReact}
+        onReport={(messageId, userId) => setReportModal({ messageId, userId })}
+        onOpenGroupMenu={() => setGroupMenuOpen(true)}
 	      />
     </section>
   );

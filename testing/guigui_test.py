@@ -34,7 +34,7 @@ def test_unit():
     #users_id.append(clement.login().json()['user']['id'])
 #
     #print("guillaume cree un groupe avec yann et clement\n")
-    #conversation_id = guillaume.createGroupRoom("groupe de guigui", users_id).json()['conversation']['id']
+    #conversation_id = guillaume.createGroupRoom("groupe de guigui", users_id).json()['CONVERSATION']['id']
 #
     #print("guillaume envoie un message dans le groupe cree\n")
     #guillaume.sendMessageConversation(conversation_id, "salut c'est guillaume")

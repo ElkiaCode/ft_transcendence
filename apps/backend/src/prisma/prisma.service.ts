@@ -1,80 +1,25 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@prisma/client';
+import { Pool } from 'pg';
 
 @Injectable()
-export class PrismaService
-  extends PrismaClient
-  implements OnModuleInit, OnModuleDestroy
-{
-  constructor() {
-    const adapter = new PrismaPg({
-      connectionString: process.env.DATABASE_URL!,
-    });
+export class PrismaService implements OnModuleInit, OnModuleDestroy {
+  // We make it public so you can still do this.prisma.user.findMany()
+  public readonly client: PrismaClient;
 
-    super({ adapter });
+  constructor() {
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    const adapter = new PrismaPg(pool);
+
+    this.client = new PrismaClient({ adapter });
   }
 
   async onModuleInit() {
-    await this.$connect();
+    await this.client.$connect();
   }
 
   async onModuleDestroy() {
-    await this.$disconnect();
+    await this.client.$disconnect();
   }
 }
-
-/*import { Injectable, OnModuleInit, OnApplicationShutdown } from '@nestjs/common';
-import { Pool } from 'pg';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '../generated/prisma';
-
-@Injectable()
-export class PrismaService implements OnModuleInit, OnApplicationShutdown {
-  private prisma: PrismaClient;
-
-  constructor() {
-    const connectionString = `${process.env.DATABASE_URL}`;
-    const pool = new Pool({ connectionString });
-    const adapter = new PrismaPg(pool);
-    this.prisma = new PrismaClient({ adapter });
-  }
-
-  async onModuleInit() {
-    await this.prisma.$connect();
-  }
-
-  async onApplicationShutdown() {
-    await this.prisma.$disconnect();
-  }
-
-  // Expose Prisma client properties
-  get user() {
-    return this.prisma.user;
-  }
-
-  get profile() {
-    return this.prisma.profile;
-  }
-
-  get oAuthAccount() {
-    return this.prisma.oAuthAccount;
-  }
-
-  get refreshToken() {
-    return this.prisma.refreshToken;
-  }
-
-  get $connect() {
-    return this.prisma.$connect.bind(this.prisma);
-  }
-
-  get $disconnect() {
-    return this.prisma.$disconnect.bind(this.prisma);
-  }
-
-  get $transaction() {
-    return this.prisma.$transaction.bind(this.prisma);
-  }
-}
-*/

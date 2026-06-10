@@ -490,13 +490,13 @@ def test_unit2():
     # full_database_audit()
     print("guillaume creates a group with yann and clement\n")
     res_creationGroup = guillaume.createGroupRoom("groupe de guigui", users_id)
-    conversation_idNb = res_creationGroup.json()['conversation']['id']
+    conversation_idNb = res_creationGroup.json()['CONVERSATION']['id']
     data = res_creationGroup.json()
     # Check the role of the first participant
-    guillaume_entry = data['conversation']['participants'][0]
+    guillaume_entry = data['CONVERSATION']['participants'][0]
     assert guillaume_entry["role"] == "OWNER", f"Expected OWNER, got {guillaume_entry['role']}"
     # Check the role of the first member
-    yann_entry = data['conversation']['participants'][1]
+    yann_entry = data['CONVERSATION']['participants'][1]
     assert yann_entry['role'] == "MEMBER", f"Expected MEMBER, got {yann_entry['role']}"
 
     print("guillaume sends a message into the group\n")
