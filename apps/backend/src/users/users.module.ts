@@ -5,9 +5,12 @@ import { MulterModule } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { ChatModule } from '../chat/chat.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { UsersBootstrapDev } from './bootstrap/users.bootstrap';
+import { AuthModule } from '@/auth/auth.module';
 
 @Module({
   imports: [
+    AuthModule,
     ChatModule,
     NotificationsModule,
     MulterModule.register({
@@ -21,6 +24,6 @@ import { NotificationsModule } from '../notifications/notifications.module';
     }),
   ],
   controllers: [UsersController],
-  providers: [UsersService],
+  providers: [UsersBootstrapDev, UsersService],
 })
 export class UsersModule {}

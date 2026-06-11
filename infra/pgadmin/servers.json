@@ -1,0 +1,13 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "transcendence-postgres",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "transcendence",
+      "Username": "transcendence",
+      "SSLMode": "prefer"
+    }
+  }
+}

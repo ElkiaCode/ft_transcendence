@@ -11,7 +11,6 @@ COPY . .
 
 RUN npx prisma generate && npm run build
 
-
 EXPOSE 3001
 
 CMD ["sh", "-lc", "npx prisma generate && npx prisma migrate deploy && npm run seed:admin && npm run start:dev"]
