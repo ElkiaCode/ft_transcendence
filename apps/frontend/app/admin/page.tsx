@@ -20,9 +20,9 @@ type Report = {
   targetType: 'USER' | 'MESSAGE';
   reason: string;
   createdAt: string;
-  creator: { username: string; profile: { avatarUrl: string | null } | null };
+  creator: { username: string; profile: { avatarUrl: string | null } | null } | null;
   targetUser: { id: string; username: string; profile?: { avatarUrl: string | null } | null } | null;
-  targetMessage: { id: string; content: string | null; sender: { id: string; username: string } } | null;
+  targetMessage: { id: string; content: string | null; sender: { id: string; username: string } | null } | null;
   actions: ModerationAction[];
 };
 
@@ -143,8 +143,10 @@ function ReviewModal({
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
       <div className="bg-white rounded-xl p-6 w-[520px] flex flex-col gap-4 shadow-xl max-h-[90vh] overflow-y-auto">
         <h2 className="text-lg font-bold text-gray-900">Review report</h2>
+
         <div className="text-sm text-gray-600 bg-gray-50 rounded-lg p-3 flex flex-col gap-2">
           <p className="font-medium text-gray-900">{targetDescription()}</p>
+
           {report.targetType === 'MESSAGE' && (
             report.targetMessage?.content
               ? (
@@ -157,6 +159,7 @@ function ReviewModal({
                 </div>
               )
           )}
+
           <p className="text-gray-500">
             <span className="font-medium text-gray-700">Reason:</span> {report.reason}
           </p>
@@ -168,16 +171,19 @@ function ReviewModal({
             on {new Date(report.createdAt).toLocaleDateString()}
           </p>
         </div>
+
         {targetGone && (
           <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm text-amber-700">
             ⚠️ The targeted account no longer exists (RGPD deletion). Only <strong>Dismiss</strong> is available.
           </div>
         )}
+
         {report.actions.length > 0 && (
           <div className="bg-gray-50 rounded-lg p-3">
             <ActionHistory actions={report.actions} />
           </div>
         )}
+
         <div className="flex flex-col gap-2">
           <label className="text-sm font-medium text-gray-700">Action</label>
           <div className="flex flex-wrap gap-2">
@@ -200,6 +206,7 @@ function ReviewModal({
             })}
           </div>
         </div>
+
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-gray-700">Note (optional)</label>
           <input
@@ -209,6 +216,7 @@ function ReviewModal({
             className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
+
         {isAdmin && !targetGone && (
           <div className="flex flex-col gap-1">
             <label className="text-sm font-medium text-gray-700">Penalty points to subtract</label>
@@ -221,6 +229,7 @@ function ReviewModal({
             />
           </div>
         )}
+
         <div className="flex gap-2 justify-end">
           <button
             onClick={onClose}
@@ -243,9 +252,11 @@ function ReviewModal({
 function ReportCard({
   report,
   onReview,
+  isRecentlyReviewed = false,
 }: {
   report: Report;
   onReview: (report: Report) => void;
+  isRecentlyReviewed?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -268,7 +279,9 @@ function ReportCard({
   };
 
   return (
-    <div className="bg-white border border-gray-100 rounded-xl p-4 flex flex-col gap-3 shadow-sm">
+    <div className={`bg-white border rounded-xl p-4 flex flex-col gap-3 shadow-sm transition-colors duration-700 ${
+      isRecentlyReviewed ? 'border-green-300 bg-green-50' : 'border-gray-100'
+    }`}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 flex-wrap">
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
@@ -285,6 +298,11 @@ function ReportCard({
           }`}>
             {report.targetType}
           </span>
+          {isRecentlyReviewed && (
+            <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-700">
+              ✓ Reviewed
+            </span>
+          )}
         </div>
         <span className="text-xs text-gray-400 flex-shrink-0">
           {new Date(report.createdAt).toLocaleDateString()}
@@ -296,7 +314,9 @@ function ReportCard({
         {report.creator?.username ?? <span className="italic text-gray-400">[deleted user]</span>}
         {targetLabel()}
       </div>
+
       <p className="text-sm text-gray-500 italic">{report.reason}</p>
+
       {report.targetType === 'MESSAGE' && (
         report.targetMessage?.content
           ? (
@@ -311,6 +331,7 @@ function ReportCard({
             </div>
           ) : null
       )}
+
       {report.actions.length > 0 && (
         <button
           onClick={() => setExpanded(v => !v)}
@@ -320,6 +341,7 @@ function ReportCard({
         </button>
       )}
       {expanded && <ActionHistory actions={report.actions} />}
+
       {report.status === 'OPEN' && (
         <button
           onClick={() => onReview(report)}
