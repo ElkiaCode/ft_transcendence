@@ -953,8 +953,9 @@ function Section() {
       setConversations((prev) => prev.filter((c) => c.id !== selectedConv.id));
       setSelectedConv(null);
       setLeaveModal(false);
-    } catch (err) {
-      console.error("Failed to leave group:", err);
+    } catch (err: any) {
+      setLeaveModal(false);
+      window.alert(err.message ?? 'Failed to leave group');
     }
   };
 
@@ -1000,6 +1001,7 @@ function Section() {
       try {
         const data = await apiGetConversations();
         setConversations(data);
+        if (data.length > 0) setSelectedConv(data[0]);
       } catch (err) {
         console.error('Failed to load conversations:', err);
       }
