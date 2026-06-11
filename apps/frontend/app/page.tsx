@@ -514,7 +514,10 @@ function SidebarSearch({
   onSearchChange,
   onSelectConv,
   onOpenGroupModal,
-  onDeleteConv, 
+  onDeleteConv,
+  searchResults,
+  onSelectUser,
+  onOpenMenu,
 }: {
   searchQuery: string;
   conversations: Conversation[];
@@ -523,54 +526,128 @@ function SidebarSearch({
   onSelectConv: (conv: Conversation) => void;
   onOpenGroupModal: () => void;
   onDeleteConv: (convId: string) => void;
-  
+  searchResults: SearchUser[];
+  onSelectUser: (user: SearchUser) => void;
+  onOpenMenu: (user: SearchUser, x: number, y: number) => void;
 }) {
   const router = useRouter();
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   return (
     <div className="w-1/4 bg-gray-200 text-black font-bold flex flex-col p-4 gap-4 overflow-hidden">
-      <div className="flex gap-2 items-center">
-      <input
-        type="text"
-        placeholder="Search users..."
-        value={searchQuery}
-        onChange={e => onSearchChange(e.target.value)}
-        className="border border-gray-400 text-black rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 w-[90%] font-normal"
-        onKeyDown={(e) => {
+      <div ref={wrapperRef} className="flex gap-2 items-center relative">
+        <input
+          type="text"
+          placeholder="Search users..."
+          value={searchQuery}
+          onChange={(e) => {
+            onSearchChange(e.target.value);
+            if (e.target.value.trim().length >= 2) {
+              setDropdownOpen(true);
+            } else {
+              setDropdownOpen(false);
+            }
+          }}
+          onFocus={() => {
+            if (searchResults.length > 0) setDropdownOpen(true);
+          }}
+          className="border border-gray-400 text-black rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 w-[90%] font-normal"
+          onKeyDown={(e) => {
             if (e.key === "Enter" && searchQuery.trim().length >= 2) {
               router.push(`/search?query=${searchQuery.trim()}`);
             }
           }}
-      />
-      <button onClick={onOpenGroupModal} className="bg-green-500 text-white px-4 py-2 rounded-full hover:bg-green-600 cursor-pointer transition w-[10%]">
-        <img src="/addGroup.png" alt="Add Group" className="h-full w-full" />
-      </button>
+        />
+        <button
+          onClick={onOpenGroupModal}
+          className="bg-green-500 text-white px-4 py-2 rounded-full hover:bg-green-600 cursor-pointer transition w-[10%]"
+        >
+          <img src="/addGroup.png" alt="Add Group" className="h-full w-full" />
+        </button>
+
+        {dropdownOpen && searchResults.length > 0 && (
+          <div className="absolute top-full left-0 w-[90%] bg-white border border-gray-200 rounded shadow-lg z-10 max-h-60 overflow-y-auto flex flex-col mt-1">
+            {searchResults.map((user) => (
+              <div
+                key={user.id}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onSelectUser(user);
+                  setDropdownOpen(false);
+                }}
+                className="flex items-center gap-3 p-2 hover:bg-gray-100 cursor-pointer"
+              >
+                <div className="w-10 h-10 ColorsS rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center text-white font-medium">
+                  {user.profile?.avatarUrl ? (
+                    <img src={user.profile.avatarUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    user.username.charAt(0).toUpperCase()
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">{user.username}</p>
+                  {user.profile?.displayName && user.profile.displayName !== user.username && (
+                    <p className="text-xs text-gray-500 truncate">{user.profile.displayName}</p>
+                  )}
+                </div>
+                <button
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                    onOpenMenu(
+                      user,
+                      Math.min(rect.right, window.innerWidth - 160),
+                      Math.min(rect.bottom, window.innerHeight - 150)
+                    );
+                    setDropdownOpen(false);
+                  }}
+                  className="px-2 py-1 text-gray-400 hover:text-gray-700 flex-shrink-0"
+                >
+                  ⋯
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-      <div className="flex flex-col gap-2 overflow-y-autoconst router = useRouter(); flex-1">
+
+      <div className="flex flex-col gap-2 overflow-y-auto flex-1">
         <h3 className="text-sm font-bold text-gray-700 px-2 text-center">Chat</h3>
         {conversations.map((conv) => (
           <div
             key={conv.id}
-            className="flex items-center gap-3 p-2 rounded-lg cursor-pointer transition"
+            onClick={() => onSelectConv(conv)}
+            className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition ${
+              selectedConvId === conv.id ? "ColorsS text-white" : "hover:bg-gray-300"
+            }`}
           >
             <div
-              onClick={() => onSelectConv(conv)}
-              className="flex items-center gap-3 flex-1"
+              className={`w-10 h-10 ColorsS rounded-full flex items-center justify-center text-white font-bold overflow-hidden ${
+                selectedConvId === conv.id ? "ring-2 ring-white" : ""
+              }`}
             >
-              <div className="w-10 h-10 ColorsS rounded-full flex items-center justify-center text-white font-bold overflow-hidden">
-                {conv.avatarUrl
-                  ? <img src={conv.avatarUrl} alt={`${conv.name} avatar`} className="w-full h-full object-cover" />
-                  : (conv.name ?? '?').charAt(0).toUpperCase()
-                }
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-sm truncate">{conv.name}</p>
-                <p className="text-xs text-gray-900 truncate">
-                  {conv.lastMessage || "No messages yet"}
-                </p>
-              </div>
+              {conv.avatarUrl ? (
+                <img src={conv.avatarUrl} alt={conv.name} className="w-full h-full object-cover" />
+              ) : (
+                conv.name?.charAt(0).toUpperCase()
+              )}
             </div>
-
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm truncate">{conv.name}</p>
+              <p className="text-xs text-gray-900 truncate">{conv.lastMessage || "No messages yet"}</p>
+            </div>
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -578,7 +655,13 @@ function SidebarSearch({
               }}
               className="text-gray-400 hover:text-red-500 px-1 transition cursor-pointer"
             >
-              🗑
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                <path
+                  fillRule="evenodd"
+                  d="M16.5 4.478v.227a48.816 48.816 0 0 1 3.878.512.75.75 0 1 1-.256 1.478l-.209-.035-1.005 13.07a3 3 0 0 1-2.991 2.77H8.084a3 3 0 0 1-2.991-2.77L4.087 6.66l-.209.035a.75.75 0 0 1-.256-1.478A48.567 48.567 0 0 1 7.5 4.705v-.227c0-1.564 1.213-2.9 2.816-2.951a52.662 52.662 0 0 1 3.369 0c1.603.051 2.815 1.387 2.815 2.951Zm-6.136-1.452a51.196 51.196 0 0 1 3.273 0C14.39 3.05 15 3.684 15 4.478v.113a49.488 49.488 0 0 0-6 0v-.113c0-.794.609-1.428 1.364-1.452Zm-.355 5.945a.75.75 0 1 0-1.5.058l.347 9a.75.75 0 1 0 1.499-.058l-.346-9Zm5.48.058a.75.75 0 1 0-1.498-.058l-.347 9a.75.75 0 0 0 1.5.058l.345-9Z"
+                  clipRule="evenodd"
+                />
+              </svg>
             </button>
           </div>
         ))}
@@ -1437,6 +1520,9 @@ const handleReport = async (messageId: string, _userId: string, reason: string) 
           setConversations((prev) => prev.filter((c) => c.id !== convId));
           if (selectedConv?.id === convId) setSelectedConv(null);
         }}
+        searchResults={searchResults}
+        onSelectUser={handleSelectUser}
+        onOpenMenu={(u, x, y) => setMenu({ user: u, x, y })}
       />
       <SearchDropdown
         results={searchResults}

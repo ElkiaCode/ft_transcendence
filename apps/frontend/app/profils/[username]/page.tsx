@@ -108,8 +108,6 @@ function Section() {
 
   return (
     <section className="flex-1 flex items-center flex-col w-full gap-8 py-12 relative z-10">
-
-      {/* AVATAR */}
       <div
         className="relative w-48 h-48 ColorsS rounded-full overflow-hidden flex items-center justify-center"
         style={{ backgroundColor: user?.profile?.avatarUrl ? 'white' : undefined }}
@@ -126,8 +124,6 @@ function Section() {
           </span>
         )}
       </div>
-
-      {/* NAME + BIO */}
       <div className="flex flex-col items-center gap-2">
         <h2 className="text-4xl font-bold text-white">
           {user?.profile?.displayName ?? user?.username ?? "..."}

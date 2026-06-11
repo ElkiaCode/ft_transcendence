@@ -21,9 +21,9 @@ type Report = {
   targetType: 'USER' | 'MESSAGE';
   reason: string;
   createdAt: string;
-  creator: { username: string; profile: { avatarUrl: string | null } | null };
+  creator: { username: string; profile: { avatarUrl: string | null } | null } | null;
   targetUser: { id: string; username: string; profile?: { avatarUrl: string | null } | null } | null;
-  targetMessage: { id: string; content: string | null; sender: { id: string; username: string } } | null;
+  targetMessage: { id: string; content: string | null; sender: { id: string; username: string } | null } | null;
   actions: ModerationAction[];
 };
 
@@ -144,7 +144,8 @@ function ActionHistory({ actions }: { actions: ModerationAction[] }) {
 function ReviewModal({
   report, isAdmin, onSubmit, onClose,
 }: {
-  report: Report; isAdmin: boolean;
+  report: Report;
+  isAdmin: boolean;
   onSubmit: (action: string, note: string, points: number) => void;
   onClose: () => void;
 }) {
@@ -152,68 +153,125 @@ function ReviewModal({
   const [note, setNote] = useState("");
   const [points, setPoints] = useState(0);
 
+  const targetDescription = () => {
+    if (report.targetType === 'USER') {
+      return report.targetUser
+        ? `Reported user: ${report.targetUser.username}`
+        : 'Reported user: [account deleted]';
+    }
+    return report.targetMessage
+      ? `Message by: ${report.targetMessage.sender?.username ?? '[deleted user]'}`
+      : 'Message: [deleted]';
+  };
+
+  // Si l'utilisateur cible n'existe plus, les actions qui le nécessitent sont désactivées
+  const targetGone =
+    (report.targetType === 'USER' && !report.targetUser) ||
+    (report.targetType === 'MESSAGE' && !report.targetMessage);
+
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
       <div className="bg-white rounded-xl p-6 w-130 flex flex-col gap-4 shadow-xl max-h-[90vh] overflow-y-auto">
         <h2 className="text-lg font-bold text-gray-900">Review report</h2>
+
         <div className="text-sm text-gray-600 bg-gray-50 rounded-lg p-3 flex flex-col gap-2">
-          <p className="font-medium text-gray-900">
-            {report.targetType === 'USER'
-              ? `Reported user: ${report.targetUser?.username}`
-              : `Message by: ${report.targetMessage?.sender.username}`}
-          </p>
-          {report.targetType === 'MESSAGE' && report.targetMessage?.content && (
-            <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 italic">
-              &quot;{report.targetMessage.content}&quot;
-            </div>
+          <p className="font-medium text-gray-900">{targetDescription()}</p>
+
+          {report.targetType === 'MESSAGE' && (
+            report.targetMessage?.content
+              ? (
+                <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 italic">
+                  "{report.targetMessage.content}"
+                </div>
+              ) : (
+                <div className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-400 italic">
+                  [original message deleted]
+                </div>
+              )
           )}
+
           <p className="text-gray-500">
             <span className="font-medium text-gray-700">Reason:</span> {report.reason}
           </p>
           <p className="text-gray-400 text-xs">
-            Reported by <span className="font-medium">{report.creator.username}</span> on {new Date(report.createdAt).toLocaleDateString()}
+            Reported by{' '}
+            <span className="font-medium">
+              {report.creator?.username ?? '[deleted user]'}
+            </span>{' '}
+            on {new Date(report.createdAt).toLocaleDateString()}
           </p>
         </div>
+
+        {targetGone && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm text-amber-700">
+            ⚠️ The targeted account no longer exists (RGPD deletion). Only <strong>Dismiss</strong> is available.
+          </div>
+        )}
+
         {report.actions.length > 0 && (
           <div className="bg-gray-50 rounded-lg p-3">
             <ActionHistory actions={report.actions} />
           </div>
         )}
+
         <div className="flex flex-col gap-2">
           <label className="text-sm font-medium text-gray-700">Action</label>
-          <select
-            value={action}
-            onChange={(e) => setAction(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="WARN">Warn</option>
-            {isAdmin && <option value="BAN">Ban</option>}
-            <option value="UNBAN">Unban</option>
-            <option value="DISMISS_REPORT">Dismiss</option>
-          </select>
+          <div className="flex flex-wrap gap-2">
+            {(['WARN', 'BAN', 'UNBAN', 'DISMISS_REPORT'] as const).map((a) => {
+              const disabledByDeletion = targetGone && a !== 'DISMISS_REPORT';
+              return (
+                <button
+                  key={a}
+                  onClick={() => !disabledByDeletion && setAction(a)}
+                  disabled={disabledByDeletion}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition cursor-pointer ${
+                    action === a
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  } disabled:opacity-40 disabled:cursor-not-allowed`}
+                >
+                  {a === 'DISMISS_REPORT' ? 'DISMISS' : a}
+                </button>
+              );
+            })}
+          </div>
         </div>
-        <div className="flex flex-col gap-2">
+
+        <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-gray-700">Note (optional)</label>
-          <textarea
+          <input
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            className="border border-gray-300 rounded-lg p-3 text-sm text-black resize-none h-24 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-gray-700">Penalty points to subtract</label>
-          <input
-            type="number"
-            min={0}
-            value={points}
-            onChange={(e) => setPoints(Number(e.target.value))}
+            placeholder="Add a note..."
             className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
+
+        {isAdmin && !targetGone && (
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">Penalty points to subtract</label>
+            <input
+              type="number"
+              value={points}
+              onChange={(e) => setPoints(Number(e.target.value))}
+              min={0}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-black focus:outline-none focus:ring-2 focus:ring-blue-500 w-32"
+            />
+          </div>
+        )}
+
         <div className="flex gap-2 justify-end">
-          <button onClick={onClose} className="px-4 py-2 rounded-full text-black hover:bg-gray-100 transition cursor-pointer">Cancel</button>
-          <button onClick={() => onSubmit(action, note, points)} className="px-4 py-2 rounded-full bg-blue-500 text-white hover:bg-blue-600 cursor-pointer transition">
-            Submit
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-full text-black hover:bg-gray-100 transition cursor-pointer text-sm"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onSubmit(action, note, points)}
+            className="px-4 py-2 rounded-full bg-blue-500 text-white hover:bg-blue-600 cursor-pointer transition text-sm"
+          >
+            Confirm
           </button>
         </div>
       </div>
@@ -224,28 +282,44 @@ function ReviewModal({
 function ReportCard({
   report,
   onReview,
-  isRecentlyReviewed,
+  isRecentlyReviewed = false,
 }: {
   report: Report;
-  onReview: (r: Report) => void;
+  onReview: (report: Report) => void;
   isRecentlyReviewed?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
 
+  const isDeleted = (label: string) => (
+    <span className="italic text-gray-400">[{label} deleted]</span>
+  );
+
+  const targetLabel = () => {
+    if (report.targetType === 'USER') {
+      return report.targetUser
+        ? <> → <span className="font-medium">{report.targetUser.username}</span></>
+        : <> → {isDeleted('user')}</>;
+    }
+    if (report.targetType === 'MESSAGE') {
+      return report.targetMessage
+        ? <> → message by <span className="font-medium">{report.targetMessage.sender?.username ?? '[deleted]'}</span></>
+        : <> → {isDeleted('message')}</>;
+    }
+    return null;
+  };
+
   return (
-    <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col gap-2">
-      {isRecentlyReviewed && (
-        <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-1.5 text-xs text-green-700 font-medium">
-          <span>✓</span>
-          <span>Treaty — will disappear in a moment</span>
-        </div>
-      )}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+    <div className={`bg-white border rounded-xl p-4 flex flex-col gap-3 shadow-sm transition-colors duration-700 ${
+      isRecentlyReviewed ? 'border-green-300 bg-green-50' : 'border-gray-100'
+    }`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-            report.status === 'OPEN' ? 'bg-yellow-100 text-yellow-700' :
-            report.status === 'RESOLVED' ? 'bg-green-100 text-green-700' :
-            'bg-gray-100 text-gray-500'
+            report.status === 'OPEN'
+              ? 'bg-yellow-100 text-yellow-700'
+              : report.status === 'RESOLVED'
+              ? 'bg-green-100 text-green-700'
+              : 'bg-gray-100 text-gray-500'
           }`}>
             {report.status}
           </span>
@@ -254,26 +328,40 @@ function ReportCard({
           }`}>
             {report.targetType}
           </span>
+          {isRecentlyReviewed && (
+            <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-green-100 text-green-700">
+              ✓ Reviewed
+            </span>
+          )}
         </div>
-        <span className="text-xs text-gray-400">{new Date(report.createdAt).toLocaleDateString()}</span>
+        <span className="text-xs text-gray-400 flex-shrink-0">
+          {new Date(report.createdAt).toLocaleDateString()}
+        </span>
       </div>
+
       <div className="text-sm text-gray-700">
-        <span className="font-medium">By:</span> {report.creator?.username ?? "Unknown"}
-        {report.targetType === 'USER' && report.targetUser && (
-          <> → <span className="font-medium">{report.targetUser.username}</span></>
-        )}
-        {report.targetType === 'MESSAGE' && report.targetMessage && (
-          <> → message by <span className="font-medium">{report.targetMessage.sender.username}</span></>
-        )}
+        <span className="font-medium">By:</span>{' '}
+        {report.creator?.username ?? <span className="italic text-gray-400">[deleted user]</span>}
+        {targetLabel()}
       </div>
+
       <p className="text-sm text-gray-500 italic">{report.reason}</p>
-      {report.targetType === 'MESSAGE' && report.targetMessage?.content && (
-        <div className="bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 text-sm text-gray-600 italic">
-          &quot;{report.targetMessage.content.length > 120
-            ? report.targetMessage.content.slice(0, 120) + '…'
-            : report.targetMessage.content}&quot;
-        </div>
+
+      {report.targetType === 'MESSAGE' && (
+        report.targetMessage?.content
+          ? (
+            <div className="bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 text-sm text-gray-600 italic">
+              "{report.targetMessage.content.length > 120
+                ? report.targetMessage.content.slice(0, 120) + '…'
+                : report.targetMessage.content}"
+            </div>
+          ) : report.targetMessage === null ? (
+            <div className="bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 text-sm text-gray-400 italic">
+              [original message deleted]
+            </div>
+          ) : null
       )}
+
       {report.actions.length > 0 && (
         <button
           onClick={() => setExpanded(v => !v)}
@@ -283,6 +371,7 @@ function ReportCard({
         </button>
       )}
       {expanded && <ActionHistory actions={report.actions} />}
+
       {report.status === 'OPEN' && (
         <button
           onClick={() => onReview(report)}
@@ -589,14 +678,12 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
             )}
           </div>
         </div>
-
-        {/* Dropdown suggestions */}
         {suggestions.length > 0 && (
           <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden">
             {suggestions.map((u) => (
               <button
                 key={u.id}
-                onMouseDown={(e) => e.preventDefault()} // ← empêche le blur de l'input avant le click
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => handleSelectUser(u)}
                 className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition cursor-pointer text-left"
               >
@@ -621,8 +708,6 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
             ))}
           </div>
         )}
-
-        {/* Aucun résultat */}
         {username.trim().length >= 2 && !searching && suggestions.length === 0 && !result && (
           <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg px-4 py-3">
             <p className="text-sm text-gray-400">No users found for &quot;{username}&quot;</p>
@@ -685,7 +770,7 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
               <button
                 onClick={() => setConfirmModal({
                   title: 'Ban user',
-                  description: `Are you sure you want to ban ${result.username}? They will no longer be able to access the platform.`,
+                  description: `Are you sure you want to ban ${result.username}? He will no longer be able to access the platform.`,
                   confirmLabel: 'Ban',
                   confirmColor: 'bg-red-500 hover:bg-red-600',
                   onConfirm: () => {
