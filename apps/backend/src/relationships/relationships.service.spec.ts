@@ -30,7 +30,7 @@ describe('RelationshipsService', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     prismaMock = mockDeep<PrismaService>();
-    prismaMock.$transaction.mockImplementation((promises) => {
+    prismaMock.client.$transaction.mockImplementation((promises) => {
       if (Array.isArray(promises)) {
         return Promise.all(promises);
       }
@@ -74,11 +74,13 @@ describe('RelationshipsService', () => {
     });
 
     it('Scenario 2: should throw BadRequest if a block exists', async () => {
-      prismaMock.user.findUnique.mockResolvedValueOnce(mockUser as any);
-      prismaMock.user.findUnique.mockResolvedValueOnce(mockTarget as any);
+      prismaMock.client.user.findUnique.mockResolvedValueOnce(mockUser as any);
+      prismaMock.client.user.findUnique.mockResolvedValueOnce(
+        mockTarget as any,
+      );
 
       // Mock finding an existing block
-      prismaMock.block.findFirst.mockResolvedValue({
+      prismaMock.client.block.findFirst.mockResolvedValue({
         id: 'block-1',
         createdAt: new Date(),
         blockerId: '',
@@ -95,10 +97,12 @@ describe('RelationshipsService', () => {
     });
 
     it('Scenario 3: should successfully create a friend request and notify the user', async () => {
-      prismaMock.user.findUnique.mockResolvedValueOnce(mockUser as any);
-      prismaMock.user.findUnique.mockResolvedValueOnce(mockTarget as any);
-      prismaMock.block.findFirst.mockResolvedValue(null);
-      prismaMock.friendship.findFirst.mockResolvedValue(null);
+      prismaMock.client.user.findUnique.mockResolvedValueOnce(mockUser as any);
+      prismaMock.client.user.findUnique.mockResolvedValueOnce(
+        mockTarget as any,
+      );
+      prismaMock.client.block.findFirst.mockResolvedValue(null);
+      prismaMock.client.friendship.findFirst.mockResolvedValue(null);
 
       const mockFriendship = {
         id: 'f-1',
@@ -108,12 +112,14 @@ describe('RelationshipsService', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      prismaMock.friendship.create.mockResolvedValue(mockFriendship as any);
+      prismaMock.client.friendship.create.mockResolvedValue(
+        mockFriendship as any,
+      );
 
       const result = await service.sendFriendRequest('user-1', 'user-2');
 
       expect(result['message']).toBe('friend request sent');
-      expect(prismaMock.friendship.create).toHaveBeenCalled();
+      expect(prismaMock.client.friendship.create).toHaveBeenCalled();
       expect(notificationsService['createFromInput']).toHaveBeenCalled();
       expect(gateway['emitNotificationCreated']).toHaveBeenCalledWith(
         'user-2',
@@ -124,9 +130,9 @@ describe('RelationshipsService', () => {
 
   describe('acceptFriendRequest', () => {
     it('Scenario 1: should throw NotFound if no pending request exists', async () => {
-      prismaMock.user.findUnique.mockResolvedValue(mockUser as any);
-      prismaMock.block.findFirst.mockResolvedValue(null);
-      prismaMock.friendship.findFirst.mockResolvedValue(null);
+      prismaMock.client.user.findUnique.mockResolvedValue(mockUser as any);
+      prismaMock.client.block.findFirst.mockResolvedValue(null);
+      prismaMock.client.friendship.findFirst.mockResolvedValue(null);
 
       await expect(
         service.acceptFriendRequest('user-1', 'user-2'),
@@ -136,32 +142,30 @@ describe('RelationshipsService', () => {
 
   describe('blockUser', () => {
     it('Scenario 1: should create a block and delete existing friendship in a transaction', async () => {
-      prismaMock.user.findUnique.mockResolvedValueOnce(mockUser as any);
-      prismaMock.user.findUnique.mockResolvedValueOnce(mockTarget as any);
+      prismaMock.client.user.findUnique.mockResolvedValueOnce(mockUser as any);
+      prismaMock.client.user.findUnique.mockResolvedValueOnce(
+        mockTarget as any,
+      );
 
-      prismaMock.block.findUnique.mockResolvedValue(null); // No existing block
+      prismaMock.client.block.findUnique.mockResolvedValue(null); // No existing block
       const mockFriendship = { id: 'f-1', status: 'PENDING' };
-      prismaMock.friendship.findFirst.mockResolvedValue(mockFriendship as any);
-      // prismaMock.friendship.findFirst.mockResolvedValue({
-      //   id: 'f-1',
-      //   createdAt: new Date(),
-      //   updatedAt: new Date(),
-      //   requesterId: '',
-      //   addresseeId: '',
-      //   status: 'PENDING',
-      // }); // Existing friendship
+      prismaMock.client.friendship.findFirst.mockResolvedValue(
+        mockFriendship as any,
+      );
 
       const mockBlock = { id: 'b-1', blockerId: 'user-1', blockedId: 'user-2' };
-      prismaMock.block.create.mockResolvedValue(mockBlock as any);
-      prismaMock.friendship.delete.mockResolvedValue(mockFriendship as any);
+      prismaMock.client.block.create.mockResolvedValue(mockBlock as any);
+      prismaMock.client.friendship.delete.mockResolvedValue(
+        mockFriendship as any,
+      );
 
       const result = await service.blockUser('user-1', 'user-2');
 
-      expect(prismaMock.$transaction).toHaveBeenCalled();
-      expect(prismaMock.block.create).toHaveBeenCalledWith({
+      expect(prismaMock.client.$transaction).toHaveBeenCalled();
+      expect(prismaMock.client.block.create).toHaveBeenCalledWith({
         data: { blockerId: 'user-1', blockedId: 'user-2' },
       });
-      expect(prismaMock.friendship.delete).toHaveBeenCalledWith({
+      expect(prismaMock.client.friendship.delete).toHaveBeenCalledWith({
         where: { id: 'f-1' },
       });
       expect(result.friendshipRemoved).toBe(true);
@@ -169,20 +173,3 @@ describe('RelationshipsService', () => {
     });
   });
 });
-// const createMockUser = (overrides: Partial<User> = {}): User => {
-//   const defaultUser: User = {
-//     id: 'user-id',
-//     createdAt: new Date(),
-//     updatedAt: new Date(),
-//     email: 'test@test.com',
-//     username: 'testuser',
-//     passwordHash: null,
-//     globalRole: GlobalRole.USER,
-//     isActive: true,
-//     isBanned: false,
-//     penaltyPoints: 0,
-//     preferredLanguage: 'en',
-//     ...overrides,
-//   };
-//   return { ...defaultUser, ...overrides };
-// };

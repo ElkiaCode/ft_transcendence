@@ -280,7 +280,7 @@ function BadgeGrid({
               key={badge.id}
               className={`min-h-24 border-2 rounded-lg px-4 py-3 flex items-center gap-3 shadow-sm ${badge.accentClass}`}
             >
-              <div className="w-12 h-12 rounded-full bg-white/80 border border-current flex items-center justify-center text-sm font-black flex-shrink-0">
+              <div className="w-12 h-12 rounded-full bg-white/80 border border-current flex items-center justify-center text-sm font-black shrink-0">
                 {badge.mark}
               </div>
               <div className="min-w-0 text-left">
@@ -511,6 +511,45 @@ function Section() {
           Change password
         </button>
       </div>
+
+      {/* LEADERBOARD */}
+      <div className="w-full max-w-md mt-4">
+        <h3 className="text-center font-bold mb-3 TextColorS text-lg">🏆 Top Users</h3>
+        <div className="rounded-lg overflow-hidden border-4 BorderColorS bg-white shadow-md">
+          {topUsers.length === 0 && (
+            <div className="px-4 py-6 text-center ColorsS">
+            <p className="text-white font-medium">No users yet</p>
+            </div>
+         )}
+          {topUsers.map((u, i) => (
+            <div
+              key={u.id}
+              className="flex items-center gap-3 px-4 py-3 border-b last:border-b-0"
+              style={{
+               backgroundColor: 'white',
+               border: '4px solid #00BABC',
+              }}
+            >
+              <span
+                className="font-bold w-6 h-6 flex items-center justify-center text-base"
+                style={{ color: getRankColor(i) }}
+              >
+                {getTrophy(i) ?? i + 1}
+              </span>
+              <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 flex items-center justify-center ColorsS">
+                {u.profile?.avatarUrl ? (
+                  <img src={u.profile.avatarUrl} alt={u.username} className="w-full h-full object-cover bg-white" />
+                ) : (
+                  <span className="text-black text-xs font-bold">{u.username.charAt(0).toUpperCase()}</span>
+                )}
+              </div>
+              <span className="flex-1 text-sm font-medium" style={{ color: 'black' }}>{u.profile?.displayName ?? u.username}</span>
+              <span className="font-bold text-sm" style={{ color: 'black' }}>{u.penaltyPoints} pts</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {showEdit && (
         <EditModal
           user={user}

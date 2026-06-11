@@ -1,8 +1,19 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { addFriendRequest, apiSearchUsers, blockUser, unblockUser } from "@/lib/api/auth";
-import { apiAddMessageReaction, apiCreateGroupConversation, apiGetConversations, apiGetGroupMembers, apiGetMessages, apiInviteGroupMembers, apiLeaveGroupConversation, apiRemoveGroupMember, apiRenameGroupConversation, apiReportMessage, createOrGetDirectConversation } from "@/lib/api/chat";
+import { 
+  apiAddMessageReaction, 
+  apiCreateGroupConversation, 
+  apiGetConversations, 
+  apiGetGroupMembers, 
+  apiGetMessages, 
+  apiInviteGroupMembers, 
+  apiLeaveGroupConversation, 
+  apiRemoveGroupMember, 
+  apiRenameGroupConversation, 
+  apiReportMessage, 
+  createOrGetDirectConversation } from "@/lib/api/chat";
 import { useAuthStore } from "@/store/authStore";
 import { Socket } from "socket.io-client";
 import { getChatSocket, resetChatSocket } from "@/lib/socket/chat-socket";
@@ -41,12 +52,14 @@ function GroupMenuModal({
   onRename,
   onLeave,
   onClose,
+  isOwner, 
 }: {
   onInvite: () => void;
   onMembers: () => void;
   onRename: () => void;
   onLeave: () => void;
   onClose: () => void;
+  isOwner: boolean; 
 }) {
   return (
     <div className="fixed inset-0 z-40" onClick={onClose}>
@@ -54,15 +67,19 @@ function GroupMenuModal({
         className="absolute right-4 top-12 bg-white rounded-lg shadow-lg w-44 flex flex-col overflow-hidden border border-gray-200"
         onClick={(e) => e.stopPropagation()}
       >
-        <button onClick={onInvite} className="text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition">
-          Add members
-        </button>
+        {isOwner && (
+          <button onClick={onInvite} className="text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition">
+            Add members
+          </button>
+        )}
         <button onClick={onMembers} className="text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition">
           View members
         </button>
-        <button onClick={onRename} className="text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition">
-          Rename group
-        </button>
+        {isOwner && (
+          <button onClick={onRename} className="text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition">
+            Rename group
+          </button>
+        )}
         <button onClick={onLeave} className="text-left px-4 py-2 text-sm text-red-500 hover:bg-gray-100 transition">
           Leave group
         </button>
@@ -118,7 +135,7 @@ function InviteMembersModal({
                   onClick={() => toggleUser(user)}
                   className={`flex items-center gap-3 p-2 cursor-pointer transition ${isSelected ? 'ColorsS' : 'hover:bg-gray-100'}`}
                 >
-                  <div className="w-8 h-8 ColorsS rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
+                  <div className="w-8 h-8 ColorsS rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0">
                     {user.profile?.avatarUrl ? (
                       <img src={user.profile.avatarUrl} alt={user.username} className="w-full h-full object-cover rounded-full" />
                     ) : (
@@ -178,7 +195,7 @@ function MembersModal({
         <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
           {members.map((member) => (
             <div key={member.userId} className="flex items-center gap-3 p-2 rounded-lg">
-              <div className="w-8 h-8 ColorsS rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0 overflow-hidden">
+              <div className="w-8 h-8 ColorsS rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0 overflow-hidden">
                 {member.user.avatarUrl ? (
                   <img src={member.user.avatarUrl} alt={member.user.username} className="w-full h-full object-cover" />
                 ) : (
@@ -330,7 +347,7 @@ function CreateGroupModal({
                     isSelected ? 'ColorsS' : 'hover:bg-gray-100'
                   }`}
                 >
-                  <div className="w-8 h-8 ColorsS rounded-full flex items-center justify-center text-white text-sm font-medium flex-shrink-0">
+                  <div className="w-8 h-8 ColorsS rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0">
                     {user.profile?.avatarUrl ? (
                       <img src={user.profile.avatarUrl} alt={user.username} className="w-full h-full object-cover rounded-full" />
                     ) : (
@@ -672,7 +689,7 @@ function SearchDropdown({
           onClick={() => onSelectUser(user)}
           className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-300 cursor-pointer"
         >
-          <div className="w-10 h-10 ColorsS rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center text-white font-medium">
+          <div className="w-10 h-10 ColorsS rounded-full shrink-0 overflow-hidden flex items-center justify-center text-white font-medium">
             {user.profile?.avatarUrl ? (
               <img src={user.profile.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
             ) : (
@@ -736,7 +753,7 @@ function UserContextMenu({
         onClick={() => onViewProfile(user.username)}
         className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition"
       >
-        <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
+        <span className="w-2.5 h-2.5 mr-3 shrink-0 rounded-full bg-pink-500"></span>
         View Profile
      </button>
       <button
@@ -744,7 +761,7 @@ function UserContextMenu({
         onClick={() => onAddFriend(user.id)}
         className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition"
       >
-        <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
+        <span className="w-2.5 h-2.5 mr-3 shrink-0 rounded-full bg-pink-500"></span>
         Add friend
       </button>
       <button
@@ -752,7 +769,7 @@ function UserContextMenu({
         onClick={() => onBlock(user.id)}
         className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition"
       >
-        <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
+        <span className="w-2.5 h-2.5 mr-3 shrink-0 rounded-full bg-pink-500"></span>
         Block User
       </button>
       <button
@@ -760,7 +777,7 @@ function UserContextMenu({
         onClick={() => onUnblock(user.id)}
         className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition"
       >
-        <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
+        <span className="w-2.5 h-2.5 mr-3 shrink-0 rounded-full bg-pink-500"></span>
         Unblock User
       </button>
       {isAdmin && (
@@ -769,7 +786,7 @@ function UserContextMenu({
             onClick={() => onPromote(user.id)}
             className="flex items-center w-full px-4 py-2 text-sm font-bold leading-none text-white hover:bg-white/20 transition"
           >
-            <span className="w-2.5 h-2.5 mr-3 flex-shrink-0 rounded-full bg-pink-500"></span>
+            <span className="w-2.5 h-2.5 mr-3 shrink-0 rounded-full bg-pink-500"></span>
             Promote to Moderator
         </button>
       )}
@@ -854,7 +871,7 @@ function ChatPanel({
                     {!isMe && (
                       <span className="text-xs text-gray-500 mb-1 ml-1">{msg.sender.username}</span>
                     )}
-                    <div className={`px-3 py-2 rounded-lg text-sm font-bold break-words overflow-hidden ${isMe ? "ColorsS text-white" : "bg-gray-300 text-black"} ${isDeleted ? "italic opacity-70" : ""}`}>
+                    <div className={`px-3 py-2 rounded-lg text-sm font-bold wrap-break-word overflow-hidden ${isMe ? "ColorsS text-white" : "bg-gray-300 text-black"} ${isDeleted ? "italic opacity-70" : ""}`}>
                       {isDeleted ? "Message deleted" : msg.content}
                     </div>
                     {!isMe && !isDeleted && (
@@ -935,6 +952,8 @@ function Section() {
   const socketRef = useRef<Socket | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const user = useAuthStore((state) => state.user);
+  const currentUserId = user?.id;
+  
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const router = useRouter();
   //const [messages, setMessages] = useState<any[]>([]);
@@ -955,8 +974,14 @@ function Section() {
   const [inviteModal, setInviteModal] = useState(false);
   const [membersModal, setMembersModal] = useState(false);
   const [members, setMembers] = useState<GroupMember[]>([]);
+  const currentUserRole = members?.find((m) => m.userId === user?.id)?.role;
+  const isOwner = currentUserRole === 'OWNER';
   const [renameModal, setRenameModal] = useState(false);
   const [leaveModal, setLeaveModal] = useState(false);
+  const membersRef = useRef<GroupMember[]>([]);
+  const selectedConvRef = useRef<Conversation | null>(null);
+  const userIdRef = useRef(currentUserId);
+  const convTypeRef = useRef(selectedConv?.type);
 
   const handleOpenMembers = async () => {
     if (!selectedConv) return;
@@ -1011,8 +1036,9 @@ function Section() {
       setConversations((prev) => prev.filter((c) => c.id !== selectedConv.id));
       setSelectedConv(null);
       setLeaveModal(false);
-    } catch (err) {
-      console.error("Failed to leave group:", err);
+    } catch (err: any) {
+      setLeaveModal(false);
+      window.alert(err.message ?? 'Failed to leave group');
     }
   };
 
@@ -1058,6 +1084,7 @@ function Section() {
       try {
         const data = await apiGetConversations();
         setConversations(data);
+        if (data.length > 0) setSelectedConv(data[0]);
       } catch (err) {
         console.error('Failed to load conversations:', err);
       }
@@ -1065,33 +1092,70 @@ function Section() {
     fetchConversations();
   }, [user]);
 
-  useEffect(() => {
-    if (!selectedConv) return;
-	    const fetchMessages = async () => {
-	      try {
-	        const data = await apiGetMessages(selectedConv.id);
-	        setMessages(data);
-          const lastMessage = data[data.length - 1];
-          if (lastMessage && socketRef.current) {
-            socketRef.current.emit('chat.markRead', {
-              conversationId: selectedConv.id,
-              messageId: lastMessage.id,
-            });
-          }
-	      } catch (err) {
-	        console.error(err);
-	        setMessages([]);
-      }
-    };
-    fetchMessages();
-  }, [selectedConv]);
+  const convId = selectedConv?.id;
+  const convType = selectedConv?.type;
 
   useEffect(() => {
-    if (!bottomRef.current) return;
-    setTimeout(() => {
-      bottomRef.current?.scrollIntoView({ behavior: "auto" });
-    }, 0);
-  }, [messages, selectedConv]);
+    if (!convId || !currentUserId) { return; }
+    const fetchData = async () => {
+      try {
+        // 1. Fetch both Messages and Members at the same time (faster)
+        // We use Promise.all to wait for both to finish
+        const [rawMessages, groupMembers] = await Promise.all([
+          apiGetMessages(convId),
+          convType === 'group' 
+            ? apiGetGroupMembers(convId) 
+            : Promise.resolve([]) // If it's a DM, we don't need group members
+        ]);
+
+        // 2. update the members and messages state
+        setMembers(groupMembers);
+        setMessages(rawMessages);
+        
+        // 3. Socket Read Receipt
+        const lastMessage = rawMessages[rawMessages.length - 1];
+        if (lastMessage && socketRef.current) {
+          socketRef.current.emit('chat.markRead', {
+            conversationId: convId,
+            messageId: lastMessage.id,
+          });
+        }
+
+      } catch (err) {
+        console.error("Failed to load chat data:", err);
+      }
+    };
+    fetchData();
+    // // CLEANUP: Reset messages when switching conversations to avoid "flicker"
+    return () => {
+      setMessages([]);
+      setMembers([]);
+    }  
+  }, [convId, currentUserId, convType]);
+
+  const filteredMessages = useMemo(() => {
+    // 1. Safety check: if no conversation selected, or messages haven't loaded, return empty
+    if (!selectedConv || !messages.length) return [];
+
+    // 2. If it's a Direct Conversation, show all messages
+    if (selectedConv.type !== 'group') return messages;
+
+    // 3. Find membership dates
+    const myMembership = members.find((m) => m.userId === currentUserId);
+    if (!myMembership) return [];
+    // Use a fallback for joinedAt if for some reason it's missing
+    const joinTime = new Date(myMembership.joinedAt ?? 0).getTime();
+    // If leftAt is null, they are still in the group (Infinity)
+    const leaveTime = myMembership.leftAt 
+      ? new Date(myMembership.leftAt).getTime() 
+      : Infinity;
+
+    // 4. Return only the authorized messages
+    return messages.filter((msg) => {
+      const msgTime = new Date(msg.createdAt ?? 0).getTime();
+      return msgTime >= joinTime && msgTime <= leaveTime;
+    });
+  }, [messages, members, currentUserId, selectedConv]);
 
   useEffect(() => {
     if (!user) {
@@ -1190,14 +1254,14 @@ function Section() {
   };
 
   const handleReact = async (message: ChatMessage, type: ReactionType) => {
+    // Ensure we have a user and it's not his own message
     if (!selectedConv || !user?.id || message.sender.id === user.id || message.deletedAt) return;
-    const currentUserId = user.id;
 
     try {
       const result = await apiAddMessageReaction(selectedConv.id, message.id, type);
 
-      setMessages((prev) =>
-        prev.map((item) => {
+      setMessages((prev): ChatMessage[]  =>
+        prev.map((item): ChatMessage => {
           if (item.id !== message.id) return item;
 
           const reactions = item.reactions ?? [];
@@ -1213,10 +1277,10 @@ function Section() {
               ...reactions,
               {
                 ...(result.reaction as MessageReaction),
-                userId: currentUserId,
-              },
+                userId: currentUserId as string,
+              } as MessageReaction,
             ],
-          };
+          } as ChatMessage;
         }),
       );
     } catch (err) {
@@ -1224,29 +1288,74 @@ function Section() {
     }
   };
 
-useEffect(() => {
-  if (!user) return;
+  useEffect(() => {
+    membersRef.current = members;
+  }, [members]);
 
-  const token = useAuthStore.getState().accessToken;
-  const socket = getChatSocket(token);
-  if (!socket) return;
-  socketRef.current = socket;
+  useEffect(() => {
+    selectedConvRef.current = selectedConv;
+  }, [selectedConv]);
 
-  socket.on('chat.message.created', (msg: ChatMessage) => {
-    setMessages((prev) => [...prev, msg]);
-    setConversations((prev) => {
-      const updated = prev.map((c) =>
-        c.id === msg.conversationId
-          ? { ...c, lastMessage: msg.content }
-          : c
-      );
-      const idx = updated.findIndex((c) => c.id === msg.conversationId);
-      if (idx > 0) {
-        const [conv] = updated.splice(idx, 1);
-        updated.unshift(conv);
-      }
-      return updated;
-    });
+  useEffect(() => {
+      userIdRef.current = currentUserId;
+      convTypeRef.current = selectedConv?.type;
+    }, [currentUserId, selectedConv?.type]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const token = useAuthStore.getState().accessToken;
+    const socket = getChatSocket(token);
+    if (!socket) return;
+    socketRef.current = socket;
+
+    socket.on('chat.message.created', (msg: ChatMessage) => {
+      // 1. Update Messages with GDPR Filter
+      setMessages((prev): ChatMessage[] => {
+        const myMembership = membersRef.current.find((m) => m.userId === userIdRef.current);
+
+        // GDPR Filter for real-time messages
+        if (myMembership && convTypeRef.current === 'group') {
+          const joinTime = new Date(myMembership.joinedAt ?? 0).getTime();
+          const msgTime = new Date(msg.createdAt ?? 0).getTime();
+          const leaveTime = myMembership.leftAt 
+          ? new Date(myMembership.leftAt).getTime() 
+          : Infinity;
+            // If message is before we joined, or we have already left the group, ignore it
+            if (msgTime < joinTime || msgTime > leaveTime) {
+              console.log("Unauthorized message hidden due to membership window");
+              return prev;
+            }
+        }
+        // authorized: return the new array
+        return [...prev, msg];
+      });
+      // 2. Update Sidebar and Notifications
+      setConversations((prev) => {
+        const updated = prev.map((c) => {
+          // Only update if we are currently looking at the conversation the message belongs to
+          if (c.id === msg.conversationId) {
+            // If this is NOT the current conversation, increment unread count (Notification)
+            const isNotCurrent = selectedConvRef.current?.id !== msg.conversationId;
+            return { 
+              ...c, 
+              lastMessage: msg.content,
+              unreadCount: isNotCurrent ? (c.unreadCount ?? 0) + 1 : c.unreadCount
+            };
+          }
+          return c;
+        });
+        const idx = updated.findIndex((c) => c.id === msg.conversationId);
+        if (idx > 0) {
+          const [conv] = updated.splice(idx, 1);
+          updated.unshift(conv);
+        }
+        return updated;
+      });
+    return () => {
+      socket.off('chat.message.created');
+      // ... any other socket.off calls you have ...
+    };
   });
 
   socket.on('chat.message.updated', (msg: ChatMessage) => {
@@ -1395,7 +1504,9 @@ const handleReport = async (messageId: string, _userId: string, reason: string) 
     console.error("Failed to report:", err);
   }
 };
-
+  console.log("DEBUG ROLE:", {
+    members, userId: user?.id, role: currentUserRole
+  });
   return (
     <section className="flex flex-1 h-full relative overflow-hidden">
       <SidebarSearch
@@ -1464,6 +1575,7 @@ const handleReport = async (messageId: string, _userId: string, reason: string) 
           onRename={() => { setRenameModal(true); setGroupMenuOpen(false); }}
           onLeave={() => { setLeaveModal(true); setGroupMenuOpen(false); }}
           onClose={() => setGroupMenuOpen(false)}
+          isOwner={isOwner} 
         />
       )}
       {inviteModal && (
@@ -1496,19 +1608,19 @@ const handleReport = async (messageId: string, _userId: string, reason: string) 
       )}
       <ChatPanel
         selectedConv={selectedConv}
-	        messages={messages}
-	        messageInput={messageInput}
-	        currentUserId={user?.id}
-          typingUsers={Object.values(typingUsers)}
-          onlineCount={onlineUserIds.size}
-	        bottomRef={bottomRef}
-	        onInputChange={handleInputChange}
-          onSend={handleSend}
-          onEditMessage={handleEditMessage}
-          onDeleteMessage={handleDeleteMessage}
-          onReact={handleReact}
-          onReport={(messageId, userId) => setReportModal({ messageId, userId })}
-          onOpenGroupMenu={() => setGroupMenuOpen(true)}
+        messages={filteredMessages}
+        messageInput={messageInput}
+        currentUserId={user?.id}
+        typingUsers={Object.values(typingUsers)}
+        onlineCount={onlineUserIds.size}
+        bottomRef={bottomRef}
+        onInputChange={handleInputChange}
+        onSend={handleSend}
+        onEditMessage={handleEditMessage}
+        onDeleteMessage={handleDeleteMessage}
+        onReact={handleReact}
+        onReport={(messageId, userId) => setReportModal({ messageId, userId })}
+        onOpenGroupMenu={() => setGroupMenuOpen(true)}
 	      />
     </section>
   );

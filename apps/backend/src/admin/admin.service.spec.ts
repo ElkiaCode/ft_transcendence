@@ -22,6 +22,7 @@ describe('AdminService', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     prismaMock = mockDeep<PrismaService>();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AdminService,
@@ -57,7 +58,7 @@ describe('AdminService', () => {
     });
 
     it('Scenario 2 - should throw NotFoundException if targetUser not found', async () => {
-      prismaMock.user.findUnique.mockResolvedValue(null); //nothing found ind DB
+      prismaMock.client.user.findUnique.mockResolvedValue(null); //nothing found ind DB
       await expect(service.banUser('targetUser', 'actorUser')).rejects.toThrow(
         new NotFoundException('User to ban does not exist'),
       );
@@ -69,7 +70,7 @@ describe('AdminService', () => {
         username: 'userBanned',
         isBanned: true,
       };
-      prismaMock.user.findUnique.mockResolvedValue(mockUser as any);
+      prismaMock.client.user.findUnique.mockResolvedValue(mockUser as any);
       await expect(service.banUser(mockUser.id, 'actorUser')).rejects.toThrow(
         new BadRequestException('User already banned'),
       );
@@ -81,7 +82,7 @@ describe('AdminService', () => {
         username: 'userBanned',
         isBanned: true,
       };
-      prismaMock.user.findUnique.mockResolvedValue(mockUser as any);
+      prismaMock.client.user.findUnique.mockResolvedValue(mockUser as any);
       await expect(service.banUser(mockUser.id, 'actorUser')).rejects.toThrow(
         new BadRequestException('User already banned'),
       );
@@ -103,18 +104,20 @@ describe('AdminService', () => {
         isBanned: true,
         isActive: false,
       };
-      prismaMock.user.findUnique.mockResolvedValue(mockUser as any);
-      prismaMock.$transaction.mockResolvedValue([
+      prismaMock.client.user.findUnique.mockResolvedValue(mockUser as any);
+      prismaMock.client.$transaction.mockResolvedValue([
         updatedUserMock, // This is what [updateUser] will receive
-        { id: 'refreshToken1', userId: 'targetId' } // This is for the second op in the transaction
+        { id: 'refreshToken1', userId: 'targetId' }, // This is for the second op in the transaction
       ]);
-
 
       const result = await service.banUser(targetId, actorId);
 
       expect(result.message).toBe('user banned');
-      expect(prismaMock.$transaction).toHaveBeenCalled();
-      expect(chatGateway.emitModerationBanAndDisconnect).toHaveBeenCalledWith(targetId, expect.anything());
+      expect(prismaMock.client.$transaction).toHaveBeenCalled();
+      expect(chatGateway.emitModerationBanAndDisconnect).toHaveBeenCalledWith(
+        targetId,
+        expect.anything(),
+      );
     });
   });
 
@@ -126,7 +129,7 @@ describe('AdminService', () => {
     });
 
     it('Scenario 2 - should throw NotFoundException if targetUser not found', async () => {
-      prismaMock.user.findUnique.mockResolvedValue(null); //nothing found ind DB
+      prismaMock.client.user.findUnique.mockResolvedValue(null); //nothing found ind DB
       await expect(
         service.unbanUser('targetUser', 'actorUser'),
       ).rejects.toThrow(new NotFoundException('user to unban does not exist'));
@@ -138,7 +141,7 @@ describe('AdminService', () => {
         username: 'userNotBanned',
         isBanned: false,
       };
-      prismaMock.user.findUnique.mockResolvedValue(mockUser as any);
+      prismaMock.client.user.findUnique.mockResolvedValue(mockUser as any);
       await expect(service.unbanUser(mockUser.id, 'actorUser')).rejects.toThrow(
         new BadRequestException('user is not banned'),
       );
@@ -157,8 +160,8 @@ describe('AdminService', () => {
         profile: { displayName: 'Victim' },
       };
 
-      prismaMock.user.findUnique.mockResolvedValue(mockUser as any);
-      prismaMock.user.update.mockResolvedValue({
+      prismaMock.client.user.findUnique.mockResolvedValue(mockUser as any);
+      prismaMock.client.user.update.mockResolvedValue({
         ...mockUser,
         isBanned: false,
         isActive: true,
@@ -172,14 +175,14 @@ describe('AdminService', () => {
 
   describe('promoteUserToModerator', () => {
     it('Scenario 1 - should throw NotFoundException if targetUser not found', async () => {
-      prismaMock.user.findUnique.mockResolvedValue(null); //nothing found ind DB
+      prismaMock.client.user.findUnique.mockResolvedValue(null); //nothing found ind DB
       await expect(
         service.promoteUserToModerator('targetUser', 'admin'),
       ).rejects.toThrow(new NotFoundException('user does not exist'));
     });
 
     it('Scenario 2 - should throw BadRequestException if targetUser is not an USER not found', async () => {
-      prismaMock.user.findUnique.mockResolvedValue({
+      prismaMock.client.user.findUnique.mockResolvedValue({
         globalRole: 'MODERATOR',
       } as any);
 
@@ -189,9 +192,9 @@ describe('AdminService', () => {
     });
 
     it('Scenario 3 - should throw BadRequest if user is banned', async () => {
-      prismaMock.user.findUnique.mockResolvedValue({ 
+      prismaMock.client.user.findUnique.mockResolvedValue({
         globalRole: 'USER',
-        isBanned: true
+        isBanned: true,
       } as any);
 
       await expect(
@@ -201,8 +204,11 @@ describe('AdminService', () => {
 
     it('Scenario 4 - should successfully promote a USER to MODERATOR', async () => {
       const mockUser = { id: 'u1', globalRole: 'USER', isBanned: false };
-      prismaMock.user.findUnique.mockResolvedValue(mockUser as any);
-      prismaMock.user.update.mockResolvedValue({ ...mockUser, globalRole: 'MODERATOR' } as any);
+      prismaMock.client.user.findUnique.mockResolvedValue(mockUser as any);
+      prismaMock.client.user.update.mockResolvedValue({
+        ...mockUser,
+        globalRole: 'MODERATOR',
+      } as any);
 
       const result = await service.promoteUserToModerator('u1', 'admin');
 
@@ -212,14 +218,14 @@ describe('AdminService', () => {
 
   describe('unpromoteModeratorToUser', () => {
     it('Scenario 1 - should throw NotFoundException if targetUser not found', async () => {
-      prismaMock.user.findUnique.mockResolvedValue(null); //nothing found ind DB
+      prismaMock.client.user.findUnique.mockResolvedValue(null); //nothing found ind DB
       await expect(
         service.unpromoteModeratorToUser('targetUser', 'admin'),
       ).rejects.toThrow(new NotFoundException('user does not exist'));
     });
 
     it('Scenario 2 - should throw BadRequestException if targetUser is not a MODERATOR not found', async () => {
-      prismaMock.user.findUnique.mockResolvedValue({
+      prismaMock.client.user.findUnique.mockResolvedValue({
         globalRole: 'USER',
       } as any);
 
@@ -229,9 +235,9 @@ describe('AdminService', () => {
     });
 
     it('Scenario 3 - should throw BadRequest if user is banned', async () => {
-      prismaMock.user.findUnique.mockResolvedValue({ 
+      prismaMock.client.user.findUnique.mockResolvedValue({
         globalRole: 'MODERATOR',
-        isBanned: true
+        isBanned: true,
       } as any);
 
       await expect(
@@ -241,8 +247,11 @@ describe('AdminService', () => {
 
     it('Scenario 4 - should successfully unpromote a MODERATOR to USER', async () => {
       const mockUser = { id: 'u1', globalRole: 'MODERATOR', isBanned: false };
-      prismaMock.user.findUnique.mockResolvedValue(mockUser as any);
-      prismaMock.user.update.mockResolvedValue({ ...mockUser, globalRole: 'USER' } as any);
+      prismaMock.client.user.findUnique.mockResolvedValue(mockUser as any);
+      prismaMock.client.user.update.mockResolvedValue({
+        ...mockUser,
+        globalRole: 'USER',
+      } as any);
 
       const result = await service.unpromoteModeratorToUser('u1', 'admin');
 

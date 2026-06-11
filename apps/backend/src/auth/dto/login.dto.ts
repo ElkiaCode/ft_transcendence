@@ -8,7 +8,7 @@ export class LoginDto {
   })
   @IsEmail()
   @MaxLength(255)
-  email: string | undefined;
+  email!: string;
 
   @ApiProperty({
     example: 'password123',
@@ -17,5 +17,5 @@ export class LoginDto {
   @IsString()
   @MinLength(8)
   @MaxLength(72)
-  password: string | undefined;
+  password!: string;
 }

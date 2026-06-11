@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuthStore } from "@/store/authStore";
 import { apiListReports, apiReviewReport, apiBanUser, apiUnbanUser, apiPromoteToModerator, apiUnpromoteModerator, apiAdjustPenaltyPoints } from "@/lib/api/admin";
 import { apiGetUserByUsername, apiSearchUsers } from "@/lib/api/auth";
+import Link from 'next/link';
 
 type ModerationAction = {
   id: string;
@@ -27,6 +28,35 @@ type Report = {
 };
 
 type ToastType = 'success' | 'error';
+
+interface UserProfile {
+  id: string;
+  userId: string;
+  displayName: string;
+  bio: string | null;
+  avatarUrl: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface UserAccount {
+  id: string;
+  email: string;
+  username: string;
+  globalRole: 'USER' | 'MODERATOR' | 'ADMIN';
+  isActive: boolean;
+  isBanned: boolean;
+  penaltyPoints: number; 
+  createdAt?: Date;
+  updatedAt: Date;
+  profile?: UserProfile | null;
+}
+
+// 1. Define the shape of what the API action returns
+interface ActionResponse {
+  user: Partial<UserAccount>;
+  promoted?: boolean;
+}
 
 function Toast({ message, type, onClose }: { message: string; type: ToastType; onClose: () => void }) {
   useEffect(() => {
@@ -62,7 +92,7 @@ function ConfirmModal({
 }) {
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
-      <div className="bg-white rounded-xl p-6 w-[400px] flex flex-col gap-4 shadow-xl">
+      <div className="bg-white rounded-xl p-6 w-100 flex flex-col gap-4 shadow-xl">
         <h2 className="text-lg font-bold text-gray-900">{title}</h2>
         <p className="text-sm text-gray-600">{description}</p>
         <div className="flex gap-2 justify-end">
@@ -103,7 +133,7 @@ function ActionHistory({ actions }: { actions: ModerationAction[] }) {
               {a.penaltyPointsChange > 0 ? `+${a.penaltyPointsChange}` : a.penaltyPointsChange} pts
             </span>
           )}
-          {a.note && <span className="italic text-gray-400">"{a.note}"</span>}
+          {a.note && <span className="italic text-gray-400">&quot;{a.note}&quot;</span>}
           <span className="text-gray-300">{new Date(a.createdAt).toLocaleDateString()}</span>
         </div>
       ))}
@@ -141,7 +171,7 @@ function ReviewModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
-      <div className="bg-white rounded-xl p-6 w-[520px] flex flex-col gap-4 shadow-xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-xl p-6 w-130 flex flex-col gap-4 shadow-xl max-h-[90vh] overflow-y-auto">
         <h2 className="text-lg font-bold text-gray-900">Review report</h2>
 
         <div className="text-sm text-gray-600 bg-gray-50 rounded-lg p-3 flex flex-col gap-2">
@@ -377,7 +407,7 @@ function ReportsTab({ isAdmin, showToast }: { isAdmin: boolean; showToast: (msg:
   const handleReview = async (action: string, note: string, points: number) => {
     if (!reviewModal) return;
     try {
-      await apiReviewReport(reviewModal.id, action as any, note || undefined, points || undefined);
+      await apiReviewReport(reviewModal.id, action as 'WARN' | 'BAN' | 'UNBAN' | 'DISMISS_REPORT', note || undefined, points || undefined);
 
       const newAction: ModerationAction = {
         id: crypto.randomUUID(),
@@ -435,7 +465,22 @@ function ReportsTab({ isAdmin, showToast }: { isAdmin: boolean; showToast: (msg:
   const totalPages = Math.ceil(filtered.length / REPORTS_PER_PAGE);
   const paginated = filtered.slice((page - 1) * REPORTS_PER_PAGE, page * REPORTS_PER_PAGE);
 
-  useEffect(() => { setPage(1); }, [filter, typeFilter, sortOrder]);
+  const handleFilterChange = (f: 'ALL' | 'OPEN' | 'RESOLVED' | 'DISMISSED') => {
+    setFilter(f);
+    setPage(1);
+  };
+
+  const handleTypeChange = (t: 'ALL' | 'USER' | 'MESSAGE') => {
+    setTypeFilter(t);
+    setPage(1);
+  };
+
+  const handleSortChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    // Cast to the specific union type instead of 'any'
+    const value = e.target.value as 'newest' | 'oldest';
+    setSortOrder(value);
+    setPage(1);
+  };
 
   if (loading) return <p className="text-sm text-gray-500 p-4">Loading...</p>;
 
@@ -456,7 +501,8 @@ function ReportsTab({ isAdmin, showToast }: { isAdmin: boolean; showToast: (msg:
             {(['ALL', 'OPEN', 'RESOLVED', 'DISMISSED'] as const).map((f) => (
               <button
                 key={f}
-                onClick={() => setFilter(f)}
+                // Use the new handler here
+                onClick={() => handleFilterChange(f)}
                 className={`px-3 py-1 rounded-full text-xs transition cursor-pointer flex items-center gap-1 ${
                   filter === f ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
@@ -476,7 +522,8 @@ function ReportsTab({ isAdmin, showToast }: { isAdmin: boolean; showToast: (msg:
             {(['ALL', 'USER', 'MESSAGE'] as const).map((t) => (
               <button
                 key={t}
-                onClick={() => setTypeFilter(t)}
+                // Use the new handler here
+                onClick={() => handleTypeChange(t)}
                 className={`px-3 py-1 rounded-full text-xs transition cursor-pointer ${
                   typeFilter === t ? 'bg-purple-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
@@ -488,69 +535,22 @@ function ReportsTab({ isAdmin, showToast }: { isAdmin: boolean; showToast: (msg:
         </div>
         <select
           value={sortOrder}
-          onChange={(e) => setSortOrder(e.target.value as any)}
+          // Use the new handler here and remove 'any'
+          onChange={handleSortChange}
           className="border border-gray-200 rounded-lg px-3 py-1 text-xs text-gray-600 focus:outline-none cursor-pointer"
         >
           <option value="newest">Newest first</option>
           <option value="oldest">Oldest first</option>
         </select>
       </div>
-
-      <p className="text-xs text-gray-400">{filtered.length} report{filtered.length !== 1 ? 's' : ''} found</p>
-
-      {paginated.length === 0 ? (
-        <p className="text-sm text-gray-500">No reports found.</p>
-      ) : (
-        <>
-          <div className="flex flex-col gap-3">
-            {paginated.map((report) => (
-              <ReportCard
-                key={report.id}
-                report={report}
-                onReview={setReviewModal}
-                isRecentlyReviewed={recentlyReviewed.has(report.id)}
-              />
-            ))}
-          </div>
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 mt-2">
-              <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="px-3 py-1 rounded-lg text-xs border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition"
-              >
-                ← Prev
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setPage(p)}
-                  className={`w-7 h-7 rounded-lg text-xs font-medium transition cursor-pointer ${
-                    page === p ? 'bg-blue-500 text-white' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  {p}
-                </button>
-              ))}
-              <button
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="px-3 py-1 rounded-lg text-xs border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition"
-              >
-                Next →
-              </button>
-            </div>
-          )}
-        </>
-      )}
     </div>
   );
 }
 
 function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => void }) {
   const [username, setUsername] = useState("");
-  const [suggestions, setSuggestions] = useState<any[]>([]);
-  const [result, setResult] = useState<any | null>(null);
+  const [suggestions, setSuggestions] = useState<UserAccount[]>([]);
+  const [result, setResult] = useState<UserAccount | null>(null);
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -560,28 +560,35 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
     title: string; description: string; confirmLabel: string;
     confirmColor: string; onConfirm: () => void;
   } | null>(null);
+  const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const value = e.target.value;
+    setUsername(value);
+
+    // Clear suggestions immediately if the input is too short
+    if (value.trim().length < 2) {
+      setSuggestions([]);
+    }
+  };
 
   useEffect(() => {
-    if (username.trim().length < 2) {
-      setSuggestions([]);
-      return;
-    }
-    const timeout = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const data = await apiSearchUsers(username.trim());
-        setSuggestions(data);
-      } catch {
-        setSuggestions([]);
-      } finally {
-        setSearching(false);
-      }
-    }, 300);
+    // If too short, do nothing (suggestions were already cleared by the handler)
+    if (username.trim().length < 2) return;
 
-    return () => clearTimeout(timeout);
+    const fetchSuggestions = async () => {
+      try {
+        const data = await apiSearchUsers(username);
+        setSuggestions(data);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    // Optional: Add a debounce here to avoid spamming the API
+    const timeoutId = setTimeout(fetchSuggestions, 300);
+    return () => clearTimeout(timeoutId);
   }, [username]);
 
-  const handleSelectUser = async (u: any) => {
+  const handleSelectUser = async (u: UserAccount) => {
     setUsername(u.username);
     setSuggestions([]);
     setError(null);
@@ -591,26 +598,40 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
       const data = await apiGetUserByUsername(u.username);
       if (!data) throw new Error('User not found');
       setResult(data);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      // Check if err is actually an Error object
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAction = async (action: () => Promise<any>, successMsg: string, promotedMsg?: string) => {
-    try {
-      const res = await action();
-      setResult((prev: any) => ({ ...prev, ...res.user }));
-      if (promotedMsg && res.promoted) {
-        showToast(promotedMsg, 'success');
-      } else {
-        showToast(successMsg, 'success');
-      }
-    } catch (err: any) {
-      showToast(err.message, 'error');
+  const handleAction = async (
+  action: () => Promise<ActionResponse>, // Replace any
+  successMsg: string,
+  promotedMsg?: string
+) => {
+  try {
+    const res = await action();
+    
+    // Typing 'prev' based on UserAccount type
+    setResult((prev: UserAccount | null) => {
+      if (!prev) return null;
+      return { ...prev, ...res.user };
+    });
+
+    if (promotedMsg && res.promoted) {
+      showToast(promotedMsg, 'success');
+    } else {
+      showToast(successMsg, 'success');
     }
-  };
+  } catch (err) {
+    // Handle the error type here too
+    const msg = err instanceof Error ? err.message : 'Action failed';
+    showToast(msg, 'error');
+  }
+};
 
   const penaltyColor = (pts: number) => {
     if (pts >= 100) return 'text-green-600';
@@ -618,6 +639,19 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
     return 'text-gray-700';
   };
 
+  const onUnban = () => {
+    // 1. Guard: If result is null, stop here. 
+    // This tells TypeScript that 'result' is definitely NOT null below this line.
+    if (!result) return;
+
+    handleAction(
+      async () => {
+        const u = await apiUnbanUser(result.id);
+        return { user: u }; // Wrap to match the ActionResponse interface
+      },
+      `${result.username} has been unbanned`
+    );
+  };
   return (
     <div className="flex flex-col gap-4">
       {confirmModal && <ConfirmModal {...confirmModal} onClose={() => setConfirmModal(null)} />}
@@ -635,11 +669,7 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
               type="text"
               placeholder="Search by username (min. 2 characters)..."
               value={username}
-              onChange={(e) => {
-                setUsername(e.target.value);
-                if (result) setResult(null);
-                setError(null);
-              }}
+              onChange={handleUsernameChange}
               onKeyDown={(e) => { if (e.key === 'Escape') setSuggestions([]); }}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
@@ -657,10 +687,16 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
                 onClick={() => handleSelectUser(u)}
                 className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition cursor-pointer text-left"
               >
-                <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold overflow-hidden flex-shrink-0">
-                  {u.profile?.avatarUrl
-                    ? <img src={u.profile.avatarUrl} className="w-full h-full object-cover" />
-                    : u.username.charAt(0).toUpperCase()}
+                <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold overflow-hidden shrink-0">
+                  {u.profile?.avatarUrl ? (
+                    <img 
+                      src={u.profile.avatarUrl} 
+                      alt={`${u.username}'s avatar`} // Fixes the ESLint alt-text error
+                      className="w-full h-full object-cover" 
+                    />
+                  ) : (
+                    u.username.charAt(0).toUpperCase()
+                  )}
                 </div>
                 <div className="flex flex-col">
                   <span className="text-sm font-medium text-gray-900">{u.username}</span>
@@ -674,7 +710,7 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
         )}
         {username.trim().length >= 2 && !searching && suggestions.length === 0 && !result && (
           <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg px-4 py-3">
-            <p className="text-sm text-gray-400">No users found for "{username}"</p>
+            <p className="text-sm text-gray-400">No users found for &quot;{username}&quot;</p>
           </div>
         )}
       </div>
@@ -684,10 +720,16 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
       {result && (
         <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex flex-col gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold overflow-hidden flex-shrink-0">
-              {result.profile?.avatarUrl
-                ? <img src={result.profile.avatarUrl} className="w-full h-full object-cover" />
-                : result.username?.charAt(0).toUpperCase()}
+            <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold overflow-hidden shrink-0">
+              {result.profile?.avatarUrl ? (
+                <img 
+                  src={result.profile.avatarUrl} 
+                  alt={`${result.username}'s avatar`} // Fixes the ESLint alt-text error
+                  className="w-full h-full object-cover" 
+                />
+              ) : (
+                result.username.charAt(0).toUpperCase()
+              )}
             </div>
             <div className="flex flex-col gap-0.5">
               <p className="font-semibold text-gray-900">{result.username}</p>
@@ -731,7 +773,15 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
                   description: `Are you sure you want to ban ${result.username}? He will no longer be able to access the platform.`,
                   confirmLabel: 'Ban',
                   confirmColor: 'bg-red-500 hover:bg-red-600',
-                  onConfirm: () => handleAction(() => apiBanUser(result.id), `${result.username} has been banned`),
+                  onConfirm: () => {
+                    if (!result) return; // Guard against null
+                    
+                    handleAction(
+                      // Wrap the return value so it has a .user property
+                      () => apiBanUser(result.id).then(u => ({ user: u })), 
+                      `${result.username} has been banned`
+                    );
+                  }
                 })}
                 className="px-3 py-1 rounded-full bg-red-500 text-white text-xs hover:bg-red-600 cursor-pointer transition"
               >
@@ -739,7 +789,8 @@ function UsersTab({ showToast }: { showToast: (msg: string, type: ToastType) => 
               </button>
             ) : (
               <button
-                onClick={() => handleAction(() => apiUnbanUser(result.id), `${result.username} has been unbanned`)}
+                onClick={onUnban}
+                
                 className="px-3 py-1 rounded-full bg-green-500 text-white text-xs hover:bg-green-600 cursor-pointer transition"
               >
                 Unban
@@ -835,9 +886,9 @@ export default function AdminPage() {
           <h1 className="text-2xl font-bold text-gray-900">
             {isAdmin ? 'Admin Dashboard' : 'Moderator Dashboard'}
           </h1>
-          <a href="/profils" className="text-sm text-gray-500 hover:text-gray-700 transition cursor-pointer">
+          <Link href="/profils" className="text-sm text-gray-500 hover:text-gray-700 transition cursor-pointer">
             ← Back
-          </a>
+          </Link>
         </div>
         <div className="flex gap-2 border-b border-gray-200 pb-2">
           {tabs.filter((t) => t.visible).map((t) => (

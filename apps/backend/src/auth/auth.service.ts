@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -7,7 +11,43 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { DEFAULT_REFRESH_DAYS } from './constants/auth.constants';
 import type { JwtPayload } from './types/jwt-payload.type';
-import { generateRefreshToken, hashRefreshToken } from './utils/refresh-token.util';
+import {
+  generateRefreshToken,
+  hashRefreshToken,
+} from './utils/refresh-token.util';
+
+interface FortyTwoTokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  scope: string;
+  created_at: number;
+}
+
+interface FortyTwoUserResponse {
+  id: number;
+  email: string;
+  login: string;
+  displayname: string;
+  image?: {
+    link: string | null;
+  };
+}
+
+interface UserForPublic {
+  id: string;
+  email: string;
+  username: string;
+  globalRole: string;
+  preferredLanguage: string;
+  passwordHash?: string | null;
+  oauthAccounts?: Array<{ provider: string }>;
+  profile?: {
+    displayName: string;
+    bio?: string | null;
+    avatarUrl?: string | null;
+  } | null;
+}
 
 @Injectable()
 export class AuthService {
@@ -20,7 +60,9 @@ export class AuthService {
   getRefreshTokenDays(): number {
     const raw = this.configService.get<string>('JWT_REFRESH_DAYS');
     const parsed = Number(raw);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_REFRESH_DAYS;
+    return Number.isFinite(parsed) && parsed > 0
+      ? parsed
+      : DEFAULT_REFRESH_DAYS;
   }
 
   getRefreshTokenMaxAgeMs(): number {
@@ -32,10 +74,10 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto) {
-    const email = dto.email.trim().toLowerCase();
+    const email = (dto.email ?? '').trim().toLowerCase();
     const username = dto.username.trim();
 
-    const existingUserByEmail = await this.prisma.user.findUnique({
+    const existingUserByEmail = await this.prisma.client.user.findUnique({
       where: { email },
     });
 
@@ -43,7 +85,7 @@ export class AuthService {
       throw new BadRequestException('email already in use');
     }
 
-    const existingUserByUsername = await this.prisma.user.findUnique({
+    const existingUserByUsername = await this.prisma.client.user.findUnique({
       where: { username },
     });
 
@@ -53,7 +95,7 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
 
-    const user = await this.prisma.user.create({
+    const user = await this.prisma.client.user.create({
       data: {
         email,
         username,
@@ -86,9 +128,10 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const email = (dto.email ?? '').trim().toLowerCase();
+    const { password, email: rawEmail } = dto;
+    const email = (rawEmail ?? '').trim().toLowerCase();
 
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.client.user.findUnique({
       where: { email },
       include: {
         profile: true,
@@ -99,7 +142,7 @@ export class AuthService {
       throw new UnauthorizedException('invalid credentials');
     }
 
-    if (!dto.password) {
+    if (!password) {
       throw new BadRequestException('Password is required');
     }
     const passwordOk = await bcrypt.compare(dto.password, user.passwordHash);
@@ -139,7 +182,7 @@ export class AuthService {
 
     const tokenHash = hashRefreshToken(rawRefreshToken);
 
-    const storedToken = await this.prisma.refreshToken.findUnique({
+    const storedToken = await this.prisma.client.refreshToken.findUnique({
       where: { tokenHash },
       include: {
         user: {
@@ -187,12 +230,12 @@ export class AuthService {
     const newExpiresAt = this.getRefreshTokenExpiresAt();
     const accessToken = await this.signAccessToken(payload);
 
-    await this.prisma.$transaction([
-      this.prisma.refreshToken.update({
+    await this.prisma.client.$transaction([
+      this.prisma.client.refreshToken.update({
         where: { id: storedToken.id },
         data: { revokedAt: new Date() },
       }),
-      this.prisma.refreshToken.create({
+      this.prisma.client.refreshToken.create({
         data: {
           userId: storedToken.userId,
           tokenHash: newRefreshTokenHash,
@@ -215,7 +258,7 @@ export class AuthService {
 
     const tokenHash = hashRefreshToken(rawRefreshToken);
 
-    await this.prisma.refreshToken.updateMany({
+    await this.prisma.client.refreshToken.updateMany({
       where: {
         tokenHash,
         revokedAt: null,
@@ -227,7 +270,7 @@ export class AuthService {
   }
 
   async loginWith42(code: string) {
-    // 1. Échanger le code contre un token 42
+    // 1. replace the code by a 42 token
     const params = new URLSearchParams({
       grant_type: 'authorization_code',
       client_id: this.configService.getOrThrow('FORTYTWO_CLIENT_ID'),
@@ -248,10 +291,10 @@ export class AuthService {
       throw new UnauthorizedException('invalid 42 code');
     }
 
-    const tokenData = await tokenResponse.json();
+    const tokenData = (await tokenResponse.json()) as FortyTwoTokenResponse;
     const accessToken42 = tokenData.access_token;
 
-    // 2. Récupérer les infos du user depuis l'API 42
+    // 2. Retrieve infos from user within 42 API
     const userResponse = await fetch('https://api.intra.42.fr/v2/me', {
       headers: { Authorization: `Bearer ${accessToken42}` },
     });
@@ -260,10 +303,10 @@ export class AuthService {
       throw new UnauthorizedException('failed to fetch 42 user');
     }
 
-    const user42 = await userResponse.json();
+    const user42 = (await userResponse.json()) as FortyTwoUserResponse;
 
-    // 3. Chercher ou créer le user en DB
-    let user = await this.prisma.user.findFirst({
+    // 3. Search or create the user in DB
+    let user = await this.prisma.client.user.findFirst({
       where: {
         oauthAccounts: {
           some: {
@@ -276,7 +319,7 @@ export class AuthService {
     });
 
     if (!user) {
-      user = await this.prisma.user.create({
+      user = await this.prisma.client.user.create({
         data: {
           email: user42.email,
           username: user42.login,
@@ -300,7 +343,7 @@ export class AuthService {
     if (!user.isActive) throw new UnauthorizedException('account is inactive');
     if (user.isBanned) throw new UnauthorizedException('account is banned');
 
-    // 4. Créer notre propre session JWT
+    // 4. Create JWT user session
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
@@ -326,7 +369,7 @@ export class AuthService {
     const tokenHash = hashRefreshToken(refreshToken);
     const expiresAt = this.getRefreshTokenExpiresAt();
 
-    await this.prisma.refreshToken.create({
+    await this.prisma.client.refreshToken.create({
       data: {
         userId,
         tokenHash,
@@ -340,11 +383,18 @@ export class AuthService {
     };
   }
 
-  private toPublicUser(user: any) {
-    const authProviders = [
-      ...(user.passwordHash ? ['LOCAL'] : []),
-      ...((user.oauthAccounts ?? []).map((account: any) => account.provider)),
-    ];
+  private toPublicUser(user: UserForPublic) {
+    const authProviders: string[] = [];
+
+    if (user.passwordHash) {
+      authProviders.push('LOCAL');
+    }
+
+    if (user.oauthAccounts && Array.isArray(user.oauthAccounts)) {
+      user.oauthAccounts.forEach((acc) => {
+        authProviders.push(acc.provider);
+      });
+    }
 
     return {
       id: user.id,
@@ -352,12 +402,13 @@ export class AuthService {
       username: user.username,
       globalRole: user.globalRole,
       preferredLanguage: user.preferredLanguage,
-      authProviders: [...new Set(authProviders)],
+      // Use Set to remove duplicates (e.g. if logic changes later)
+      authProviders: Array.from(new Set(authProviders)),
       profile: user.profile
         ? {
             displayName: user.profile.displayName,
-            bio: user.profile.bio,
-            avatarUrl: user.profile.avatarUrl,
+            bio: user.profile.bio ?? null,
+            avatarUrl: user.profile.avatarUrl ?? null,
           }
         : null,
     };

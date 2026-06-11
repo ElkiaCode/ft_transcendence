@@ -22,6 +22,37 @@ import { EditMessageDto } from './dto/edit-message.dto';
 import { MarkReadDto } from './dto/mark-read.dto';
 import { AddMessageReactionDto } from './dto/add-message-reaction.dto';
 
+interface MessageWithSender {
+  id: string;
+  content: string;
+  type: string; // 'TEXT' | 'SYSTEM'
+  conversationId: string;
+  senderId: string;
+  createdAt: Date;
+  sender: {
+    username: string;
+    profile: any;
+  };
+  reads?: any[]; // Included in the BLOCK path
+  reactions?: any[]; // Included in the BLOCK path
+}
+
+interface ModerationWarning {
+  message: string;
+  severity: any; // from moderationResult
+  penaltyPointsToSubtract: number;
+  penaltyPoints: number;
+  pointsLeftBeforeBan: number;
+  isBanned: boolean;
+  banReason: string;
+  categories: string[];
+}
+
+export interface SendMessageResponse extends MessageWithSender {
+  moderationWarning?: ModerationWarning;
+  banAnnouncementMessage?: MessageWithSender | null;
+}
+
 @Controller('chat')
 @UseGuards(JwtAuthGuard)
 export class ChatController {
@@ -39,7 +70,7 @@ export class ChatController {
       userId,
       input,
     );
-    await this.chatGateway.emitNotificationCreated(userId, notification);
+    this.chatGateway.emitNotificationCreated(userId, notification);
     return notification;
   }
 
@@ -55,7 +86,7 @@ export class ChatController {
       );
 
     for (const notification of notifications) {
-      await this.chatGateway.emitNotificationCreated(
+      this.chatGateway.emitNotificationCreated(
         notification.userId,
         notification,
       );
@@ -95,7 +126,7 @@ export class ChatController {
       title: 'Added to group',
       body: `${user.username} added you to ${groupName}.`,
       actorId: user.sub,
-      entityType: 'conversation',
+      entityType: 'CONVERSATION',
       entityId: conversation.id,
       action: 'group_created',
       metadata: {
@@ -127,7 +158,7 @@ export class ChatController {
         title: 'Group invitation',
         body: `${user.username} added you to ${groupName}.`,
         actorId: user.sub,
-        entityType: 'conversation',
+        entityType: 'CONVERSATION',
         entityId: conversationId,
         action: 'group_members_invited',
         metadata: {
@@ -158,7 +189,7 @@ export class ChatController {
       title: 'Removed from group',
       body: `${user.username} removed you from ${result.conversationTitle}.`,
       actorId: user.sub,
-      entityType: 'conversation',
+      entityType: 'CONVERSATION',
       entityId: conversationId,
       action: 'group_member_removed',
       metadata: {
@@ -186,7 +217,7 @@ export class ChatController {
       title: 'Member left group',
       body: `${user.username} left ${result.conversationTitle}.`,
       actorId: user.sub,
-      entityType: 'conversation',
+      entityType: 'CONVERSATION',
       entityId: conversationId,
       action: 'group_member_left',
       metadata: {
@@ -203,7 +234,7 @@ export class ChatController {
         title: 'You are now group owner',
         body: `Ownership of ${result.conversationTitle} was transferred to you.`,
         actorId: user.sub,
-        entityType: 'conversation',
+        entityType: 'CONVERSATION',
         entityId: conversationId,
         action: 'group_owner_transferred',
         metadata: {
@@ -238,7 +269,7 @@ export class ChatController {
       title: 'Group renamed',
       body: `${user.username} renamed the group to ${result.conversation.title}.`,
       actorId: user.sub,
-      entityType: 'conversation',
+      entityType: 'CONVERSATION',
       entityId: conversationId,
       action: 'group_renamed',
       metadata: {
@@ -284,7 +315,7 @@ export class ChatController {
       dto.messageId,
     );
 
-    await this.chatGateway.emitConversationRead(conversationId, {
+    this.chatGateway.emitConversationRead(conversationId, {
       userId: user.sub,
       conversationId,
       messageId: dto.messageId ?? null,
@@ -300,33 +331,32 @@ export class ChatController {
     @Param('conversationId') conversationId: string,
     @Body() dto: SendMessageDto,
   ) {
-    const message = await this.chatService.sendMessage(
+    const message = (await this.chatService.sendMessage(
       user.sub,
       conversationId,
       dto.content,
-    );
+    )) as SendMessageResponse;
 
-    await this.chatGateway.emitMessageCreated(conversationId, message);
+    this.chatGateway.emitMessageCreated(conversationId, message);
 
-    if ((message as any).banAnnouncementMessage) {
-      await this.chatGateway.emitMessageCreated(
+    if (message.banAnnouncementMessage) {
+      this.chatGateway.emitMessageCreated(
         conversationId,
-        (message as any).banAnnouncementMessage,
+        message.banAnnouncementMessage,
       );
     }
 
-    if ((message as any).moderationWarning) {
-      await this.chatGateway.emitModerationWarning(
+    if (message.moderationWarning) {
+      this.chatGateway.emitModerationWarning(
         user.sub,
-        (message as any).moderationWarning,
+        message.moderationWarning,
       );
 
-      if ((message as any).moderationWarning.isBanned) {
+      if (message.moderationWarning.isBanned) {
         await this.chatGateway.emitModerationBanAndDisconnect(user.sub, {
           message: 'Your account was banned by automatic moderation.',
-          reason:
-            (message as any).moderationWarning.banReason ?? 'harmful message',
-          penaltyPoints: (message as any).moderationWarning.penaltyPoints,
+          reason: message.moderationWarning.banReason ?? 'harmful message',
+          penaltyPoints: message.moderationWarning.penaltyPoints,
         });
       }
     }
@@ -347,8 +377,8 @@ export class ChatController {
       title: 'New message',
       body: preview,
       actorId: user.sub,
-      entityType: 'message',
-      entityId: message.id,
+      entityType: 'CONVERSATION',
+      entityId: conversationId,
       action: 'message_created',
       metadata: {
         conversationId,
@@ -373,7 +403,7 @@ export class ChatController {
       dto.content,
     );
 
-    await this.chatGateway.emitMessageUpdated(conversationId, message);
+    this.chatGateway.emitMessageUpdated(conversationId, message);
 
     const recipientIds = await this.chatService.getOtherParticipantIds(
       conversationId,
@@ -385,7 +415,7 @@ export class ChatController {
       title: 'Message edited',
       body: `${user.username} edited a message.`,
       actorId: user.sub,
-      entityType: 'message',
+      entityType: 'CONVERSATION',
       entityId: message.id,
       action: 'message_updated',
       metadata: {
@@ -409,7 +439,7 @@ export class ChatController {
       messageId,
     );
 
-    await this.chatGateway.emitMessageDeleted(conversationId, message);
+    this.chatGateway.emitMessageDeleted(conversationId, message);
 
     const recipientIds = await this.chatService.getOtherParticipantIds(
       conversationId,
@@ -421,7 +451,7 @@ export class ChatController {
       title: 'Message deleted',
       body: `${user.username} deleted a message.`,
       actorId: user.sub,
-      entityType: 'message',
+      entityType: 'CONVERSATION',
       entityId: message.id,
       action: 'message_deleted',
       metadata: {
@@ -453,7 +483,7 @@ export class ChatController {
         title: 'New reaction',
         body: `${user.username} reacted to your message.`,
         actorId: user.sub,
-        entityType: 'message',
+        entityType: 'CONVERSATION',
         entityId: messageId,
         action: 'message_reaction_created',
         metadata: {

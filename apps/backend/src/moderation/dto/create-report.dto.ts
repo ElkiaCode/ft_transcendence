@@ -1,8 +1,14 @@
-import { IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsEnum,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export class CreateReportDto {
   @IsEnum(['USER', 'MESSAGE'])
-  targetType: 'USER' | 'MESSAGE';
+  targetType!: 'USER' | 'MESSAGE';
 
   @IsOptional()
   @IsString()
@@ -15,5 +21,5 @@ export class CreateReportDto {
   @IsString()
   @MinLength(5)
   @MaxLength(1000)
-  reason: string;
+  reason!: string;
 }

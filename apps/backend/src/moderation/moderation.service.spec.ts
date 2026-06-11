@@ -92,7 +92,7 @@ describe('ModerationService', () => {
       });
 
       it('Scenario 3 - should throw NotFound if target user does not exist', async () => {
-        prismaMock.user.findUnique.mockResolvedValue(null);
+        prismaMock.client.user.findUnique.mockResolvedValue(null);
         await expect(
           service.createReport(
             creatorId,
@@ -106,13 +106,13 @@ describe('ModerationService', () => {
 
       it('Scenario 4 - should successfully create a report', async () => {
         const mockUser: User = createMockUser({ id: 'target-id' });
-        prismaMock.user.findUnique.mockResolvedValue(mockUser);
+        prismaMock.client.user.findUnique.mockResolvedValue(mockUser);
         // For findMany (Moderators notification logic)
-        prismaMock.user.findMany.mockResolvedValue([
+        prismaMock.client.user.findMany.mockResolvedValue([
           createMockUser({ id: 'mod-1', globalRole: GlobalRole.MODERATOR }),
           createMockUser({ id: 'admin-1', globalRole: GlobalRole.ADMIN }),
         ]);
-        prismaMock.report.create.mockResolvedValue({
+        prismaMock.client.report.create.mockResolvedValue({
           id: 'report-1',
           reason: '',
           targetType: 'USER',
@@ -129,10 +129,10 @@ describe('ModerationService', () => {
           { id: 'notif-2', userId: 'admin-1' },
         ] as any);
 
-        prismaMock.$transaction.mockImplementation(async (callback) => {
+        prismaMock.client.$transaction.mockImplementation(async (callback) => {
           // This handles the transaction mock cleanly
           if (typeof callback === 'function') {
-            return callback(prismaMock);
+            return callback(prismaMock as any);
           }
           return callback;
         });
@@ -146,7 +146,7 @@ describe('ModerationService', () => {
         );
 
         expect(result.id).toBe('report-1');
-        expect(prismaMock.report.create).toHaveBeenCalledWith({
+        expect(prismaMock.client.report.create).toHaveBeenCalledWith({
           data: expect.objectContaining({ reason: 'Toxic' }),
         });
         expect(service['notifyModerators']).toHaveBeenCalled();
@@ -169,7 +169,7 @@ describe('ModerationService', () => {
       });
 
       it('Scenario 6 - should throw NotFound if target message does not exist', async () => {
-        prismaMock.message.findUnique.mockResolvedValue(null);
+        prismaMock.client.message.findUnique.mockResolvedValue(null);
         await expect(
           service.createReport(
             'creatorId',
@@ -182,7 +182,7 @@ describe('ModerationService', () => {
       });
       it('Scenario 7 - should successfully create a message report and notify moderators', async () => {
         const targetMessageId = 'msg-123';
-        prismaMock.message.findUnique.mockResolvedValue({
+        prismaMock.client.message.findUnique.mockResolvedValue({
           id: targetMessageId,
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -193,7 +193,7 @@ describe('ModerationService', () => {
           isEdited: false,
           deletedAt: null,
         });
-        prismaMock.report.create.mockResolvedValue({
+        prismaMock.client.report.create.mockResolvedValue({
           id: 'report-2',
           targetType: 'USER',
           reason: '',
@@ -204,7 +204,7 @@ describe('ModerationService', () => {
           targetUserId: null,
           targetMessageId: null,
         });
-        prismaMock.user.findMany.mockResolvedValue([
+        prismaMock.client.user.findMany.mockResolvedValue([
           {
             id: 'admin-1',
             createdAt: new Date(),
@@ -245,7 +245,7 @@ describe('ModerationService', () => {
           'Inappropriate',
         );
 
-        expect(prismaMock.message.findUnique).toHaveBeenCalledWith({
+        expect(prismaMock.client.message.findUnique).toHaveBeenCalledWith({
           where: { id: targetMessageId },
         });
         expect(result.id).toBe('report-2');
@@ -285,14 +285,14 @@ describe('ModerationService', () => {
     ];
 
     it('Scenario 1: succesfully list report', async () => {
-      prismaMock.report.findMany.mockResolvedValue(mockReports);
+      prismaMock.client.report.findMany.mockResolvedValue(mockReports);
 
       const result = await service.listReports();
 
       expect(Array.isArray(result)).toBe(true);
       expect(result.length).toBe(1);
       expect(result[0].creatorId).toBe(creatorId);
-      expect(prismaMock.report.findMany).toHaveBeenCalledWith({
+      expect(prismaMock.client.report.findMany).toHaveBeenCalledWith({
         include: expect.objectContaining({
           creator: {
             include: { profile: true },
@@ -325,7 +325,7 @@ describe('ModerationService', () => {
     });
 
     it('Scenario 1: should throw NotFoundException if report does not exist', async () => {
-      prismaMock.report.findUnique.mockResolvedValue(null);
+      prismaMock.client.report.findUnique.mockResolvedValue(null);
 
       await expect(
         service.reviewReport(moderatorId, reportId, 'DISMISS_REPORT'),
@@ -334,7 +334,7 @@ describe('ModerationService', () => {
 
     it('Scenario 2: should DISMISS a report (No penalty, no ban)', async () => {
       // 1. Mock finding the report
-      prismaMock.report.findUnique.mockResolvedValue({
+      prismaMock.client.report.findUnique.mockResolvedValue({
         id: reportId,
         targetUserId,
         createdAt: new Date(),
@@ -346,14 +346,14 @@ describe('ModerationService', () => {
         targetMessageId: null,
       });
 
-      prismaMock.moderationAction.create.mockResolvedValue({
+      prismaMock.client.moderationAction.create.mockResolvedValue({
         id: 'act-456',
         action: 'DISMISS_REPORT',
         moderatorId,
         targetUserId,
       } as any);
 
-      prismaMock.report.update.mockResolvedValue({
+      prismaMock.client.report.update.mockResolvedValue({
         id: reportId,
         status: 'DISMISSED',
         moderationAction: {
@@ -363,7 +363,9 @@ describe('ModerationService', () => {
       } as any);
 
       // Ensure the transaction returns the report (which now has the moderationAction)
-      prismaMock.$transaction.mockImplementation(async (cb) => cb(prismaMock));
+      prismaMock.client.$transaction.mockImplementation(async (cb) =>
+        cb(prismaMock as any),
+      );
       // The transaction callback will use these mocks
       // Note: ensure your smart $transaction mock is in place in beforeEach
       const result = await service.reviewReport(
@@ -376,11 +378,11 @@ describe('ModerationService', () => {
       expect(result.updatedReport.status).toBe('DISMISSED');
       expect(result.moderationAction.id).toBe('act-456');
       // Use the transaction mock to verify NO user update happened
-      expect(prismaMock.user.update).not.toHaveBeenCalled();
+      expect(prismaMock.client.user.update).not.toHaveBeenCalled();
     });
 
     it('Scenario 3: should WARN and subtract penalty points', async () => {
-      prismaMock.report.findUnique.mockResolvedValue({
+      prismaMock.client.report.findUnique.mockResolvedValue({
         id: reportId,
         targetUserId,
         creatorId: null,
@@ -392,7 +394,7 @@ describe('ModerationService', () => {
         updatedAt: new Date(),
       });
 
-      prismaMock.moderationAction.create.mockResolvedValue({
+      prismaMock.client.moderationAction.create.mockResolvedValue({
         id: 'act-456',
         action: 'WARN',
         moderatorId,
@@ -400,7 +402,7 @@ describe('ModerationService', () => {
         penaltyPointsChange: -50,
       } as any);
 
-      prismaMock.report.update.mockResolvedValue({
+      prismaMock.client.report.update.mockResolvedValue({
         id: reportId,
         status: 'RESOLVED',
         moderationAction: {
@@ -411,7 +413,9 @@ describe('ModerationService', () => {
       } as any);
 
       // Ensure the transaction returns the report (which now has the moderationAction)
-      prismaMock.$transaction.mockImplementation(async (cb) => cb(prismaMock));
+      prismaMock.client.$transaction.mockImplementation(async (cb) =>
+        cb(prismaMock as any),
+      );
       // Act
       const result = await service.reviewReport(
         moderatorId,
@@ -424,7 +428,7 @@ describe('ModerationService', () => {
       // Assert: Check if penaltyPointsChange was calculated correctly (-50)
       // We check the transaction call for ModerationAction creation
       expect(result.moderationAction.penaltyPointsChange).toBe(-50);
-      expect(prismaMock.moderationAction.create).toHaveBeenCalledWith({
+      expect(prismaMock.client.moderationAction.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           penaltyPointsChange: -50,
         }),
@@ -432,7 +436,7 @@ describe('ModerationService', () => {
     });
 
     it('Scenario 4: should BAN user, revoke tokens, and disconnect via WebSocket', async () => {
-      prismaMock.report.findUnique.mockResolvedValue({
+      prismaMock.client.report.findUnique.mockResolvedValue({
         id: reportId,
         targetUserId,
         createdAt: new Date(),
@@ -444,7 +448,7 @@ describe('ModerationService', () => {
         updatedAt: new Date(),
       });
 
-      prismaMock.moderationAction.create.mockResolvedValue({
+      prismaMock.client.moderationAction.create.mockResolvedValue({
         id: 'act-456',
         action: 'BAN',
         moderatorId,
@@ -452,7 +456,7 @@ describe('ModerationService', () => {
         penaltyPointsChange: -500,
       } as any);
 
-      prismaMock.report.update.mockResolvedValue({
+      prismaMock.client.report.update.mockResolvedValue({
         id: reportId,
         status: 'RESOLVED',
         moderationAction: {
@@ -463,7 +467,9 @@ describe('ModerationService', () => {
       } as any);
 
       // Ensure the transaction returns the report (which now has the moderationAction)
-      prismaMock.$transaction.mockImplementation(async (cb) => cb(prismaMock));
+      prismaMock.client.$transaction.mockImplementation(async (cb) =>
+        cb(prismaMock as any),
+      );
 
       const result = await service.reviewReport(
         moderatorId,
@@ -485,7 +491,7 @@ describe('ModerationService', () => {
     });
 
     it('Scenario 5: should UNBAN a user successfully', async () => {
-      prismaMock.report.findUnique.mockResolvedValue({
+      prismaMock.client.report.findUnique.mockResolvedValue({
         id: reportId,
         targetUserId,
         createdAt: new Date(),
@@ -497,14 +503,14 @@ describe('ModerationService', () => {
         updatedAt: new Date(),
       });
 
-      prismaMock.moderationAction.create.mockResolvedValue({
+      prismaMock.client.moderationAction.create.mockResolvedValue({
         id: 'act-456',
         action: 'UNBAN',
         moderatorId,
         targetUserId,
       } as any);
 
-      prismaMock.report.update.mockResolvedValue({
+      prismaMock.client.report.update.mockResolvedValue({
         id: reportId,
         status: 'RESOLVED',
         moderationAction: {
@@ -514,7 +520,9 @@ describe('ModerationService', () => {
       } as any);
 
       // Ensure the transaction returns the report (which now has the moderationAction)
-      prismaMock.$transaction.mockImplementation(async (cb) => cb(prismaMock));
+      prismaMock.client.$transaction.mockImplementation(async (cb) =>
+        cb(prismaMock as any),
+      );
 
       const userUpdateCall = await service.reviewReport(
         moderatorId,
@@ -524,7 +532,7 @@ describe('ModerationService', () => {
 
       // Verify the DB call to unban
       expect(userUpdateCall.updatedReport.status).toBe('RESOLVED');
-      expect(prismaMock.user.update).toHaveBeenCalledWith(
+      expect(prismaMock.client.user.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: targetUserId },
           data: { isBanned: false, isActive: true },
@@ -554,7 +562,7 @@ describe('ModerationService', () => {
     });
 
     it('Scenario 3: Normal Adjustment (No Ban/Promotion)', async () => {
-      prismaMock.user.findUnique.mockResolvedValue(
+      prismaMock.client.user.findUnique.mockResolvedValue(
         createMockUser({
           id: targetId,
           penaltyPoints: 0,
@@ -562,7 +570,7 @@ describe('ModerationService', () => {
       );
 
       // We mock the first update to return 100 points
-      prismaMock.user.update.mockResolvedValue(
+      prismaMock.client.user.update.mockResolvedValue(
         createMockUser({
           id: targetId,
           username: 'marvin',
@@ -573,15 +581,15 @@ describe('ModerationService', () => {
         }),
       );
 
-      prismaMock.moderationAction.create.mockResolvedValue({
+      prismaMock.client.moderationAction.create.mockResolvedValue({
         id: 'act-456',
         action: 'UNBAN',
         moderatorId: modId,
         targetUserId: targetId,
       } as any);
 
-      prismaMock.$transaction.mockImplementation(async (cb) => {
-        if (typeof cb === 'function') return cb(prismaMock);
+      prismaMock.client.$transaction.mockImplementation(async (cb) => {
+        if (typeof cb === 'function') return cb(prismaMock as any);
         return cb;
       });
 
@@ -601,7 +609,7 @@ describe('ModerationService', () => {
     });
 
     it('Scenario 4: should trigger Auto-Ban if points reach -500', async () => {
-      prismaMock.user.findUnique.mockResolvedValue({
+      prismaMock.client.user.findUnique.mockResolvedValue({
         id: targetId,
         penaltyPoints: 0,
         createdAt: new Date(),
@@ -615,7 +623,7 @@ describe('ModerationService', () => {
         preferredLanguage: '',
       });
       // Mock first update to return -500
-      prismaMock.user.update.mockResolvedValue(
+      prismaMock.client.user.update.mockResolvedValue(
         createMockUser({
           id: targetId,
           username: 'bad_user',
@@ -623,15 +631,15 @@ describe('ModerationService', () => {
           isBanned: false,
         }),
       );
-      prismaMock.moderationAction.create.mockResolvedValue({
+      prismaMock.client.moderationAction.create.mockResolvedValue({
         id: 'act-456',
         action: 'BAN',
         moderatorId: modId,
         targetUserId: targetId,
       } as any);
 
-      prismaMock.$transaction.mockImplementation(async (cb) => {
-        if (typeof cb === 'function') return cb(prismaMock);
+      prismaMock.client.$transaction.mockImplementation(async (cb) => {
+        if (typeof cb === 'function') return cb(prismaMock as any);
         return cb;
       });
 
@@ -644,18 +652,18 @@ describe('ModerationService', () => {
         targetId,
         expect.objectContaining({ penaltyPoints: -500 }),
       );
-      expect(prismaMock.refreshToken.updateMany).toHaveBeenCalled();
+      expect(prismaMock.client.refreshToken.updateMany).toHaveBeenCalled();
     });
 
     it('Scenario 5: should trigger Auto-Promotion if points reach +500', async () => {
-      prismaMock.user.findUnique.mockResolvedValue(
+      prismaMock.client.user.findUnique.mockResolvedValue(
         createMockUser({
           id: targetId,
           penaltyPoints: 490,
         }),
       );
 
-      prismaMock.user.update.mockResolvedValueOnce(
+      prismaMock.client.user.update.mockResolvedValueOnce(
         createMockUser({
           id: targetId,
           username: 'helpful_user',
@@ -667,7 +675,7 @@ describe('ModerationService', () => {
       );
 
       // 2. Mock second update (role change to MODERATOR)
-      prismaMock.user.update.mockResolvedValueOnce(
+      prismaMock.client.user.update.mockResolvedValueOnce(
         createMockUser({
           id: targetId,
           globalRole: 'MODERATOR',
@@ -675,15 +683,15 @@ describe('ModerationService', () => {
         }),
       );
 
-      prismaMock.moderationAction.create.mockResolvedValue({
+      prismaMock.client.moderationAction.create.mockResolvedValue({
         id: 'act-456',
         action: 'ADJUST_POINTS',
         moderatorId: modId,
         targetUserId: targetId,
       } as any);
 
-      prismaMock.$transaction.mockImplementation(async (cb) => {
-        if (typeof cb === 'function') return cb(prismaMock);
+      prismaMock.client.$transaction.mockImplementation(async (cb) => {
+        if (typeof cb === 'function') return cb(prismaMock as any);
         return cb;
       });
 
