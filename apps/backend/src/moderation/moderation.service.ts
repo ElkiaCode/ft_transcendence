@@ -127,6 +127,7 @@ export class ModerationService {
           creatorId,
           targetType: 'MESSAGE',
           targetMessageId,
+          targetUserId: targetMessage.senderId,
           reason: reason.trim(),
         },
       });
@@ -198,10 +199,16 @@ export class ModerationService {
       throw new NotFoundException('report not found');
     }
 
-    const targetUserId = report.targetUserId ?? report.targetMessage?.senderId;
+    console.log('action', action);
+    console.log('report', report);
+    const isSystemMessage = report.creatorId === null;
+
+    const targetUserId = report.targetUserId;
     const penaltyPointsChange =
       targetUserId && penaltyPointsToSubtract > 0
-        ? -penaltyPointsToSubtract
+        ? action === 'DISMISS_REPORT'
+          ? penaltyPointsToSubtract
+          : -penaltyPointsToSubtract
         : 0;
 
     const result = await this.prisma.client.$transaction(async (tx) => {
@@ -251,7 +258,7 @@ export class ModerationService {
           (updatedTargetUser && updatedTargetUser.penaltyPoints <= -500))
       ) {
         await tx.user.update({
-          where: { id: targetUserId },
+          where: { id: targetUserId, globalRole: { not: 'ADMIN' } },
           data: {
             isBanned: true,
             isActive: false,
@@ -282,7 +289,7 @@ export class ModerationService {
       return { moderationAction, updatedReport };
     });
 
-    if (targetUserId) {
+    if (isSystemMessage || action === 'BAN' || action === 'WARN') {
       await this.notifyUser(targetUserId, {
         type: 'MODERATION',
         title: 'Moderation update',
@@ -302,6 +309,40 @@ export class ModerationService {
         await this.chatGateway.emitModerationBanAndDisconnect(targetUserId, {
           message: 'Your account was banned by moderation.',
           reason: note ?? action,
+        });
+      }
+    }
+
+    if (!isSystemMessage) {
+      if (action !== 'DISMISS_REPORT') {
+        await this.notifyUser(report.creatorId!, {
+          type: 'MODERATION',
+          title: 'Flag taken into account',
+          body: note ?? action,
+          actorId: moderatorId,
+          entityType: 'report',
+          entityId: reportId,
+          action: `report_${action.toLowerCase()}`,
+          metadata: {
+            reportId,
+            moderationActionId: result.moderationAction.id,
+            penaltyPointsChange,
+          },
+        });
+      } else {
+        await this.notifyUser(report.creatorId!, {
+          type: 'MODERATION',
+          title: 'Flag refused',
+          body: note ?? action,
+          actorId: moderatorId,
+          entityType: 'report',
+          entityId: reportId,
+          action: `report_${action.toLowerCase()}`,
+          metadata: {
+            reportId,
+            moderationActionId: result.moderationAction.id,
+            penaltyPointsChange,
+          },
         });
       }
     }

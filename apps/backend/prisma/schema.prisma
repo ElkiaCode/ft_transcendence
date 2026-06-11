@@ -271,7 +271,7 @@ model Report {
   id              String           @id @default(cuid())
   creatorId       String?
   targetType      ReportTargetType
-  targetUserId    String?
+  targetUserId    String
   targetMessageId String?
   reason          String
   status          ReportStatus     @default(OPEN)
@@ -279,7 +279,7 @@ model Report {
   updatedAt       DateTime         @updatedAt
 
   creator       User?    @relation("ReportCreator", fields: [creatorId], references: [id], onDelete: SetNull)
-  targetUser    User?    @relation("ReportTargetUser", fields: [targetUserId], references: [id], onDelete: SetNull)
+  targetUser    User?    @relation("ReportTargetUser", fields: [targetUserId], references: [id], onDelete: Cascade)
   targetMessage Message? @relation("ReportTargetMessage", fields: [targetMessageId], references: [id], onDelete: SetNull)
 
   actions ModerationAction[]

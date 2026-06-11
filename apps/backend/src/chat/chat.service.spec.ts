@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
+
 describe('ChatService', () => {
   let service: ChatService;
   let prisma: PrismaService;

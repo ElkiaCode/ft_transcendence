@@ -100,7 +100,7 @@ export class AutoModerationService {
       data: {
         creatorId: null,
         targetType: messageId ? 'MESSAGE' : 'USER',
-        targetUserId: messageId ? undefined : userId,
+        targetUserId: userId,
         targetMessageId: messageId,
         reason: this.buildReason('blocked message', result, content),
       },
@@ -132,6 +132,7 @@ export class AutoModerationService {
         creatorId: null,
         targetType: 'MESSAGE',
         targetMessageId: messageId,
+        targetUserId: userId,
         reason: this.buildReason('flagged message', result, content),
       },
     });

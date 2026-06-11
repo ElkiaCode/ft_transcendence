@@ -7,8 +7,8 @@ export type NotificationType = 'MESSAGE' | 'MODERATION' | 'SYSTEM';
 
 export type NotificationContext = {
   actorId?: string;
-  entityType?: string;
-  entityId?: string;
+  entityType: string;
+  entityId: string;
   action?: string;
   metadata?: Prisma.InputJsonValue;
 };
@@ -27,8 +27,8 @@ export class NotificationsService {
     userId: string,
     type: NotificationType,
     title: string,
+    context: NotificationContext,
     body?: string,
-    context: NotificationContext = {},
   ) {
     return this.prisma.client.notification.create({
       data: {
@@ -49,12 +49,12 @@ export class NotificationsService {
     userIds: string[],
     type: NotificationType,
     title: string,
+    context: NotificationContext,
     body?: string,
-    context: NotificationContext = {},
   ) {
     return Promise.all(
       userIds.map((userId) =>
-        this.createForUser(userId, type, title, body, context),
+        this.createForUser(userId, type, title, context, body),
       ),
     );
   }
@@ -64,8 +64,8 @@ export class NotificationsService {
       userId,
       input.type,
       input.title,
-      input.body,
       input,
+      input.body,
     );
   }
 
@@ -99,6 +99,8 @@ export class NotificationsService {
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
+
+    console.log('notifications', notifications);
 
     // 3. Filter notifications based on GDPR/Membership rules
     return notifications.filter((notification) => {
@@ -143,6 +145,22 @@ export class NotificationsService {
       where: {
         userId,
         isRead: false,
+      },
+      data: {
+        isRead: true,
+      },
+    });
+
+    return { success: true };
+  }
+
+  async markAllConversationAsRead(userId: string, conversationId: string) {
+    await this.prisma.client.notification.updateMany({
+      where: {
+        userId,
+        isRead: false,
+        entityType: 'CONVERSATION',
+        entityId: conversationId,
       },
       data: {
         isRead: true,

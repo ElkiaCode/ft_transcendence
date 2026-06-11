@@ -14,6 +14,8 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChatService } from './chat.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { UseInterceptors } from '@nestjs/common';
+import { LoggingInterceptor } from '@/utils/logger/logger';
 
 type SocketUser = {
   sub: string;
@@ -46,6 +48,7 @@ interface ChatMessageResult {
   };
 }
 
+@UseInterceptors(LoggingInterceptor)
 @WebSocketGateway({
   namespace: '/chat',
   cors: {
@@ -258,15 +261,15 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {
     const user = await this.getLiveSocketUserOrThrow(client);
 
-    await this.prisma.client.conversationParticipant.update({
-      where: {
-        conversationId_userId: {
-          conversationId: body.conversationId,
-          userId: user.sub,
-        },
-      },
-      data: { leftAt: new Date() },
-    });
+    // await this.prisma.client.conversationParticipant.update({
+    //   where: {
+    //     conversationId_userId: {
+    //       conversationId: body.conversationId,
+    //       userId: user.sub,
+    //     },
+    //   },
+    //   data: { leftAt: new Date() },
+    // });
 
     await client.leave(`conversation:${body.conversationId}`);
 
@@ -331,6 +334,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       recipientIds,
       'MESSAGE',
       'New message',
+      {
+        entityType: 'CONVERSATION',
+        entityId: body.conversationId,
+      },
       preview,
     );
 
