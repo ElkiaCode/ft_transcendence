@@ -44,3 +44,4 @@ __pytestcache__/
 .pytest_cache/
 testing/.pytest_cache/
 *.pyc
+cookie_*.txt
