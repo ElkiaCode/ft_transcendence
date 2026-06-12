@@ -29,9 +29,10 @@ export function LoginModal({
   };
 
   const handleLogin42 = () => {
-    setError('');
     const clientId = process.env.NEXT_PUBLIC_42_CLIENT_ID;
-    const redirectUri = "https://localhost/api/auth/42/callback";
+    const appUrl =
+      process.env.NEXT_PUBLIC_APP_URL ?? "https://localhost:8443";
+    const redirectUri = `${appUrl}/api/auth/42/callback`;
     window.location.href = `https://api.intra.42.fr/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code`;
   };
 

@@ -8,8 +8,6 @@ import { FriendsMenu } from "@/features/friends/components/FriendsMenu";
 import { NotificationsMenu } from "@/features/notifications/components/NotificationsMenu";
 import { apiLogout } from "@/features/auth/api/auth.api";
 import { useAuthStore } from "@/features/auth/stores/auth.store";
-import { MAILPIT_URL } from "@/lib/config/api";
-import { Mail } from "lucide-react";
 
 const ERROR_MESSAGES: Record<string, string> = {
   oauth_missing_code: '42 connection is invalid.',
@@ -68,7 +66,7 @@ export default function Header() {
           <NotificationsMenu />
           {user ? (
             <div className="flex items-center justify-between bg-white px-4 py-2 rounded-full shadow-md border">
-              <Link href="/profils" className="flex items-center gap-3">
+              <Link href="/profiles" className="flex items-center gap-3">
                 <div className="w-10 h-10 ColorsS rounded-full flex items-center justify-center overflow-hidden">
                   {user?.profile?.avatarUrl ? (
                     <img
@@ -84,11 +82,12 @@ export default function Header() {
                 </div>
                 <div className="flex flex-col">
                   <span className="text-xs text-gray-500">
-                    {user?.provider === '42' ? 'Connected with 42' : 'Connected'}
+                    {user?.provider === "42"
+                      ? "Connected with 42"
+                      : "Connected"}
                   </span>
                   <span className="text-sm font-bold">{user.username}</span>
                 </div>
-
                 <div className="w-2 h-2 ColorsS rounded-full animate-pulse" />
               </Link>
               <div className="w-px h-8 bg-gray-200 mx-4" />
@@ -96,7 +95,10 @@ export default function Header() {
                 onClick={handleLogout}
                 className="text-xs text-gray-500 hover:text-red-500 hover:underline transition-colors"
               >
-                <Link href="/" className="text-xs text-gray-500 hover:text-red-500 hover:underline transition-colors">
+                <Link
+                  href="/"
+                  className="text-xs text-gray-500 hover:text-red-500 hover:underline transition-colors"
+                >
                   logout
                 </Link>
               </button>

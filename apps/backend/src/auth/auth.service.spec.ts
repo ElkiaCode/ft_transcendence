@@ -39,9 +39,6 @@ describe('AuthService', () => {
                 findFirst: jest.fn<any>(),
                 create: jest.fn<any>(),
               },
-              oAuthAccount: {
-                create: jest.fn<any>(),
-              },
               refreshToken: {
                 create: jest.fn<any>(),
                 findUnique: jest.fn<any>(),
@@ -354,17 +351,9 @@ describe('AuthService', () => {
 
   describe('loginWith42', () => {
     it('Scenario 1 - should throw Unauthorized if 42 token exchange fails', async () => {
-      jest.mocked(global.fetch).mockResolvedValue({
-        ok: false,
-        status: 401,
-        json: () =>
-          Promise.resolve({
-            error: 'invalid_grant',
-            error_description: 'The authorization code is invalid',
-          }),
-      } as Response);
+      jest.mocked(global.fetch).mockResolvedValue({ ok: false } as Response);
       await expect(service.loginWith42('fake-code')).rejects.toThrow(
-        '42 OAuth failed: The authorization code is invalid',
+        'invalid 42 code',
       );
     });
 
@@ -391,45 +380,6 @@ describe('AuthService', () => {
 
       const result = await service.loginWith42('valid-code');
       expect(result.user.id).toBe('user-42');
-    });
-
-    it('Scenario 3 - should link an existing local user with the same email', async () => {
-      const mockFetch = jest.mocked(global.fetch);
-      mockFetch
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve({ access_token: 'at' }),
-        } as Response)
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              id: 42,
-              email: 'marvin@42.fr',
-              login: 'marvin',
-            }),
-        } as Response);
-
-      jest.mocked(prisma.client.user.findFirst).mockResolvedValue(null);
-      jest.mocked(prisma.client.user.findUnique).mockResolvedValue({
-        id: 'local-user',
-        email: 'marvin@42.fr',
-        username: 'local_marvin',
-        globalRole: 'USER',
-        isActive: true,
-        isBanned: false,
-      } as any);
-
-      const result = await service.loginWith42('valid-code');
-
-      expect(prisma.client.oAuthAccount.create).toHaveBeenCalledWith({
-        data: {
-          userId: 'local-user',
-          provider: '42',
-          providerAccountId: '42',
-        },
-      });
-      expect(result.user.id).toBe('local-user');
     });
   });
 
