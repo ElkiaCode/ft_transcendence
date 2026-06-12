@@ -16,9 +16,9 @@ WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
 
-ARG NEXT_PUBLIC_APP_URL=https://localhost
-ARG NEXT_PUBLIC_API_URL=https://localhost/api
-ARG NEXT_PUBLIC_SOCKET_URL=https://localhost
+ARG NEXT_PUBLIC_APP_URL=https://localhost:8443
+ARG NEXT_PUBLIC_API_URL=https://localhost:8443/api
+ARG NEXT_PUBLIC_SOCKET_URL=https://localhost:8443
 ARG NEXT_PUBLIC_42_CLIENT_ID
 
 ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL

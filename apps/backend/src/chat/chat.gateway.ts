@@ -52,7 +52,7 @@ interface ChatMessageResult {
 @WebSocketGateway({
   namespace: '/chat',
   cors: {
-    origin: 'https://localhost',
+    origin: process.env.CORS_ORIGIN ?? 'https://localhost:8443',
     credentials: true,
   },
 })

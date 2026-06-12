@@ -80,7 +80,9 @@ export class UsersService {
     let pathname: string;
 
     try {
-      const localBaseUrl = new URL(process.env.API_URL || 'https://localhost');
+      const localBaseUrl = new URL(
+        process.env.API_URL || 'https://localhost:8443',
+      );
       const parsedAvatarUrl = new URL(avatarUrl, localBaseUrl);
 
       if (parsedAvatarUrl.origin !== localBaseUrl.origin) {
@@ -328,7 +330,7 @@ export class UsersService {
       throw new BadRequestException('file is too large!');
     }
 
-    const avatarPath = `${process.env.API_URL || 'https://localhost'}/uploads/${file.filename}`;
+    const avatarPath = `${process.env.API_URL || 'https://localhost:8443'}/uploads/${file.filename}`;
 
     const profile = await this.prisma.client.profile.upsert({
       where: { userId },

@@ -200,7 +200,7 @@ describe('UsersService privacy behavior', () => {
         email: 'personal@example.com',
         passwordHash: null,
         profile: {
-          avatarUrl: `https://localhost/uploads/${filename}`,
+          avatarUrl: `https://localhost:8443/uploads/${filename}`,
         },
       },
     });

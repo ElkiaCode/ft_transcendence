@@ -1,13 +1,13 @@
 docker compose exec backend npx prisma migrate deploy
 
 register :
-curl -k -X POST https://localhost/api/auth/register \
+curl -k -X POST https://localhost:8443/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com","username":"testuser","password":"password123"}'
 
 
 login :
-curl -k -i -c cookies.txt -X POST https://localhost/api/auth/login \
+curl -k -i -c cookies.txt -X POST https://localhost:8443/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com","password":"password123"}'
 
@@ -17,64 +17,64 @@ docker compose exec postgres sh -lc \
 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "UPDATE \"User\" SET \"globalRole\" = '\''ADMIN'\'' WHERE email = '\''test@example.com'\'';"'
 
 refresh-cookie:
-curl -k -i -b cookies.txt -c cookies.txt -X POST https://localhost/api/auth/refresh
+curl -k -i -b cookies.txt -c cookies.txt -X POST https://localhost:8443/api/auth/refresh
 
 logout:
-curl -k -i -b cookies.txt -c cookies.txt -X POST https://localhost/api/auth/logout
+curl -k -i -b cookies.txt -c cookies.txt -X POST https://localhost:8443/api/auth/logout
 
 ban another user as admin/moderator:
-curl -k -X POST https://localhost/api/admin/users/USER_ID_HERE/ban \
+curl -k -X POST https://localhost:8443/api/admin/users/USER_ID_HERE/ban \
   -H "Authorization: Bearer ADMIN_ACCESS_TOKEN"
 
 unban another user as admin/moderator:
-curl -k -X POST https://localhost/api/admin/users/USER_ID_HERE/unban \
+curl -k -X POST https://localhost:8443/api/admin/users/USER_ID_HERE/unban \
   -H "Authorization: Bearer ADMIN_ACCESS_TOKEN"
 
 erase data using password:
-curl -k -X POST https://localhost/api/users/me/erase-data \
+curl -k -X POST https://localhost:8443/api/users/me/erase-data \
   -H "Authorization: Bearer USER_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"currentPassword":"password123"}'
 
 # Open https://localhost:8025, then open the confirmation email and follow its link.
 # The confirmation page calls this while authenticated as the same user:
-curl -k -X POST https://localhost/api/users/me/confirm-data-erasure \
+curl -k -X POST https://localhost:8443/api/users/me/confirm-data-erasure \
   -H "Authorization: Bearer USER_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"token":"TOKEN_FROM_EMAIL","currentPassword":"password123"}'
 
 erase data with Oauth only user:
-curl -k -X POST https://localhost/api/users/me/erase-data \
+curl -k -X POST https://localhost:8443/api/users/me/erase-data \
   -H "Authorization: Bearer USER_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{}'
 
 send a friend request:
-curl -k -X POST https://localhost/api/relationships/users/TARGET_USER_ID/friend-request \
+curl -k -X POST https://localhost:8443/api/relationships/users/TARGET_USER_ID/friend-request \
   -H "Authorization: Bearer ACTOR_ACCESS_TOKEN"
 
 accept friend request:
-curl -k -X POST https://localhost/api/relationships/users/REQUESTER_USER_ID/friend-accept \
+curl -k -X POST https://localhost:8443/api/relationships/users/REQUESTER_USER_ID/friend-accept \
   -H "Authorization: Bearer ADDRESSEE_ACCESS_TOKEN"
 
 remove friend:
-curl -k -X DELETE https://localhost/api/relationships/users/TARGET_USER_ID/friend \
+curl -k -X DELETE https://localhost:8443/api/relationships/users/TARGET_USER_ID/friend \
   -H "Authorization: Bearer ACTOR_ACCESS_TOKEN"
 
 block user:
-curl -k -X POST https://localhost/api/relationships/users/TARGET_USER_ID/block \
+curl -k -X POST https://localhost:8443/api/relationships/users/TARGET_USER_ID/block \
   -H "Authorization: Bearer ACTOR_ACCESS_TOKEN"
 
 unblock user:
-curl -k -X DELETE https://localhost/api/relationships/users/TARGET_USER_ID/block \
+curl -k -X DELETE https://localhost:8443/api/relationships/users/TARGET_USER_ID/block \
   -H "Authorization: Bearer ACTOR_ACCESS_TOKEN"
 
 search user:
-curl -k "https://localhost/api/users/search?q=test" \
+curl -k "https://localhost:8443/api/users/search?q=test" \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
 
 Get me :
-curl -k https://localhost/api/users/me -H "Authorization: Bearer YOUR_TOKEN"
+curl -k https://localhost:8443/api/users/me -H "Authorization: Bearer YOUR_TOKEN"
 
 and verify in postgre :
 

@@ -8,7 +8,7 @@ import requests
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-BASE_URL = 'https://localhost/api'
+BASE_URL = 'https://localhost:8443/api'
 MAILPIT_API_URL = 'https://localhost:8025/api/v1'
 
 class User:

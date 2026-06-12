@@ -8,8 +8,8 @@ import * as https from "https";
 console.log("🚀 Simulation script starting...");
 
 // const API_URL = "http://127.0.0.1:3001/api"; // Your NestJS API
-const API_URL = "https://localhost/api"; // Your NestJS API
-const WS_URL = "https://localhost/chat";  // Your NestJS Gateway
+const API_URL = "https://localhost:8443/api"; // Your NestJS API
+const WS_URL = "https://localhost:8443/chat";  // Your NestJS Gateway
 
 const httpsAgent = new https.Agent({  
   rejectUnauthorized: false

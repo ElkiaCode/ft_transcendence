@@ -9,6 +9,7 @@ import {
   Get,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -21,7 +22,10 @@ import { ApiBody, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
 
   @Post('register')
   async register(
@@ -111,6 +115,10 @@ export class AuthController {
       result.refreshToken,
       this.authService.getRefreshTokenDays(),
     );
-    return response.redirect('https://localhost/'); // TODO: Changer pour ne pas avoir localhost
+    const frontendUrl = this.configService.get<string>(
+      'FRONTEND_URL',
+      'https://localhost:8443',
+    );
+    return response.redirect(frontendUrl);
   }
 }

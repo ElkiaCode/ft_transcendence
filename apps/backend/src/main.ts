@@ -8,7 +8,7 @@ import { LoggingInterceptor } from './utils/logger/logger';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  const corsOrigins = (process.env.CORS_ORIGIN ?? 'https://localhost')
+  const corsOrigins = (process.env.CORS_ORIGIN ?? 'https://localhost:8443')
     .split(',')
     .map((origin) => origin.trim().replace(/\/$/, ''))
     .filter(Boolean);

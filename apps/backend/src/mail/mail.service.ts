@@ -24,7 +24,7 @@ export class MailService {
     this.frontendUrl = (
       this.configService.get<string>('FRONTEND_URL') ??
       this.configService.get<string>('NEXT_PUBLIC_APP_URL') ??
-      'https://localhost'
+      'https://localhost:8443'
     ).replace(/\/+$/, '');
   }
 
