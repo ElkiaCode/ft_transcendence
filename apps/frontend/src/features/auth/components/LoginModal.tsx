@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { apiLogin } from "@/features/auth/api/auth.api";
 import { useAuthStore } from "@/features/auth/stores/auth.store";
+import { API_URL } from "@/lib/config/api";
 import { errorMessage } from "@/lib/utils/error-message";
 
 export function LoginModal({ onClose }: { onClose: () => void }) {
@@ -23,11 +24,7 @@ export function LoginModal({ onClose }: { onClose: () => void }) {
   };
 
   const handleLogin42 = () => {
-    const clientId = process.env.NEXT_PUBLIC_42_CLIENT_ID;
-    const appUrl =
-      process.env.NEXT_PUBLIC_APP_URL ?? "https://localhost:8443";
-    const redirectUri = `${appUrl}/api/auth/42/callback`;
-    window.location.href = `https://api.intra.42.fr/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code`;
+    window.location.href = `${API_URL}/auth/42`;
   };
 
   return (

@@ -1,6 +1,8 @@
 import {
+  BadGatewayException,
   BadRequestException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -22,6 +24,11 @@ interface FortyTwoTokenResponse {
   expires_in: number;
   scope: string;
   created_at: number;
+}
+
+interface FortyTwoOAuthError {
+  error?: string;
+  error_description?: string;
 }
 
 interface FortyTwoUserResponse {
@@ -51,6 +58,8 @@ interface UserForPublic {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
@@ -270,8 +279,19 @@ export class AuthService {
     });
   }
 
+  getFortyTwoAuthorizationUrl(state: string): string {
+    const url = new URL('https://api.intra.42.fr/oauth/authorize');
+    url.search = new URLSearchParams({
+      client_id: this.configService.getOrThrow('FORTYTWO_CLIENT_ID'),
+      redirect_uri: this.configService.getOrThrow('FORTYTWO_CALLBACK_URL'),
+      response_type: 'code',
+      scope: 'public',
+      state,
+    }).toString();
+    return url.toString();
+  }
+
   async loginWith42(code: string) {
-    // 1. replace the code by a 42 token
     const params = new URLSearchParams({
       grant_type: 'authorization_code',
       client_id: this.configService.getOrThrow('FORTYTWO_CLIENT_ID'),
@@ -280,39 +300,63 @@ export class AuthService {
       redirect_uri: this.configService.getOrThrow('FORTYTWO_CALLBACK_URL'),
     });
 
-    const tokenResponse = await fetch('https://api.intra.42.fr/oauth/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: params.toString(),
-    });
+    let tokenResponse: Response;
+
+    try {
+      tokenResponse = await fetch('https://api.intra.42.fr/oauth/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: params.toString(),
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'unknown network error';
+      this.logger.error(`Could not reach the 42 token endpoint: ${message}`);
+      throw new BadGatewayException('42 API is unreachable');
+    }
 
     if (!tokenResponse.ok) {
-      throw new UnauthorizedException('invalid 42 code');
+      const reason = await this.readFortyTwoError(tokenResponse);
+      this.logger.warn(
+        `42 token exchange failed (${tokenResponse.status}): ${reason}`,
+      );
+      throw new UnauthorizedException(`42 OAuth failed: ${reason}`);
     }
 
     const tokenData = (await tokenResponse.json()) as FortyTwoTokenResponse;
     const accessToken42 = tokenData.access_token;
+    let userResponse: Response;
 
-    // 2. Retrieve infos from user within 42 API
-    const userResponse = await fetch('https://api.intra.42.fr/v2/me', {
-      headers: { Authorization: `Bearer ${accessToken42}` },
-    });
+    try {
+      userResponse = await fetch('https://api.intra.42.fr/v2/me', {
+        headers: { Authorization: `Bearer ${accessToken42}` },
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'unknown network error';
+      this.logger.error(`Could not reach the 42 user endpoint: ${message}`);
+      throw new BadGatewayException('42 API is unreachable');
+    }
 
     if (!userResponse.ok) {
-      throw new UnauthorizedException('failed to fetch 42 user');
+      const reason = await this.readFortyTwoError(userResponse);
+      this.logger.warn(
+        `42 user request failed (${userResponse.status}): ${reason}`,
+      );
+      throw new UnauthorizedException(`42 user request failed: ${reason}`);
     }
 
     const user42 = (await userResponse.json()) as FortyTwoUserResponse;
-
-    // 3. Search or create the user in DB
+    const email = user42.email.trim().toLowerCase();
+    const providerAccountId = String(user42.id);
     let user = await this.prisma.client.user.findFirst({
       where: {
         oauthAccounts: {
           some: {
             provider: '42',
-            providerAccountId: String(user42.id),
+            providerAccountId,
           },
         },
       },
@@ -320,31 +364,51 @@ export class AuthService {
     });
 
     if (!user) {
-      user = await this.prisma.client.user.create({
-        data: {
-          email: user42.email,
-          username: user42.login,
-          profile: {
-            create: {
-              displayName: user42.displayname ?? user42.login,
-              avatarUrl: user42.image?.link ?? null,
-            },
-          },
-          oauthAccounts: {
-            create: {
-              provider: '42',
-              providerAccountId: String(user42.id),
-            },
-          },
-        },
+      const existingUser = await this.prisma.client.user.findUnique({
+        where: { email },
         include: { profile: true },
       });
+
+      if (existingUser) {
+        await this.prisma.client.oAuthAccount.create({
+          data: {
+            userId: existingUser.id,
+            provider: '42',
+            providerAccountId,
+          },
+        });
+        user = existingUser;
+      } else {
+        const username = await this.getAvailableFortyTwoUsername(
+          user42.login,
+          providerAccountId,
+        );
+
+        user = await this.prisma.client.user.create({
+          data: {
+            email,
+            username,
+            profile: {
+              create: {
+                displayName: user42.displayname ?? user42.login,
+                avatarUrl: user42.image?.link ?? null,
+              },
+            },
+            oauthAccounts: {
+              create: {
+                provider: '42',
+                providerAccountId,
+              },
+            },
+          },
+          include: { profile: true },
+        });
+      }
     }
 
     if (!user.isActive) throw new UnauthorizedException('account is inactive');
     if (user.isBanned) throw new UnauthorizedException('account is banned');
 
-    // 4. Create JWT user session
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
@@ -358,6 +422,38 @@ export class AuthService {
       refreshToken: session.refreshToken,
       user: this.toPublicUser(user),
     };
+  }
+
+  private async readFortyTwoError(response: Response): Promise<string> {
+    try {
+      const payload = (await response.json()) as FortyTwoOAuthError;
+      return (
+        payload.error_description ?? payload.error ?? `HTTP ${response.status}`
+      );
+    } catch {
+      return `HTTP ${response.status}`;
+    }
+  }
+
+  private async getAvailableFortyTwoUsername(
+    requestedUsername: string,
+    providerAccountId: string,
+  ): Promise<string> {
+    const baseUsername =
+      requestedUsername.trim().replace(/[^a-zA-Z0-9_]/g, '_') ||
+      `user_${providerAccountId}`;
+    const preferredUsername = baseUsername.slice(0, 30);
+    const preferredUser = await this.prisma.client.user.findUnique({
+      where: { username: preferredUsername },
+      select: { id: true },
+    });
+
+    if (!preferredUser) {
+      return preferredUsername;
+    }
+
+    const suffix = `_${providerAccountId}`;
+    return `${baseUsername.slice(0, Math.max(1, 30 - suffix.length))}${suffix}`;
   }
 
   async signAccessToken(payload: JwtPayload): Promise<string> {

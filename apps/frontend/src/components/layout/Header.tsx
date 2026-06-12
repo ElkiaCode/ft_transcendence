@@ -8,6 +8,8 @@ import { FriendsMenu } from "@/features/friends/components/FriendsMenu";
 import { NotificationsMenu } from "@/features/notifications/components/NotificationsMenu";
 import { apiLogout } from "@/features/auth/api/auth.api";
 import { useAuthStore } from "@/features/auth/stores/auth.store";
+import { MAILPIT_URL } from "@/lib/config/api";
+import { Mail } from "lucide-react";
 
 export function Header() {
   const [showLogin, setShowLogin] = useState(false);
@@ -42,44 +44,56 @@ export function Header() {
         <div className="ml-auto flex items-center gap-4">
           <NotificationsMenu />
           {user ? (
-            <div className="flex items-center justify-between bg-white px-4 py-2 rounded-full shadow-md border">
-              <Link href="/profiles" className="flex items-center gap-3">
-                <div className="w-10 h-10 ColorsS rounded-full flex items-center justify-center overflow-hidden">
-                  {user?.profile?.avatarUrl ? (
-                    <img
-                      src={user.profile.avatarUrl}
-                      alt="avatar"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-white font-bold">
-                      {user?.username?.charAt(0).toUpperCase()}
-                    </span>
-                  )}
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-xs text-gray-500">
-                    {user?.provider === "42"
-                      ? "Connected with 42"
-                      : "Connected"}
-                  </span>
-                  <span className="text-sm font-bold">{user.username}</span>
-                </div>
-                <div className="w-2 h-2 ColorsS rounded-full animate-pulse" />
-              </Link>
-              <div className="w-px h-8 bg-gray-200 mx-4" />
-              <button
-                onClick={handleLogout}
-                className="text-xs text-gray-500 hover:text-red-500 hover:underline transition-colors"
+            <>
+              <a
+                href={MAILPIT_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 rounded-full border bg-white px-4 py-2 text-sm font-medium shadow-md transition-colors hover:bg-gray-50"
+                title="Open the Mailpit inbox"
               >
-                <Link
-                  href="/"
+                <Mail className="h-4 w-4" aria-hidden="true" />
+                Mailbox
+              </a>
+              <div className="flex items-center justify-between bg-white px-4 py-2 rounded-full shadow-md border">
+                <Link href="/profiles" className="flex items-center gap-3">
+                  <div className="w-10 h-10 ColorsS rounded-full flex items-center justify-center overflow-hidden">
+                    {user?.profile?.avatarUrl ? (
+                      <img
+                        src={user.profile.avatarUrl}
+                        alt="avatar"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-white font-bold">
+                        {user?.username?.charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs text-gray-500">
+                      {user?.provider === "42"
+                        ? "Connected with 42"
+                        : "Connected"}
+                    </span>
+                    <span className="text-sm font-bold">{user.username}</span>
+                  </div>
+                  <div className="w-2 h-2 ColorsS rounded-full animate-pulse" />
+                </Link>
+                <div className="w-px h-8 bg-gray-200 mx-4" />
+                <button
+                  onClick={handleLogout}
                   className="text-xs text-gray-500 hover:text-red-500 hover:underline transition-colors"
                 >
-                  logout
-                </Link>
-              </button>
-            </div>
+                  <Link
+                    href="/"
+                    className="text-xs text-gray-500 hover:text-red-500 hover:underline transition-colors"
+                  >
+                    logout
+                  </Link>
+                </button>
+              </div>
+            </>
           ) : (
             <div className="flex flex-col gap-1">
               <button
