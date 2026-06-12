@@ -27,24 +27,27 @@ services:
     build:
       context: ./apps/frontend
       dockerfile: Dockerfile
+      target: production
+      args:
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://localhost}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://localhost/api}
+        NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL:-https://localhost}
+        NEXT_PUBLIC_42_CLIENT_ID: ${FORTYTWO_CLIENT_ID:-}
     restart: unless-stopped
-    env_file:
-      - .env
     environment:
-      NODE_ENV: development
+      NODE_ENV: production
       HOSTNAME: 0.0.0.0
       PORT: 3000
-      NEXT_PUBLIC_APP_URL: https://localhost
-      NEXT_PUBLIC_API_URL: https://localhost/api
-      NEXT_PUBLIC_SOCKET_URL: https://localhost
-    volumes:
-      - ./apps/frontend:/app
-      - frontend_node_modules:/app/node_modules
-      - frontend_next_cache:/app/.next
     networks:
       - transcendence
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000 >/dev/null 2>&1 || exit 1"]
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
       interval: 10s
       timeout: 5s
       retries: 20
@@ -54,29 +57,38 @@ services:
     build:
       context: ./apps/backend
       dockerfile: Dockerfile
+      target: production
     restart: unless-stopped
     env_file:
       - .env
     environment:
-      NODE_ENV: development
+      NODE_ENV: production
       PORT: 3001
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
-      REDIS_URL: redis://redis:6379
       CORS_ORIGIN: https://localhost
-    command: sh -lc "npx prisma generate && npx prisma migrate deploy && npm run seed:admin && npm run start:dev"
+      FRONTEND_URL: ${NEXT_PUBLIC_APP_URL:-https://localhost}
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_FROM: ${SMTP_FROM:-Transcendence <no-reply@transcendence.local>}
+      DATA_ERASURE_TOKEN_TTL_MINUTES: ${DATA_ERASURE_TOKEN_TTL_MINUTES:-30}
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
+      mailpit:
         condition: service_healthy
     volumes:
-      - ./apps/backend:/app
-      - ./data/uploads:/app/uploads
-      - backend_node_modules:/app/node_modules
+      - uploads_data:/app/uploads
     networks:
       - transcendence
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/api/health >/dev/null 2>&1 || exit 1"]
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
       interval: 10s
       timeout: 5s
       retries: 20
@@ -85,14 +97,12 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
-    env_file:
-      - .env
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - ./data/postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     networks:
       - transcendence
     healthcheck:
@@ -115,7 +125,7 @@ services:
       PGADMIN_REPLACE_SERVERS_ON_STARTUP: "True"
       PGPASS_FILE: /pgpass/pgpass
     ports:
-      - "5050:80"
+      - "127.0.0.1:5050:80"
     volumes:
       - pgadmin_data:/var/lib/pgadmin
       - ./infra/pgadmin/servers.json:/pgadmin4/servers.json:ro
@@ -123,19 +133,26 @@ services:
     networks:
       - transcendence
 
-  redis:
-    image: redis:7-alpine
+  mailpit:
+    image: axllent/mailpit:latest
     restart: unless-stopped
-    command: redis-server --appendonly yes
+    command:
+      - --ui-tls-cert
+      - /etc/mailpit/certs/dev.crt
+      - --ui-tls-key
+      - /etc/mailpit/certs/dev.key
+    ports:
+      - "127.0.0.1:8025:8025"
     volumes:
-      - redis_data:/data
+      - ./infra/nginx/certs:/etc/mailpit/certs:ro
     networks:
       - transcendence
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
+      test: ["CMD", "/mailpit", "readyz", "--https"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
 
 networks:
   transcendence:
@@ -144,8 +161,5 @@ networks:
 
 volumes:
   postgres_data:
-  redis_data:
-  frontend_node_modules:
-  frontend_next_cache:
-  backend_node_modules:
+  uploads_data:
   pgadmin_data:

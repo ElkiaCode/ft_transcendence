@@ -13,5 +13,6 @@ export type AppUser = {
   globalRole?: UserRole;
   penaltyPoints?: number;
   provider?: "local" | "42";
+  authProviders?: string[];
   profile: UserProfile | null;
 };

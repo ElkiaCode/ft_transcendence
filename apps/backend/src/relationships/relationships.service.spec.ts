@@ -170,6 +170,54 @@ describe('RelationshipsService', () => {
       });
       expect(result.friendshipRemoved).toBe(true);
       expect(result.block.id).toBe('b-1');
+      expect(notificationsService['createFromInput']).toHaveBeenCalledWith(
+        'user-2',
+        expect.objectContaining({
+          action: 'user_blocked',
+          entityType: 'block',
+          entityId: 'b-1',
+        }),
+      );
+      expect(gateway['emitNotificationCreated']).toHaveBeenCalledWith(
+        'user-2',
+        expect.anything(),
+      );
+    });
+  });
+
+  describe('unblockUser', () => {
+    it('deletes the block and notifies the unblocked user', async () => {
+      prismaMock.client.user.findUnique.mockResolvedValueOnce(mockUser as any);
+      prismaMock.client.user.findUnique.mockResolvedValueOnce(
+        mockTarget as any,
+      );
+      prismaMock.client.block.findUnique.mockResolvedValue({
+        id: 'b-1',
+        blockerId: 'user-1',
+        blockedId: 'user-2',
+        createdAt: new Date(),
+      });
+      prismaMock.client.block.delete.mockResolvedValue({
+        id: 'b-1',
+        blockerId: 'user-1',
+        blockedId: 'user-2',
+        createdAt: new Date(),
+      });
+
+      await service.unblockUser('user-1', 'user-2');
+
+      expect(notificationsService['createFromInput']).toHaveBeenCalledWith(
+        'user-2',
+        expect.objectContaining({
+          action: 'user_unblocked',
+          entityType: 'block',
+          entityId: 'b-1',
+        }),
+      );
+      expect(gateway['emitNotificationCreated']).toHaveBeenCalledWith(
+        'user-2',
+        expect.anything(),
+      );
     });
   });
 });

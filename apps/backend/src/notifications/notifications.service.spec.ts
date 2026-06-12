@@ -21,10 +21,15 @@ describe('NotificationsService', () => {
     [NotificationCreateArgs]
   >();
   const prisma = {
-    notification: {
-      create: notificationCreate,
-      findMany: jest.fn(),
-      updateMany: jest.fn(),
+    client: {
+      notification: {
+        create: notificationCreate,
+        findMany: jest.fn(),
+        updateMany: jest.fn(),
+      },
+      conversationParticipant: {
+        findMany: jest.fn(),
+      },
     },
   } as unknown as PrismaService;
 
@@ -49,7 +54,6 @@ describe('NotificationsService', () => {
         'user-1',
         'SYSTEM',
         'Friend request received',
-        'alice sent you a friend request.',
         {
           actorId: 'actor-1',
           entityType: 'friendship',
@@ -59,6 +63,7 @@ describe('NotificationsService', () => {
             requesterUsername: 'alice',
           },
         },
+        'alice sent you a friend request.',
       ),
     ).resolves.toBe(createdNotification);
 

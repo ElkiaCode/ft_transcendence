@@ -36,6 +36,13 @@ curl -k -X POST https://localhost/api/users/me/erase-data \
   -H "Content-Type: application/json" \
   -d '{"currentPassword":"password123"}'
 
+# Open https://localhost:8025, then open the confirmation email and follow its link.
+# The confirmation page calls this while authenticated as the same user:
+curl -k -X POST https://localhost/api/users/me/confirm-data-erasure \
+  -H "Authorization: Bearer USER_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"token":"TOKEN_FROM_EMAIL","currentPassword":"password123"}'
+
 erase data with Oauth only user:
 curl -k -X POST https://localhost/api/users/me/erase-data \
   -H "Authorization: Bearer USER_ACCESS_TOKEN" \

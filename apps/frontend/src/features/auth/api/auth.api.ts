@@ -274,18 +274,42 @@ export async function apiUpdatePassword(
   return data;
 }
 
-export async function apiEraseMyData(currentPassword: string) {
+export async function apiRequestDataErasure(currentPassword?: string) {
   const res = await fetchWithAuth(`${API_URL}/users/me/erase-data`, {
     method: "POST",
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ currentPassword }),
+    body: JSON.stringify(
+      currentPassword ? { currentPassword } : {},
+    ),
   });
   const data = await res.json();
   if (!res.ok) {
-    throw new Error(data.message || "Error deleting account");
+    throw new Error(data.message || "Error requesting account deletion");
+  }
+  return data;
+}
+
+export async function apiConfirmDataErasure(
+  token: string,
+  currentPassword?: string,
+) {
+  const res = await fetchWithAuth(`${API_URL}/users/me/confirm-data-erasure`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      token,
+      ...(currentPassword ? { currentPassword } : {}),
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.message || "Error confirming account deletion");
   }
   return data;
 }

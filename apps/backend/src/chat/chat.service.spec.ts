@@ -10,7 +10,6 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
-
 describe('ChatService', () => {
   let service: ChatService;
   let prisma: PrismaService;
@@ -27,6 +26,7 @@ describe('ChatService', () => {
       conversationParticipant: {
         delete: jest.fn(),
         update: jest.fn(),
+        create: jest.fn(),
         createMany: jest.fn(),
       },
       conversation: {
@@ -58,6 +58,7 @@ describe('ChatService', () => {
         findMany: jest.fn(),
         findUnique: jest.fn(),
         count: jest.fn(),
+        update: jest.fn(),
         createMany: jest.fn(),
         delete: jest.fn(),
       },
@@ -609,6 +610,7 @@ describe('ChatService', () => {
         .mockResolvedValue({
           conversationId,
           userId,
+          joinedAt: new Date('2026-01-01'),
         });
     });
     it('Scenario 1: should list up to 100 messages with sender, reads, and reactions', async () => {
@@ -638,17 +640,30 @@ describe('ChatService', () => {
       // 4. Verify Prisma Call: Ensure we are fetching the right data
       // Fix the verification part in your listMessages test:
       expect(prisma.client.message.findMany).toHaveBeenCalledWith({
-        where: { conversationId },
-        include: expect.objectContaining({
+        where: {
+          conversationId,
+          createdAt: { gte: new Date('2026-01-01') },
+        },
+        select: expect.objectContaining({
           sender: {
-            include: { profile: true },
+            select: expect.objectContaining({
+              id: true,
+              username: true,
+              profile: expect.anything(),
+            }),
           },
-          reads: expect.anything(), // Use anything() to save space
-          reactions: expect.anything(), // Use anything() to save space
+          reads: expect.anything(),
+          reactions: expect.anything(),
         }),
-        orderBy: { createdAt: 'asc' },
+        orderBy: { createdAt: 'desc' },
         take: 100,
       });
+
+      const query = jest.mocked(prisma.client.message.findMany).mock
+        .calls[0][0];
+      expect(JSON.stringify(query)).not.toContain('passwordHash');
+      expect(JSON.stringify(query)).not.toContain('"email"');
+      expect(JSON.stringify(query)).not.toContain('globalRole');
     });
 
     it('Scenario 2: should throw ForbiddenException if user is not a member (Security check)', async () => {
@@ -673,13 +688,17 @@ describe('ChatService', () => {
           id: '1',
           type: 'DIRECT',
           participants: [
-            { userId: 'me', user: { username: 'me' } },
+            {
+              userId: 'me',
+              joinedAt: new Date('2026-01-01'),
+              user: { username: 'me' },
+            },
             {
               userId: 'other',
               user: { username: 'Yann', profile: { avatarUrl: 'img.png' } },
             },
           ],
-          messages: [{ content: 'Hi!' }],
+          messages: [{ content: 'Hi!', createdAt: new Date('2026-02-01') }],
         },
       ];
 
@@ -700,13 +719,17 @@ describe('ChatService', () => {
           id: '1',
           type: 'GROUP',
           participants: [
-            { userId: 'me', user: { username: 'me' } },
+            {
+              userId: 'me',
+              joinedAt: new Date('2026-01-01'),
+              user: { username: 'me' },
+            },
             {
               userId: 'other',
               user: { username: 'Yann', profile: { avatarUrl: 'img.png' } },
             },
           ],
-          messages: [{ content: 'Hi!' }],
+          messages: [{ content: 'Hi!', createdAt: new Date('2026-02-01') }],
         },
       ];
 
@@ -1021,7 +1044,9 @@ describe('ChatService', () => {
       // Mock: Database says this user is already a participant
       jest
         .spyOn(prisma.client.conversationParticipant, 'findMany')
-        .mockResolvedValue([{ userId: 'user-already-in' }] as any);
+        .mockResolvedValue([
+          { userId: 'user-already-in', leftAt: null },
+        ] as any);
 
       const result = await service.inviteUsers(actorId, conversationId, dto);
 
@@ -1029,8 +1054,8 @@ describe('ChatService', () => {
         'all selected users are already in the conversation',
       );
       expect(result.invitedCount).toBe(0);
-      // CRITICAL: Ensure transaction was NEVER called
-      expect(prisma.client.$transaction).not.toHaveBeenCalled();
+      expect(mockTick.conversationParticipant.create).not.toHaveBeenCalled();
+      expect(mockTick.conversationParticipant.update).not.toHaveBeenCalled();
     });
 
     it('Scenario 3: should successfully invite new users via transaction', async () => {
@@ -1039,7 +1064,9 @@ describe('ChatService', () => {
       // 1. Mock: 'existing-user' is already in, 'new-user' is not
       jest
         .spyOn(prisma.client.conversationParticipant, 'findMany')
-        .mockResolvedValue([{ userId: 'existing-user' }] as any);
+        .mockResolvedValue([{ userId: 'existing-user', leftAt: null }] as any);
+      mockTick.conversationParticipant.create.mockResolvedValue({} as any);
+      mockTick.conversation.update.mockResolvedValue({} as any);
 
       // 2. Mock: The final conversation fetch
       const mockConv = { id: conversationId, participants: [] };
@@ -1057,10 +1084,14 @@ describe('ChatService', () => {
 
       // Verify transaction was called
       expect(prisma.client.$transaction).toHaveBeenCalled();
-      expect(
-        prisma.client.conversationParticipant.createMany,
-      ).toHaveBeenCalledWith({
-        data: [{ conversationId, userId: 'new-user', role: 'MEMBER' }],
+      expect(mockTick.conversationParticipant.create).toHaveBeenCalledWith({
+        data: {
+          conversationId,
+          userId: 'new-user',
+          role: 'MEMBER',
+          joinedAt: expect.any(Date),
+          leftAt: null,
+        },
       });
     });
   });
@@ -1228,11 +1259,11 @@ describe('ChatService', () => {
 
       // Second check (the 'catch' block recovery)
       const finalConv = { id: 'cuid_recovered' };
-      mockPrisma.conversation.findUnique.mockResolvedValue(finalConv);
+      mockPrisma.client.conversation.findUnique.mockResolvedValue(finalConv);
 
       const result = await service.createOrGetDirectConversation('A', 'B');
       expect(result).toEqual(finalConv);
-      expect(mockPrisma.conversation.findUnique).toHaveBeenCalledWith(
+      expect(mockPrisma.client.conversation.findUnique).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { participantHash: 'DM_A_B' },
         }),
@@ -1246,7 +1277,7 @@ describe('ChatService', () => {
 
     it('scenario 1: should return a forbiddenExeception if user is not part of the conversation', async () => {
       jest
-        .spyOn(prisma.client.conversationParticipant, 'findFirst')
+        .spyOn(prisma.client.conversationParticipant, 'findUnique')
         .mockResolvedValue(null);
       await expect(
         service.ensureConversationMembership(userId, conversationId),
@@ -1257,9 +1288,10 @@ describe('ChatService', () => {
       const mockUser = {
         conversationId: 'conv-123',
         userId: 'User1',
+        leftAt: null,
       };
       jest
-        .spyOn(prisma.client.conversationParticipant, 'findFirst')
+        .spyOn(prisma.client.conversationParticipant, 'findUnique')
         .mockResolvedValue(mockUser as any);
 
       const result = await service.ensureConversationMembership(
@@ -1301,7 +1333,7 @@ describe('ChatService', () => {
       expect(
         prisma.client.conversationParticipant.findMany,
       ).toHaveBeenCalledWith({
-        where: { conversationId },
+        where: { conversationId, leftAt: null },
         select: { userId: true },
       });
     });

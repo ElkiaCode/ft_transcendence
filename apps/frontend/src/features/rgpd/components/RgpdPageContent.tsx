@@ -1,19 +1,16 @@
 "use client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import {
-  apiEraseMyData,
   apiExportMyData,
-  apiLogout,
+  apiRequestDataErasure,
 } from "@/features/auth/api/auth.api";
 import { useAuthStore } from "@/features/auth/stores/auth.store";
 import { errorMessage } from "@/lib/utils/error-message";
 
-type Step = "idle" | "password" | "confirm" | "deleted";
+type Step = "idle" | "password" | "confirm" | "email-sent";
 type ExportStep = "idle" | "confirm" | "downloaded";
 
 export function RgpdPageContent() {
-  const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const [step, setStep] = useState<Step>("idle");
   const [password, setPassword] = useState("");
@@ -22,6 +19,9 @@ export function RgpdPageContent() {
   const [exportStep, setExportStep] = useState<ExportStep>("idle");
   const [exportError, setExportError] = useState<string | null>(null);
   const [exportLoading, setExportLoading] = useState(false);
+  const requiresPassword = user?.authProviders
+    ? user.authProviders.includes("LOCAL")
+    : user?.provider !== "42";
 
   function downloadReadableJson(data: unknown) {
     const prettyJson = JSON.stringify(data, null, 2);
@@ -58,18 +58,17 @@ export function RgpdPageContent() {
     }
   }
 
-  async function handleConfirm() {
-    if (!password) return; // 👈 à ajouter
+  async function handleDeletionRequest() {
+    if (requiresPassword && !password) return;
     setLoading(true);
     setError(null);
     try {
-      await apiEraseMyData(password);
-      await apiLogout();
-      setStep("deleted");
-      setTimeout(() => router.push("/"), 2000);
+      await apiRequestDataErasure(requiresPassword ? password : undefined);
+      setStep("email-sent");
+      setPassword("");
     } catch (e: unknown) {
-      setError(errorMessage(e, "Wrong password."));
-      setStep("password");
+      setError(errorMessage(e, "Unable to send the confirmation email."));
+      setStep(requiresPassword ? "password" : "confirm");
     } finally {
       setLoading(false);
     }
@@ -227,7 +226,8 @@ export function RgpdPageContent() {
           <div className="mt-10 border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 rounded-xl px-6 py-6">
             <p className="text-sm text-red-600/70 dark:text-red-400/60 mb-4">
               Permanently delete your account and all associated data. This
-              action is immediate and cannot be undone.
+              operation requires confirmation through a temporary link sent to
+              your account email.
             </p>
             {error && (
               <p className="text-sm text-red-600 dark:text-red-400 mb-3 font-medium">
@@ -237,7 +237,9 @@ export function RgpdPageContent() {
 
             {step === "idle" && (
               <button
-                onClick={() => setStep("password")}
+                onClick={() =>
+                  setStep(requiresPassword ? "password" : "confirm")
+                }
                 className="bg-red-500 hover:bg-red-600 active:bg-red-700 text-white font-medium px-6 py-2 rounded-lg transition-colors cursor-pointer"
               >
                 Delete my data
@@ -253,17 +255,19 @@ export function RgpdPageContent() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleConfirm()}
+                  onKeyDown={(e) =>
+                    e.key === "Enter" && handleDeletionRequest()
+                  }
                   placeholder="Your password"
                   className="w-64 px-4 py-2 text-sm border border-red-200 dark:border-red-800 rounded-lg bg-white dark:bg-zinc-900 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-400"
                 />
                 <div className="flex gap-3">
                   <button
-                    onClick={handleConfirm}
+                    onClick={handleDeletionRequest}
                     disabled={loading || !password}
                     className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-1.5 rounded-lg transition-colors cursor-pointer"
                   >
-                    {loading ? "Checking..." : "Continue"}
+                    {loading ? "Sending..." : "Send confirmation email"}
                   </button>
                   <button
                     onClick={handleCancel}
@@ -278,15 +282,17 @@ export function RgpdPageContent() {
             {step === "confirm" && (
               <div className="flex flex-col items-center gap-3">
                 <p className="text-sm text-red-700 dark:text-red-400 font-medium">
-                  Are you sure? This will permanently delete your account.
+                  A confirmation link will be sent to{" "}
+                  {user.email ?? "your email"}. Your data will not be deleted
+                  until you use that link.
                 </p>
                 <div className="flex gap-3">
                   <button
-                    onClick={handleConfirm}
+                    onClick={handleDeletionRequest}
                     disabled={loading}
                     className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-1.5 rounded-lg transition-colors cursor-pointer"
                   >
-                    {loading ? "Deleting..." : "Yes, delete everything"}
+                    {loading ? "Sending..." : "Send confirmation email"}
                   </button>
                   <button
                     onClick={handleCancel}
@@ -298,10 +304,19 @@ export function RgpdPageContent() {
               </div>
             )}
 
-            {step === "deleted" && (
-              <p className="text-sm font-medium text-red-600 dark:text-red-400">
-                ✓ Your account has been deleted. Redirecting...
-              </p>
+            {step === "email-sent" && (
+              <div className="flex flex-col items-center gap-3">
+                <p className="text-sm font-medium text-red-600 dark:text-red-400">
+                  Confirmation email sent. Your account remains active until
+                  you confirm permanent deletion from the email.
+                </p>
+                <button
+                  onClick={handleCancel}
+                  className="bg-gray-200 dark:bg-zinc-700 hover:bg-gray-300 dark:hover:bg-zinc-600 text-gray-800 dark:text-gray-200 text-sm font-medium px-4 py-1.5 rounded-lg transition-colors cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
             )}
           </div>
         )}

@@ -104,7 +104,9 @@ describe('AdminService', () => {
         isBanned: true,
         isActive: false,
       };
-      prismaMock.client.user.findUnique.mockResolvedValue(mockUser as any);
+      prismaMock.client.user.findUnique
+        .mockResolvedValueOnce(mockUser as any)
+        .mockResolvedValueOnce({ globalRole: 'ADMIN' } as any);
       prismaMock.client.$transaction.mockResolvedValue([
         updatedUserMock, // This is what [updateUser] will receive
         { id: 'refreshToken1', userId: 'targetId' }, // This is for the second op in the transaction

@@ -5,41 +5,39 @@ import {
   Logger,
   NestInterceptor,
 } from '@nestjs/common';
-import { Request } from 'express';
 import { Observable, tap } from 'rxjs';
+
+type SocketClient = {
+  id?: string;
+};
 
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
   private readonly logger = new Logger(LoggingInterceptor.name);
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const type = context.getType();
-
     const handlerName = context.getHandler().name;
     const className = context.getClass().name;
-
     let requestData: unknown;
 
     if (type === 'http') {
-      const request = context.switchToHttp().getRequest() as Request;
+      const request = context.switchToHttp().getRequest<{
+        method?: string;
+        path?: string;
+        url?: string;
+      }>();
 
       requestData = {
         method: request.method,
-        url: request.url,
-        params: request.params,
-        query: request.query,
-        body: request.body,
+        path: request.path ?? request.url?.split('?')[0],
       };
     } else if (type === 'ws') {
-      const ws = context.switchToWs();
-
-      const client = ws.getClient();
-      const data = ws.getData();
+      const client = context.switchToWs().getClient<SocketClient>();
 
       requestData = {
-        socketId: client?.id,
+        socketId: client.id,
         event: context.getHandler().name,
-        data,
       };
     } else {
       requestData = 'Unknown context';
@@ -53,15 +51,19 @@ export class LoggingInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       tap({
-        next: (response) => {
+        next: () => {
           this.logger.debug(
-            `[${type}] ${className}.${handlerName} -> ${JSON.stringify(response)} (${Date.now() - startedAt}ms)`,
+            `[${type}] ${className}.${handlerName} -> completed (${Date.now() - startedAt}ms)`,
           );
         },
-        error: (error) => {
+        error: (error: unknown) => {
+          const errorDetails =
+            error instanceof Error
+              ? `${error.name}: ${error.message}`
+              : 'Unknown error';
+
           this.logger.error(
-            `[${type}] ${className}.${handlerName} ERROR (${Date.now() - startedAt}ms)`,
-            error?.stack,
+            `[${type}] ${className}.${handlerName} ERROR (${Date.now() - startedAt}ms): ${errorDetails}`,
           );
         },
       }),

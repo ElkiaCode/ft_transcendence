@@ -3,6 +3,8 @@ import type { UserProfile } from "@/features/auth/types/auth.types";
 export type SearchUser = {
   id: string;
   username: string;
+  isBlockedByCurrentUser: boolean;
+  hasBlockedCurrentUser: boolean;
   profile: {
     displayName: string;
     avatarUrl: string | null;

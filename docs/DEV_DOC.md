@@ -11,10 +11,9 @@
 1. Next.js (React framework) + Tailwindcss: ---> Frontend (pages/UI, call backend /api/...)  
 2. NestJS:                                  ---> Backend (Websocket, auth, ...)  
 3. PostgreSQL + prisma:                     ---> Persistent storage Database (users, matches, stats)  and prisma ORM for easier schema usage  
-4. Redis:                                   ---> Ephemeral data (presence/online users, matchmaking queues, rate limiting and websocket scaling) 
-5. Minio:                                   ---> Upload*/manage files   
-6. Nginx + HTTPS:                           ---> Reverse Proxy and TLS certificate  
-7. Docker-compose + Makefile:               ---> Run in a single command  
+4. Minio:                                   ---> Upload*/manage files
+5. Nginx + HTTPS:                           ---> Reverse Proxy and TLS certificate
+6. Docker-compose + Makefile:               ---> Run in a single command
 
 ## Documentation  
 
@@ -26,7 +25,6 @@
 [TailwindCSS](https://v2.tailwindcss.com/docs/installation)  
 [NestJS](https://docs.nestjs.com/)  
 [Nginx](https://nginx.org/en/docs/)  
-[Redis](https://redis.io/docs/latest/)  
 [PostgreSQL](https://www.postgresql.org/docs/current/)   
 [Prisma](https://www.prisma.io/docs/getting-started/prisma-orm/quickstart/postgresql)  
 
@@ -56,4 +54,4 @@ send message
 receive message  
 persist messages  
 direct messages  
-group channel messages  
+group channel messages

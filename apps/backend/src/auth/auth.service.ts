@@ -93,7 +93,8 @@ export class AuthService {
       throw new BadRequestException('username already in use');
     }
 
-    const passwordHash = await bcrypt.hash(dto.password, 12);
+    const passwordSalt = await bcrypt.genSalt(12);
+    const passwordHash = await bcrypt.hash(dto.password, passwordSalt);
 
     const user = await this.prisma.client.user.create({
       data: {

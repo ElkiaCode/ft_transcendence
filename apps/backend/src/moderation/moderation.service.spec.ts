@@ -295,15 +295,28 @@ describe('ModerationService', () => {
       expect(prismaMock.client.report.findMany).toHaveBeenCalledWith({
         include: expect.objectContaining({
           creator: {
-            include: { profile: true },
+            select: expect.objectContaining({
+              id: true,
+              username: true,
+              profile: expect.anything(),
+            }),
           },
           targetUser: {
-            include: { profile: true },
+            select: expect.objectContaining({
+              id: true,
+              username: true,
+              profile: expect.anything(),
+            }),
           },
           targetMessage: {
-            include: {
+            select: {
+              id: true,
+              content: true,
               sender: {
-                include: { profile: true },
+                select: {
+                  id: true,
+                  username: true,
+                },
               },
             },
           },
@@ -322,6 +335,16 @@ describe('ModerationService', () => {
     beforeEach(() => {
       // Mock private notifyUser to avoid deep dependency testing
       jest.spyOn(service as any, 'notifyUser').mockResolvedValue({});
+      prismaMock.client.user.findUnique.mockResolvedValue(
+        createMockUser({
+          id: moderatorId,
+          globalRole: GlobalRole.ADMIN,
+        }),
+      );
+      prismaMock.client.report.updateMany.mockResolvedValue({ count: 1 });
+      prismaMock.client.$transaction.mockImplementation(async (cb) =>
+        cb(prismaMock.client),
+      );
     });
 
     it('Scenario 1: should throw NotFoundException if report does not exist', async () => {
@@ -362,12 +385,6 @@ describe('ModerationService', () => {
         },
       } as any);
 
-      // Ensure the transaction returns the report (which now has the moderationAction)
-      prismaMock.client.$transaction.mockImplementation(async (cb) =>
-        cb(prismaMock as any),
-      );
-      // The transaction callback will use these mocks
-      // Note: ensure your smart $transaction mock is in place in beforeEach
       const result = await service.reviewReport(
         moderatorId,
         reportId,
@@ -412,11 +429,6 @@ describe('ModerationService', () => {
         },
       } as any);
 
-      // Ensure the transaction returns the report (which now has the moderationAction)
-      prismaMock.client.$transaction.mockImplementation(async (cb) =>
-        cb(prismaMock as any),
-      );
-      // Act
       const result = await service.reviewReport(
         moderatorId,
         reportId,
@@ -466,11 +478,6 @@ describe('ModerationService', () => {
         },
       } as any);
 
-      // Ensure the transaction returns the report (which now has the moderationAction)
-      prismaMock.client.$transaction.mockImplementation(async (cb) =>
-        cb(prismaMock as any),
-      );
-
       const result = await service.reviewReport(
         moderatorId,
         reportId,
@@ -519,11 +526,6 @@ describe('ModerationService', () => {
         },
       } as any);
 
-      // Ensure the transaction returns the report (which now has the moderationAction)
-      prismaMock.client.$transaction.mockImplementation(async (cb) =>
-        cb(prismaMock as any),
-      );
-
       const userUpdateCall = await service.reviewReport(
         moderatorId,
         reportId,
@@ -538,6 +540,154 @@ describe('ModerationService', () => {
           data: { isBanned: false, isActive: true },
         }),
       );
+    });
+
+    it('rejects a report that has already been reviewed', async () => {
+      prismaMock.client.report.findUnique.mockResolvedValue({
+        id: reportId,
+        targetUserId,
+        creatorId: null,
+        targetType: 'USER',
+        targetMessageId: null,
+        reason: '',
+        status: 'RESOLVED',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      await expect(
+        service.reviewReport(moderatorId, reportId, 'BAN'),
+      ).rejects.toThrow('report has already been reviewed');
+      expect(prismaMock.client.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('prevents a moderator from banning another moderator', async () => {
+      prismaMock.client.report.findUnique.mockResolvedValue({
+        id: reportId,
+        targetUserId,
+        creatorId: null,
+        targetType: 'USER',
+        targetMessageId: null,
+        reason: '',
+        status: 'OPEN',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        targetUser: {
+          id: targetUserId,
+          globalRole: GlobalRole.MODERATOR,
+        },
+      } as any);
+      prismaMock.client.user.findUnique.mockResolvedValue(
+        createMockUser({
+          id: moderatorId,
+          globalRole: GlobalRole.MODERATOR,
+        }),
+      );
+
+      await expect(
+        service.reviewReport(moderatorId, reportId, 'BAN'),
+      ).rejects.toThrow(
+        'moderators cannot moderate administrators or other moderators',
+      );
+      expect(prismaMock.client.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('allows a moderator to warn the standard user who sent a reported message', async () => {
+      const messageSenderId = 'message-sender';
+      prismaMock.client.report.findUnique.mockResolvedValue({
+        id: reportId,
+        targetUserId: null,
+        creatorId: null,
+        targetType: 'MESSAGE',
+        targetMessageId: 'message-1',
+        reason: '',
+        status: 'OPEN',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        targetUser: null,
+        targetMessage: {
+          sender: {
+            id: messageSenderId,
+            globalRole: GlobalRole.USER,
+          },
+        },
+      } as any);
+      prismaMock.client.user.findUnique.mockResolvedValue(
+        createMockUser({
+          id: moderatorId,
+          globalRole: GlobalRole.MODERATOR,
+        }),
+      );
+      prismaMock.client.moderationAction.create.mockResolvedValue({
+        id: 'action-1',
+        reportId,
+        moderatorId,
+        targetUserId: messageSenderId,
+        action: 'WARN',
+      } as any);
+
+      await service.reviewReport(moderatorId, reportId, 'WARN');
+
+      expect(prismaMock.client.moderationAction.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          targetUserId: messageSenderId,
+          action: 'WARN',
+        }),
+      });
+    });
+
+    it('prevents a moderator from banning the moderator who sent a reported message', async () => {
+      prismaMock.client.report.findUnique.mockResolvedValue({
+        id: reportId,
+        targetUserId: null,
+        creatorId: null,
+        targetType: 'MESSAGE',
+        targetMessageId: 'message-1',
+        reason: '',
+        status: 'OPEN',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        targetUser: null,
+        targetMessage: {
+          sender: {
+            id: 'other-moderator',
+            globalRole: GlobalRole.MODERATOR,
+          },
+        },
+      } as any);
+      prismaMock.client.user.findUnique.mockResolvedValue(
+        createMockUser({
+          id: moderatorId,
+          globalRole: GlobalRole.MODERATOR,
+        }),
+      );
+
+      await expect(
+        service.reviewReport(moderatorId, reportId, 'BAN'),
+      ).rejects.toThrow(
+        'moderators cannot moderate administrators or other moderators',
+      );
+      expect(prismaMock.client.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('atomically rejects a report claimed by another review', async () => {
+      prismaMock.client.report.findUnique.mockResolvedValue({
+        id: reportId,
+        targetUserId,
+        creatorId: null,
+        targetType: 'USER',
+        targetMessageId: null,
+        reason: '',
+        status: 'OPEN',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      prismaMock.client.report.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(
+        service.reviewReport(moderatorId, reportId, 'DISMISS_REPORT'),
+      ).rejects.toThrow('report has already been reviewed');
+      expect(prismaMock.client.moderationAction.create).not.toHaveBeenCalled();
     });
   });
 
@@ -562,12 +712,19 @@ describe('ModerationService', () => {
     });
 
     it('Scenario 3: Normal Adjustment (No Ban/Promotion)', async () => {
-      prismaMock.client.user.findUnique.mockResolvedValue(
-        createMockUser({
-          id: targetId,
-          penaltyPoints: 0,
-        }),
-      );
+      prismaMock.client.user.findUnique
+        .mockResolvedValueOnce(
+          createMockUser({
+            id: modId,
+            globalRole: GlobalRole.ADMIN,
+          }),
+        )
+        .mockResolvedValueOnce(
+          createMockUser({
+            id: targetId,
+            penaltyPoints: 0,
+          }),
+        );
 
       // We mock the first update to return 100 points
       prismaMock.client.user.update.mockResolvedValue(
@@ -589,7 +746,7 @@ describe('ModerationService', () => {
       } as any);
 
       prismaMock.client.$transaction.mockImplementation(async (cb) => {
-        if (typeof cb === 'function') return cb(prismaMock as any);
+        if (typeof cb === 'function') return cb(prismaMock.client);
         return cb;
       });
 
@@ -609,19 +766,26 @@ describe('ModerationService', () => {
     });
 
     it('Scenario 4: should trigger Auto-Ban if points reach -500', async () => {
-      prismaMock.client.user.findUnique.mockResolvedValue({
-        id: targetId,
-        penaltyPoints: 0,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        email: '',
-        username: '',
-        passwordHash: null,
-        globalRole: 'USER',
-        isActive: false,
-        isBanned: false,
-        preferredLanguage: '',
-      });
+      prismaMock.client.user.findUnique
+        .mockResolvedValueOnce(
+          createMockUser({
+            id: modId,
+            globalRole: GlobalRole.ADMIN,
+          }),
+        )
+        .mockResolvedValueOnce({
+          id: targetId,
+          penaltyPoints: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          email: '',
+          username: '',
+          passwordHash: null,
+          globalRole: 'USER',
+          isActive: false,
+          isBanned: false,
+          preferredLanguage: '',
+        });
       // Mock first update to return -500
       prismaMock.client.user.update.mockResolvedValue(
         createMockUser({
@@ -639,7 +803,7 @@ describe('ModerationService', () => {
       } as any);
 
       prismaMock.client.$transaction.mockImplementation(async (cb) => {
-        if (typeof cb === 'function') return cb(prismaMock as any);
+        if (typeof cb === 'function') return cb(prismaMock.client);
         return cb;
       });
 
@@ -656,12 +820,19 @@ describe('ModerationService', () => {
     });
 
     it('Scenario 5: should trigger Auto-Promotion if points reach +500', async () => {
-      prismaMock.client.user.findUnique.mockResolvedValue(
-        createMockUser({
-          id: targetId,
-          penaltyPoints: 490,
-        }),
-      );
+      prismaMock.client.user.findUnique
+        .mockResolvedValueOnce(
+          createMockUser({
+            id: modId,
+            globalRole: GlobalRole.ADMIN,
+          }),
+        )
+        .mockResolvedValueOnce(
+          createMockUser({
+            id: targetId,
+            penaltyPoints: 490,
+          }),
+        );
 
       prismaMock.client.user.update.mockResolvedValueOnce(
         createMockUser({
@@ -691,7 +862,7 @@ describe('ModerationService', () => {
       } as any);
 
       prismaMock.client.$transaction.mockImplementation(async (cb) => {
-        if (typeof cb === 'function') return cb(prismaMock as any);
+        if (typeof cb === 'function') return cb(prismaMock.client);
         return cb;
       });
 
@@ -700,6 +871,29 @@ describe('ModerationService', () => {
       expect(result.promoted).toBe(true);
       expect(result.user.globalRole).toBe('MODERATOR');
       expect(service['notifyUser']).toHaveBeenCalledTimes(2);
+    });
+
+    it('prevents a moderator from modifying another moderator points', async () => {
+      prismaMock.client.user.findUnique
+        .mockResolvedValueOnce(
+          createMockUser({
+            id: 'mod-1',
+            globalRole: GlobalRole.MODERATOR,
+          }),
+        )
+        .mockResolvedValueOnce(
+          createMockUser({
+            id: 'mod-2',
+            globalRole: GlobalRole.MODERATOR,
+          }),
+        );
+
+      await expect(
+        service.adjustPenaltyPoints('mod-1', 'mod-2', -100),
+      ).rejects.toThrow(
+        'moderators cannot modify points of administrators or other moderators',
+      );
+      expect(prismaMock.client.$transaction).not.toHaveBeenCalled();
     });
   });
 

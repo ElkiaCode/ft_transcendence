@@ -1,12 +1,15 @@
 from http.cookiejar import MozillaCookieJar
 import subprocess
 import os
+import re
+import time
 import urllib3
 import requests
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 BASE_URL = 'https://localhost/api'
+MAILPIT_API_URL = 'https://localhost:8025/api/v1'
 
 class User:
     def __init__(self, email: str, username: str, password: str):
@@ -144,10 +147,66 @@ class User:
 
 
     def eraseDataPassword(self):
-        response = requests.post(
+        request_response = requests.post(
             f"{BASE_URL}/users/me/erase-data",
             headers = { "Authorization": f"Bearer {self.accessToken}" },
             json = { "currentPassword": self.password },
+            verify = False
+        )
+
+        if not request_response.ok:
+            print(f"{self.username}: {request_response.json()}\n")
+            return request_response
+
+        token = None
+        for _ in range(20):
+            messages_response = requests.get(
+                f"{MAILPIT_API_URL}/messages",
+                timeout=2,
+                verify=False
+            )
+            messages_response.raise_for_status()
+
+            for message in messages_response.json().get("messages", []):
+                recipients = [
+                    recipient.get("Address")
+                    for recipient in message.get("To", [])
+                ]
+                if (
+                    self.email in recipients
+                    and message.get("Subject")
+                    == "Confirm deletion of your Transcendence data"
+                ):
+                    detail_response = requests.get(
+                        f"{MAILPIT_API_URL}/message/{message['ID']}",
+                        timeout=2,
+                        verify=False
+                    )
+                    detail_response.raise_for_status()
+                    match = re.search(
+                        r"confirm-deletion\?token=([A-Za-z0-9_-]+)",
+                        detail_response.json().get("Text", "")
+                    )
+                    if match:
+                        token = match.group(1)
+                        break
+
+            if token:
+                break
+            time.sleep(0.25)
+
+        if not token:
+            raise RuntimeError(
+                f"No data deletion confirmation email found for {self.email}"
+            )
+
+        response = requests.post(
+            f"{BASE_URL}/users/me/confirm-data-erasure",
+            headers = { "Authorization": f"Bearer {self.accessToken}" },
+            json = {
+                "token": token,
+                "currentPassword": self.password
+            },
             verify = False
         )
 

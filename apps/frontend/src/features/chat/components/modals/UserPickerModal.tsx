@@ -29,7 +29,12 @@ export function UserPickerModal({
     }
     try {
       const results = await apiSearchUsers(value);
-      setSearchResults(results);
+      setSearchResults(
+        results.filter(
+          (user: SearchUser) =>
+            !user.isBlockedByCurrentUser && !user.hasBlockedCurrentUser,
+        ),
+      );
     } catch {
       setSearchResults([]);
     }
@@ -148,7 +153,13 @@ export function CreateGroupModal({
       return;
     }
     try {
-      setSearchResults(await apiSearchUsers(value));
+      const results = await apiSearchUsers(value);
+      setSearchResults(
+        results.filter(
+          (user: SearchUser) =>
+            !user.isBlockedByCurrentUser && !user.hasBlockedCurrentUser,
+        ),
+      );
     } catch {
       setSearchResults([]);
     }

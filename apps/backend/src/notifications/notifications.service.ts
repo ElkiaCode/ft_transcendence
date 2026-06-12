@@ -100,8 +100,6 @@ export class NotificationsService {
       take: 100,
     });
 
-    console.log('notifications', notifications);
-
     // 3. Filter notifications based on GDPR/Membership rules
     return notifications.filter((notification) => {
       // If the notification isn't linked to a specific entity/conversation, show it (e.g., global system alerts)

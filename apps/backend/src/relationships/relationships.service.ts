@@ -310,7 +310,10 @@ export class RelationshipsService {
   }
 
   async blockUser(actorUserId: string, targetUserId: string) {
-    await this.ensureUsersCanInteract(actorUserId, targetUserId);
+    const { actor } = await this.ensureUsersCanInteract(
+      actorUserId,
+      targetUserId,
+    );
 
     const existingBlock = await this.prisma.client.block.findUnique({
       where: {
@@ -346,6 +349,21 @@ export class RelationshipsService {
         : []),
     ]);
 
+    await this.notifyUser(targetUserId, {
+      type: 'SYSTEM',
+      title: 'User blocked you',
+      body: `${actor.username} blocked you.`,
+      actorId: actorUserId,
+      entityType: 'block',
+      entityId: block.id,
+      action: 'user_blocked',
+      metadata: {
+        blockerId: actorUserId,
+        blockerUsername: actor.username,
+        friendshipRemoved: Boolean(friendship),
+      },
+    });
+
     return {
       message: 'user blocked',
       block: {
@@ -358,7 +376,10 @@ export class RelationshipsService {
   }
 
   async unblockUser(actorUserId: string, targetUserId: string) {
-    await this.ensureUsersCanInteract(actorUserId, targetUserId);
+    const { actor } = await this.ensureUsersCanInteract(
+      actorUserId,
+      targetUserId,
+    );
 
     const block = await this.prisma.client.block.findUnique({
       where: {
@@ -379,6 +400,20 @@ export class RelationshipsService {
           blockerId: actorUserId,
           blockedId: targetUserId,
         },
+      },
+    });
+
+    await this.notifyUser(targetUserId, {
+      type: 'SYSTEM',
+      title: 'User unblocked you',
+      body: `${actor.username} unblocked you.`,
+      actorId: actorUserId,
+      entityType: 'block',
+      entityId: block.id,
+      action: 'user_unblocked',
+      metadata: {
+        blockerId: actorUserId,
+        blockerUsername: actor.username,
       },
     });
 

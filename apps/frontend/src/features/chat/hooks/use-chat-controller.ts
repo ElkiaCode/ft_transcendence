@@ -51,6 +51,7 @@ export function useChatController() {
 
   const membersRef = useRef<GroupMember[]>([]);
   const selectedConvRef = useRef<Conversation | null>(null);
+  const presenceParticipantIdsRef = useRef<Set<string>>(new Set());
 
   const user = useAuthStore((state) => state.user);
   const currentUserId = user?.id;
@@ -161,6 +162,8 @@ export function useChatController() {
 
   const handleSelectConversation = useCallback(
     (conversation: Conversation | null) => {
+      presenceParticipantIdsRef.current = new Set();
+      setOnlineUserIds(new Set());
       setSelectedConvState(conversation);
       setActiveConversationId(conversation?.id ?? null);
 
@@ -599,7 +602,9 @@ export function useChatController() {
         unreadCount: 0,
       };
 
-      setConversations((prev) => [conv, ...prev]);
+      setConversations((prev) =>
+        prev.find((item) => item.id === conv.id) ? prev : [conv, ...prev],
+      );
       handleSelectConversation(conv);
       setGroupModal(false);
     } catch (err) {
@@ -813,7 +818,9 @@ export function useChatController() {
     }) => {
       const userId = payload.userId;
 
-      if (!userId) return;
+      if (!userId || !presenceParticipantIdsRef.current.has(userId)) {
+        return;
+      }
 
       setOnlineUserIds((prev) => {
         const next = new Set(prev);
@@ -835,6 +842,20 @@ export function useChatController() {
 
       if (queryConversationId && conv.id === queryConversationId) {
         handleSelectConversation(conv);
+      }
+    };
+
+    const handleConversationAccessRevoked = (payload: {
+      conversationId?: string;
+    }) => {
+      if (!payload.conversationId) return;
+
+      setConversations((prev) =>
+        prev.filter((conv) => conv.id !== payload.conversationId),
+      );
+
+      if (selectedConvRef.current?.id === payload.conversationId) {
+        handleSelectConversation(null);
       }
     };
 
@@ -869,16 +890,38 @@ export function useChatController() {
     socket.on("chat.typing", handleTyping);
     socket.on("presence.changed", handlePresenceChanged);
     socket.on("chat.conversation.created", handleConversationCreated);
-
-    socket.emit(
-      "presence.list",
-      {},
-      (payload: { onlineUserIds?: string[] }) => {
-        setOnlineUserIds(new Set(payload?.onlineUserIds ?? []));
-      },
+    socket.on(
+      "chat.conversation.accessRevoked",
+      handleConversationAccessRevoked,
     );
 
+    const syncConversationPresence = () => {
+      const conversationId = selectedConvRef.current?.id;
+
+      if (!conversationId) return;
+
+      socket.emit(
+        "chat.presence.list",
+        { conversationId },
+        (payload: {
+          participantUserIds?: string[];
+          onlineUserIds?: string[];
+        }) => {
+          if (selectedConvRef.current?.id !== conversationId) return;
+
+          presenceParticipantIdsRef.current = new Set(
+            payload?.participantUserIds ?? [],
+          );
+          setOnlineUserIds(new Set(payload?.onlineUserIds ?? []));
+        },
+      );
+    };
+
+    socket.on("connect", syncConversationPresence);
+    syncConversationPresence();
+
     return () => {
+      socket.off("notification.created", handleNotificationCreated);
       socket.off("chat.message.created", handleMessageCreated);
       socket.off("chat.message.updated", handleMessageUpdated);
       socket.off("chat.message.deleted", handleMessageDeleted);
@@ -887,7 +930,12 @@ export function useChatController() {
       socket.off("chat.conversation.read", handleConversationRead);
       socket.off("chat.typing", handleTyping);
       socket.off("presence.changed", handlePresenceChanged);
+      socket.off("connect", syncConversationPresence);
       socket.off("chat.conversation.created", handleConversationCreated);
+      socket.off(
+        "chat.conversation.accessRevoked",
+        handleConversationAccessRevoked,
+      );
     };
   }, [
     user,
@@ -995,14 +1043,38 @@ export function useChatController() {
       setMenu(null);
     },
 
-    handleBlock: (id: string) => {
-      blockUser(id);
-      setMenu(null);
+    handleBlock: async (id: string) => {
+      try {
+        await blockUser(id);
+        setSearchResults((prev) =>
+          prev.map((searchUser) =>
+            searchUser.id === id
+              ? { ...searchUser, isBlockedByCurrentUser: true }
+              : searchUser,
+          ),
+        );
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setMenu(null);
+      }
     },
 
-    handleUnblock: (id: string) => {
-      unblockUser(id);
-      setMenu(null);
+    handleUnblock: async (id: string) => {
+      try {
+        await unblockUser(id);
+        setSearchResults((prev) =>
+          prev.map((searchUser) =>
+            searchUser.id === id
+              ? { ...searchUser, isBlockedByCurrentUser: false }
+              : searchUser,
+          ),
+        );
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setMenu(null);
+      }
     },
 
     handlePromote: (id: string) => {

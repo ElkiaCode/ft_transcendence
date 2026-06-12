@@ -37,6 +37,16 @@ export function SearchDropdown({
             <p className="text-sm text-gray-700 font-normal">
               {user.profile?.displayName}
             </p>
+            {user.isBlockedByCurrentUser && (
+              <p className="text-xs font-medium text-red-600">
+                You blocked this user
+              </p>
+            )}
+            {user.hasBlockedCurrentUser && (
+              <p className="text-xs font-medium text-orange-600">
+                This user blocked you
+              </p>
+            )}
           </div>
           <div className="ml-auto">
             <button

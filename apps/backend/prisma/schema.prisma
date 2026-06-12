@@ -89,6 +89,7 @@ model User {
   profile       Profile?
   oauthAccounts OAuthAccount[]
   refreshTokens RefreshToken[]
+  dataErasureRequest DataErasureRequest?
 
   friendshipsSent     Friendship[] @relation("FriendshipRequester")
   friendshipsReceived Friendship[] @relation("FriendshipAddressee")
@@ -142,6 +143,18 @@ model RefreshToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+model DataErasureRequest {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
 }
 
 model Friendship {

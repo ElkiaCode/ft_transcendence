@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -159,15 +160,36 @@ export class ModerationService {
     return this.prisma.client.report.findMany({
       include: {
         creator: {
-          include: { profile: true },
+          select: {
+            id: true,
+            username: true,
+            profile: {
+              select: {
+                avatarUrl: true,
+              },
+            },
+          },
         },
         targetUser: {
-          include: { profile: true },
+          select: {
+            id: true,
+            username: true,
+            profile: {
+              select: {
+                avatarUrl: true,
+              },
+            },
+          },
         },
         targetMessage: {
-          include: {
+          select: {
+            id: true,
+            content: true,
             sender: {
-              include: { profile: true },
+              select: {
+                id: true,
+                username: true,
+              },
             },
           },
         },
@@ -189,7 +211,18 @@ export class ModerationService {
       include: {
         targetMessage: {
           select: {
-            senderId: true,
+            sender: {
+              select: {
+                id: true,
+                globalRole: true,
+              },
+            },
+          },
+        },
+        targetUser: {
+          select: {
+            id: true,
+            globalRole: true,
           },
         },
       },
@@ -199,19 +232,62 @@ export class ModerationService {
       throw new NotFoundException('report not found');
     }
 
-    console.log('action', action);
-    console.log('report', report);
+    if (report.status !== 'OPEN') {
+      throw new BadRequestException('report has already been reviewed');
+    }
+
+    const moderator = await this.prisma.client.user.findUnique({
+      where: { id: moderatorId },
+      select: {
+        id: true,
+        globalRole: true,
+      },
+    });
+
+    if (!moderator || !['ADMIN', 'MODERATOR'].includes(moderator.globalRole)) {
+      throw new ForbiddenException('user cannot perform moderation actions');
+    }
+
+    const targetUserId =
+      report.targetUserId ?? report.targetMessage?.sender.id ?? null;
+    const targetGlobalRole =
+      report.targetUser?.globalRole ??
+      report.targetMessage?.sender.globalRole ??
+      null;
+
+    if (
+      action !== 'DISMISS_REPORT' &&
+      moderator.globalRole === 'MODERATOR' &&
+      targetGlobalRole !== 'USER'
+    ) {
+      throw new ForbiddenException(
+        'moderators cannot moderate administrators or other moderators',
+      );
+    }
+
     const isSystemMessage = report.creatorId === null;
 
-    const targetUserId = report.targetUserId;
     const penaltyPointsChange =
-      targetUserId && penaltyPointsToSubtract > 0
-        ? action === 'DISMISS_REPORT'
-          ? penaltyPointsToSubtract
-          : -penaltyPointsToSubtract
+      targetUserId && action !== 'DISMISS_REPORT' && penaltyPointsToSubtract > 0
+        ? -penaltyPointsToSubtract
         : 0;
+    const nextStatus = action === 'DISMISS_REPORT' ? 'DISMISSED' : 'RESOLVED';
 
     const result = await this.prisma.client.$transaction(async (tx) => {
+      const claimedReport = await tx.report.updateMany({
+        where: {
+          id: reportId,
+          status: 'OPEN',
+        },
+        data: {
+          status: nextStatus,
+        },
+      });
+
+      if (claimedReport.count !== 1) {
+        throw new BadRequestException('report has already been reviewed');
+      }
+
       const moderationAction = await tx.moderationAction.create({
         data: {
           reportId,
@@ -223,12 +299,10 @@ export class ModerationService {
         },
       });
 
-      const updatedReport = await tx.report.update({
-        where: { id: reportId },
-        data: {
-          status: action === 'DISMISS_REPORT' ? 'DISMISSED' : 'RESOLVED',
-        },
-      });
+      const updatedReport = {
+        ...report,
+        status: nextStatus,
+      };
 
       let updatedTargetUser: {
         id: string;
@@ -362,16 +436,39 @@ export class ModerationService {
       );
     }
 
-    const targetUser = await this.prisma.client.user.findUnique({
-      where: { id: targetUserId },
-      select: {
-        id: true,
-        penaltyPoints: true,
-      },
-    });
+    const [moderator, targetUser] = await Promise.all([
+      this.prisma.client.user.findUnique({
+        where: { id: moderatorId },
+        select: {
+          id: true,
+          globalRole: true,
+        },
+      }),
+      this.prisma.client.user.findUnique({
+        where: { id: targetUserId },
+        select: {
+          id: true,
+          penaltyPoints: true,
+          globalRole: true,
+        },
+      }),
+    ]);
 
     if (!targetUser) {
       throw new NotFoundException('target user not found');
+    }
+
+    if (!moderator || !['ADMIN', 'MODERATOR'].includes(moderator.globalRole)) {
+      throw new ForbiddenException('user cannot perform moderation actions');
+    }
+
+    if (
+      moderator.globalRole === 'MODERATOR' &&
+      targetUser.globalRole !== 'USER'
+    ) {
+      throw new ForbiddenException(
+        'moderators cannot modify points of administrators or other moderators',
+      );
     }
 
     const result = await this.prisma.client.$transaction(async (tx) => {

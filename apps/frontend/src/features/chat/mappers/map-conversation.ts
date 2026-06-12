@@ -4,7 +4,9 @@ type User = {
   id: string;
   email?: string | null;
   username?: string | null;
-  avatarUrl?: string | null;
+  profile?: {
+    avatarUrl?: string | null;
+  } | null;
 };
 
 type ConversationParticipant = {
@@ -44,7 +46,7 @@ export function mapConversation(
       ? (selectedUser?.username ?? selectedUser?.email ?? "Utilisateur inconnu")
       : (conversation.title ?? "Groupe sans nom"),
 
-    avatarUrl: selectedUser?.avatarUrl ?? null,
+    avatarUrl: selectedUser?.profile?.avatarUrl ?? null,
 
     lastMessage: null,
     unreadCount: 0,

@@ -7,11 +7,13 @@ import { ChatModule } from '../chat/chat.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { UsersBootstrapDev } from './bootstrap/users.bootstrap';
 import { AuthModule } from '@/auth/auth.module';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [
     AuthModule,
     ChatModule,
+    MailModule,
     NotificationsModule,
     MulterModule.register({
       storage: diskStorage({

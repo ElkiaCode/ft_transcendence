@@ -1,6 +1,8 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -10,13 +12,23 @@ import { UpdateProfileDto } from './dto/dto';
 import { UpdatePasswordDto } from './dto/update-password.dto';
 import { ChatGateway } from '../chat/chat.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
+import { unlink } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { MailService } from '../mail/mail.service';
+import {
+  generateDataErasureToken,
+  hashDataErasureToken,
+} from './utils/data-erasure-token.util';
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
     private readonly chatGateway: ChatGateway,
+    private readonly mailService: MailService,
   ) {}
 
   private async notifyUser(
@@ -60,6 +72,69 @@ export class UsersService {
     return notifications;
   }
 
+  private getLocalAvatarPath(avatarUrl: string | null | undefined) {
+    if (!avatarUrl) {
+      return null;
+    }
+
+    let pathname: string;
+
+    try {
+      const localBaseUrl = new URL(process.env.API_URL || 'https://localhost');
+      const parsedAvatarUrl = new URL(avatarUrl, localBaseUrl);
+
+      if (parsedAvatarUrl.origin !== localBaseUrl.origin) {
+        return null;
+      }
+
+      pathname = parsedAvatarUrl.pathname;
+    } catch {
+      return null;
+    }
+
+    const uploadsPrefix = '/uploads/';
+
+    if (!pathname.startsWith(uploadsPrefix)) {
+      return null;
+    }
+
+    let filename: string;
+
+    try {
+      filename = decodeURIComponent(pathname.slice(uploadsPrefix.length));
+    } catch {
+      return null;
+    }
+
+    if (!filename || filename.includes('/') || filename.includes('\\')) {
+      return null;
+    }
+
+    return resolve(process.cwd(), 'uploads', filename);
+  }
+
+  private async deleteLocalAvatar(avatarUrl: string | null | undefined) {
+    const avatarPath = this.getLocalAvatarPath(avatarUrl);
+
+    if (!avatarPath) {
+      return;
+    }
+
+    try {
+      await unlink(avatarPath);
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        error.code === 'ENOENT'
+      ) {
+        return;
+      }
+
+      throw error;
+    }
+  }
+
   async searchUsers(currentUserId: string, rawQuery: string) {
     const q = rawQuery?.trim() ?? '';
 
@@ -90,25 +165,17 @@ export class UsersService {
             },
           },
         ],
-        NOT: [
-          {
-            blocksInitiated: {
-              some: {
-                blockedId: currentUserId,
-              },
-            },
-          },
-          {
-            blocksReceived: {
-              some: {
-                blockerId: currentUserId,
-              },
-            },
-          },
-        ],
       },
       include: {
         profile: true,
+        blocksReceived: {
+          where: { blockerId: currentUserId },
+          select: { id: true },
+        },
+        blocksInitiated: {
+          where: { blockedId: currentUserId },
+          select: { id: true },
+        },
       },
       orderBy: [{ username: 'asc' }],
       take: 20,
@@ -117,6 +184,8 @@ export class UsersService {
     return users.map((user) => ({
       id: user.id,
       username: user.username,
+      isBlockedByCurrentUser: user.blocksReceived.length > 0,
+      hasBlockedCurrentUser: user.blocksInitiated.length > 0,
       profile: user.profile
         ? {
             displayName: user.profile.displayName,
@@ -274,6 +343,20 @@ export class UsersService {
       },
     });
 
+    if (
+      user.profile?.avatarUrl &&
+      user.profile.avatarUrl !== profile.avatarUrl
+    ) {
+      try {
+        await this.deleteLocalAvatar(user.profile.avatarUrl);
+      } catch (error) {
+        this.logger.warn(
+          `Could not delete previous avatar for user ${userId}`,
+          error instanceof Error ? error.stack : undefined,
+        );
+      }
+    }
+
     await this.notifyUser(userId, {
       type: 'SYSTEM',
       title: 'Avatar updated',
@@ -303,6 +386,11 @@ export class UsersService {
       where: { id: userId },
       include: {
         profile: true,
+        oauthAccounts: {
+          select: {
+            provider: true,
+          },
+        },
       },
     });
 
@@ -319,6 +407,10 @@ export class UsersService {
       preferredLanguage: user.preferredLanguage,
       isActive: user.isActive,
       isBanned: user.isBanned,
+      authProviders: [
+        ...(user.passwordHash ? ['LOCAL'] : []),
+        ...user.oauthAccounts.map((account) => account.provider),
+      ],
       profile: user.profile
         ? {
             displayName: user.profile.displayName,
@@ -572,11 +664,13 @@ export class UsersService {
     };
   }
 
-  async eraseMyData(userId: string, dto: EraseMyDataDto) {
+  async requestDataErasure(userId: string, dto: EraseMyDataDto) {
     const user = await this.prisma.client.user.findUnique({
       where: { id: userId },
-      include: {
-        profile: true,
+      select: {
+        id: true,
+        email: true,
+        passwordHash: true,
       },
     });
 
@@ -599,29 +693,181 @@ export class UsersService {
       }
     }
 
-    await this.notifyAdminsAndModerators(
-      {
-        type: 'SYSTEM',
-        title: 'Account deleted',
-        body: `${user.username} deleted their account.`,
-        actorId: userId,
-        entityType: 'user',
-        entityId: userId,
-        action: 'account_deleted',
-        metadata: {
-          deletedUserId: userId,
-          username: user.username,
-          email: user.email,
-        },
-      },
-      userId,
+    const rawToken = generateDataErasureToken();
+    const tokenHash = hashDataErasureToken(rawToken);
+    const expiresAt = new Date(
+      Date.now() + this.getDataErasureTokenLifetimeMinutes() * 60 * 1000,
     );
 
-    await this.prisma.client.user.delete({
-      where: { id: userId },
+    await this.prisma.client.dataErasureRequest.upsert({
+      where: { userId },
+      update: {
+        tokenHash,
+        expiresAt,
+      },
+      create: {
+        userId,
+        tokenHash,
+        expiresAt,
+      },
     });
 
-    return { success: true, message: 'Your account have been erased' };
+    try {
+      await this.mailService.sendDataErasureConfirmation(user.email, rawToken);
+    } catch (error) {
+      await this.prisma.client.dataErasureRequest.deleteMany({
+        where: {
+          userId,
+          tokenHash,
+        },
+      });
+      throw error;
+    }
+
+    return {
+      success: true,
+      message: 'A confirmation email has been sent.',
+      expiresAt,
+    };
+  }
+
+  async confirmDataErasure(
+    authenticatedUserId: string,
+    rawToken: string,
+    currentPassword?: string,
+  ) {
+    const tokenHash = hashDataErasureToken(rawToken.trim());
+    const request = await this.prisma.client.dataErasureRequest.findUnique({
+      where: { tokenHash },
+      include: {
+        user: {
+          include: {
+            profile: true,
+          },
+        },
+      },
+    });
+
+    if (!request || request.expiresAt <= new Date()) {
+      if (request) {
+        await this.prisma.client.dataErasureRequest.deleteMany({
+          where: { id: request.id },
+        });
+      }
+
+      throw new BadRequestException('invalid or expired deletion confirmation');
+    }
+
+    const { user } = request;
+
+    if (request.userId !== authenticatedUserId) {
+      throw new ForbiddenException(
+        'deletion confirmation does not belong to authenticated user',
+      );
+    }
+
+    if (user.passwordHash) {
+      if (!currentPassword) {
+        throw new BadRequestException('current password is required');
+      }
+
+      const passwordOk = await bcrypt.compare(
+        currentPassword,
+        user.passwordHash,
+      );
+
+      if (!passwordOk) {
+        throw new BadRequestException('invalid credentials');
+      }
+    }
+
+    await this.deleteLocalAvatar(user.profile?.avatarUrl);
+
+    await this.prisma.client.$transaction(async (tx) => {
+      const claimedRequest = await tx.dataErasureRequest.deleteMany({
+        where: {
+          id: request.id,
+          userId: authenticatedUserId,
+          tokenHash,
+          expiresAt: { gt: new Date() },
+        },
+      });
+
+      if (claimedRequest.count !== 1) {
+        throw new BadRequestException(
+          'invalid or expired deletion confirmation',
+        );
+      }
+
+      await tx.notification.deleteMany({
+        where: {
+          OR: [{ actorId: user.id }, { entityId: user.id }],
+        },
+      });
+      await tx.report.deleteMany({
+        where: { creatorId: user.id },
+      });
+      await tx.moderationAction.deleteMany({
+        where: { targetUserId: user.id },
+      });
+      await tx.conversation.updateMany({
+        where: {
+          participants: {
+            some: { userId: user.id },
+          },
+        },
+        data: {
+          participantHash: null,
+        },
+      });
+      await tx.user.delete({
+        where: { id: user.id },
+      });
+    });
+
+    try {
+      await this.notifyAdminsAndModerators({
+        type: 'SYSTEM',
+        title: 'Account deleted',
+        body: 'A user deleted their account.',
+        entityType: 'system',
+        entityId: 'account-deletion',
+        action: 'account_deleted',
+      });
+    } catch (error) {
+      this.logger.warn(
+        'Could not notify moderators about an account deletion',
+        error instanceof Error ? error.message : undefined,
+      );
+    }
+
+    let confirmationEmailSent = true;
+
+    try {
+      await this.mailService.sendDataErasureCompleted(user.email);
+    } catch (error) {
+      confirmationEmailSent = false;
+      this.logger.warn(
+        'Could not send the data erasure completion email',
+        error instanceof Error ? error.message : undefined,
+      );
+    }
+
+    return {
+      success: true,
+      message: 'Your account and personal data have been erased.',
+      confirmationEmailSent,
+    };
+  }
+
+  private getDataErasureTokenLifetimeMinutes() {
+    const configuredLifetime = Number(
+      process.env.DATA_ERASURE_TOKEN_TTL_MINUTES ?? 30,
+    );
+
+    return Number.isFinite(configuredLifetime) && configuredLifetime > 0
+      ? configuredLifetime
+      : 30;
   }
 
   async getMyFriends(userId: string) {
@@ -672,7 +918,8 @@ export class UsersService {
     );
     if (!passwordOk) throw new BadRequestException('Invalid current password');
 
-    const newHash = await bcrypt.hash(dto.newPassword, 12);
+    const passwordSalt = await bcrypt.genSalt(12);
+    const newHash = await bcrypt.hash(dto.newPassword, passwordSalt);
 
     await this.prisma.client.user.update({
       where: { id: userId },

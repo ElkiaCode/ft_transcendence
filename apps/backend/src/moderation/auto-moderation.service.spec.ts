@@ -24,16 +24,19 @@ describe('AutoModerationService', () => {
         {
           provide: PrismaService,
           useValue: {
-            user: {
-              findUnique: jest.fn(),
-              findMany: jest.fn(),
-              update: jest.fn(),
-            },
-            message: { findUnique: jest.fn() },
-            report: {
-              create: jest.fn(),
-              findUnique: jest.fn(),
-              findMany: jest.fn(),
+            client: {
+              $transaction: jest.fn((input: unknown[]) => Promise.all(input)),
+              user: {
+                findUnique: jest.fn(),
+                findMany: jest.fn(),
+                update: jest.fn(),
+              },
+              message: { findUnique: jest.fn() },
+              report: {
+                create: jest.fn(),
+                findUnique: jest.fn(),
+                findMany: jest.fn(),
+              },
             },
           },
         },

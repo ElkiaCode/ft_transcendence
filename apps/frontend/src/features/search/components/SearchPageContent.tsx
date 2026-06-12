@@ -9,14 +9,7 @@ import {
   blockUser,
   unblockUser,
 } from "@/features/auth/api/auth.api";
-
-interface User {
-  id: string;
-  username: string;
-  profile?: {
-    avatarUrl?: string | null;
-  };
-}
+import type { SearchUser } from "@/features/chat/types/chat.types";
 
 const USERS_PER_PAGE = 5;
 
@@ -24,11 +17,11 @@ export function SearchPageContent() {
   const params = useSearchParams();
   const query = params.get("query") || "";
 
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<SearchUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(0);
 
-  const [menuUser, setMenuUser] = useState<User | null>(null);
+  const [menuUser, setMenuUser] = useState<SearchUser | null>(null);
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
   const router = useRouter();
 
@@ -38,11 +31,6 @@ export function SearchPageContent() {
     window.addEventListener("click", close);
     return () => window.removeEventListener("click", close);
   }, []);
-
-  // reset page on new query
-  useEffect(() => {
-    setPage(0);
-  }, [query]);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -57,11 +45,14 @@ export function SearchPageContent() {
         const results = await apiSearchUsers(query);
 
         const filtered = results
-          .filter((u: User) =>
+          .filter((u: SearchUser) =>
             u.username.toLowerCase().startsWith(query.toLowerCase()),
           )
-          .sort((a: User, b: User) => a.username.localeCompare(b.username));
+          .sort((a: SearchUser, b: SearchUser) =>
+            a.username.localeCompare(b.username),
+          );
 
+        setPage(0);
         setUsers(filtered);
       } catch (err) {
         console.error(err);
@@ -74,7 +65,7 @@ export function SearchPageContent() {
     fetchUsers();
   }, [query]);
 
-  const openMenu = (e: React.MouseEvent, user: User) => {
+  const openMenu = (e: React.MouseEvent, user: SearchUser) => {
     e.stopPropagation();
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     setMenuUser(user);
@@ -96,7 +87,7 @@ export function SearchPageContent() {
         {/* HEADER */}
         <div className="border-b border-gray-200 pb-6 mb-8 text-center">
           <h1 className="text-2xl font-medium text-gray-900">
-            Results for "{query}"
+            Results for &quot;{query}&quot;
           </h1>
 
           <p className="text-sm text-gray-500 mt-1">
@@ -127,6 +118,7 @@ export function SearchPageContent() {
                   {user.profile?.avatarUrl ? (
                     <img
                       src={user.profile.avatarUrl}
+                      alt={user.username}
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -135,9 +127,21 @@ export function SearchPageContent() {
                 </div>
 
                 {/* username */}
-                <span className="text-sm font-medium text-gray-900">
-                  {user.username}
-                </span>
+                <div>
+                  <p className="text-sm font-medium text-gray-900">
+                    {user.username}
+                  </p>
+                  {user.isBlockedByCurrentUser && (
+                    <p className="text-xs font-medium text-red-600">
+                      You blocked this user
+                    </p>
+                  )}
+                  {user.hasBlockedCurrentUser && (
+                    <p className="text-xs font-medium text-orange-600">
+                      This user blocked you
+                    </p>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -207,35 +211,72 @@ export function SearchPageContent() {
               View profile
             </button>
 
-            <button
-              onClick={() => {
-                addFriendRequest(menuUser.id);
-                setMenuUser(null);
-              }}
-              className="w-full text-left px-4 py-2 text-green-600 hover:bg-gray-100"
-            >
-              Add friend
-            </button>
+            {!menuUser.isBlockedByCurrentUser &&
+              !menuUser.hasBlockedCurrentUser && (
+                <button
+                  onClick={() => {
+                    void addFriendRequest(menuUser.id).catch(console.error);
+                    setMenuUser(null);
+                  }}
+                  className="w-full text-left px-4 py-2 text-green-600 hover:bg-gray-100"
+                >
+                  Add friend
+                </button>
+              )}
 
-            <button
-              onClick={() => {
-                blockUser(menuUser.id);
-                setMenuUser(null);
-              }}
-              className="w-full text-left px-4 py-2 text-red-500 hover:bg-gray-100"
-            >
-              Block user
-            </button>
+            {!menuUser.isBlockedByCurrentUser && (
+              <button
+                onClick={async () => {
+                  try {
+                    await blockUser(menuUser.id);
+                    setUsers((prev) =>
+                      prev.map((user) =>
+                        user.id === menuUser.id
+                          ? { ...user, isBlockedByCurrentUser: true }
+                          : user,
+                      ),
+                    );
+                  } catch (error) {
+                    console.error(error);
+                  } finally {
+                    setMenuUser(null);
+                  }
+                }}
+                className="w-full text-left px-4 py-2 text-red-500 hover:bg-gray-100"
+              >
+                Block user
+              </button>
+            )}
 
-            <button
-              onClick={() => {
-                unblockUser(menuUser.id);
-                setMenuUser(null);
-              }}
-              className="w-full text-left px-4 py-2 text-blue-500 hover:bg-gray-100"
-            >
-              Unblock user
-            </button>
+            {menuUser.isBlockedByCurrentUser && (
+              <button
+                onClick={async () => {
+                  try {
+                    await unblockUser(menuUser.id);
+                    setUsers((prev) =>
+                      prev.map((user) =>
+                        user.id === menuUser.id
+                          ? { ...user, isBlockedByCurrentUser: false }
+                          : user,
+                      ),
+                    );
+                  } catch (error) {
+                    console.error(error);
+                  } finally {
+                    setMenuUser(null);
+                  }
+                }}
+                className="w-full text-left px-4 py-2 text-blue-500 hover:bg-gray-100"
+              >
+                Unblock user
+              </button>
+            )}
+
+            {menuUser.hasBlockedCurrentUser && (
+              <p className="px-4 py-2 text-xs font-medium text-orange-600">
+                This user blocked you
+              </p>
+            )}
           </div>
         )}
       </div>

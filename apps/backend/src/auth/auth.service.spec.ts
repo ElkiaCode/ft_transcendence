@@ -15,6 +15,7 @@ import {
 } from '@jest/globals';
 
 jest.mock('bcrypt', () => ({
+  genSalt: jest.fn(),
   hash: jest.fn(),
   compare: jest.fn(),
 }));
@@ -31,17 +32,19 @@ describe('AuthService', () => {
         {
           provide: PrismaService,
           useValue: {
-            $transaction: jest.fn<any>((input: any[]) => Promise.all(input)),
-            user: {
-              findUnique: jest.fn<any>(),
-              findFirst: jest.fn<any>(),
-              create: jest.fn<any>(),
-            },
-            refreshToken: {
-              create: jest.fn<any>(),
-              findUnique: jest.fn<any>(),
-              update: jest.fn<any>(),
-              updateMany: jest.fn<any>(),
+            client: {
+              $transaction: jest.fn<any>((input: any[]) => Promise.all(input)),
+              user: {
+                findUnique: jest.fn<any>(),
+                findFirst: jest.fn<any>(),
+                create: jest.fn<any>(),
+              },
+              refreshToken: {
+                create: jest.fn<any>(),
+                findUnique: jest.fn<any>(),
+                update: jest.fn<any>(),
+                updateMany: jest.fn<any>(),
+              },
             },
           },
         },
@@ -107,6 +110,7 @@ describe('AuthService', () => {
         globalRole: 'USER',
       } as any);
 
+      jest.mocked(bcrypt.genSalt).mockResolvedValue('generated-salt' as never);
       jest.mocked(bcrypt.hash).mockResolvedValue('hashed-pass' as never);
 
       const result = await service.register(dto);
@@ -114,7 +118,11 @@ describe('AuthService', () => {
       expect(result.accessToken).toBeDefined();
       expect(prisma.client.user.create).toHaveBeenCalled();
       expect(result.user.username).toBe('marvin');
-      expect(jest.mocked(bcrypt.hash)).toHaveBeenCalledWith(dto.password, 12);
+      expect(jest.mocked(bcrypt.genSalt)).toHaveBeenCalledWith(12);
+      expect(jest.mocked(bcrypt.hash)).toHaveBeenCalledWith(
+        dto.password,
+        'generated-salt',
+      );
     });
   });
 
@@ -190,7 +198,7 @@ describe('AuthService', () => {
         isBanned: false,
       } as any);
 
-      jest.mocked(bcrypt.hash).mockResolvedValue('hashed-pass' as never);
+      jest.mocked(bcrypt.compare).mockResolvedValue(true as never);
 
       const result = await service.login(dto);
 

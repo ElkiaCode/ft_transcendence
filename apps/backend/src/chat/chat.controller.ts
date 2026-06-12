@@ -48,6 +48,22 @@ interface ModerationWarning {
   categories: string[];
 }
 
+interface RealtimeConversation {
+  id: string;
+  type: 'DIRECT' | 'GROUP';
+  title: string | null;
+  participants: Array<{
+    userId: string;
+    leftAt: Date | null;
+    user: {
+      username: string;
+      profile: {
+        avatarUrl: string | null;
+      } | null;
+    };
+  }>;
+}
+
 export interface SendMessageResponse extends MessageWithSender {
   moderationWarning?: ModerationWarning;
   banAnnouncementMessage?: MessageWithSender | null;
@@ -95,15 +111,50 @@ export class ChatController {
     return notifications;
   }
 
+  private emitConversationCreated(
+    conversation: RealtimeConversation,
+    userIds: string[],
+  ) {
+    for (const userId of [...new Set(userIds)]) {
+      const otherParticipant = conversation.participants.find(
+        (participant) =>
+          participant.userId !== userId && participant.leftAt === null,
+      );
+      const isDirect = conversation.type === 'DIRECT';
+
+      this.chatGateway.emitConversationCreated(userId, {
+        id: conversation.id,
+        type: isDirect ? 'dm' : 'group',
+        name: isDirect
+          ? (otherParticipant?.user.username ?? 'Unknown user')
+          : (conversation.title ?? 'Group chat'),
+        avatarUrl: isDirect
+          ? (otherParticipant?.user.profile?.avatarUrl ?? null)
+          : null,
+        lastMessage: null,
+        unreadCount: 0,
+      });
+    }
+  }
+
   @Post('direct/:userId')
-  createOrGetDirectConversation(
+  async createOrGetDirectConversation(
     @CurrentUser() user: JwtPayload,
     @Param('userId') targetUserId: string,
   ) {
-    return this.chatService.createOrGetDirectConversation(
+    const conversation = await this.chatService.createOrGetDirectConversation(
       user.sub,
       targetUserId,
     );
+
+    if (conversation) {
+      this.emitConversationCreated(
+        conversation,
+        conversation.participants.map((participant) => participant.userId),
+      );
+    }
+
+    return conversation;
   }
 
   @Post('group')
@@ -120,6 +171,11 @@ export class ChatController {
     const recipientIds = conversation.participants
       .map((participant) => participant.userId)
       .filter((userId) => userId !== user.sub);
+
+    this.emitConversationCreated(
+      conversation,
+      conversation.participants.map((participant) => participant.userId),
+    );
 
     await this.notifyUsers(recipientIds, {
       type: 'SYSTEM',
@@ -153,6 +209,13 @@ export class ChatController {
     const groupName = result.conversation?.title ?? 'Group chat';
 
     if (result.invitedUserIds?.length) {
+      if (result.conversation) {
+        this.emitConversationCreated(
+          result.conversation,
+          result.invitedUserIds,
+        );
+      }
+
       await this.notifyUsers(result.invitedUserIds, {
         type: 'SYSTEM',
         title: 'Group invitation',
@@ -184,6 +247,8 @@ export class ChatController {
       userId,
     );
 
+    this.chatGateway.revokeConversationAccess(userId, conversationId);
+
     await this.notifyUser(userId, {
       type: 'SYSTEM',
       title: 'Removed from group',
@@ -211,6 +276,8 @@ export class ChatController {
       user.sub,
       conversationId,
     );
+
+    this.chatGateway.revokeConversationAccess(user.sub, conversationId);
 
     await this.notifyUsers(result.remainingUserIds, {
       type: 'SYSTEM',
@@ -416,10 +483,11 @@ export class ChatController {
       body: `${user.username} edited a message.`,
       actorId: user.sub,
       entityType: 'CONVERSATION',
-      entityId: message.id,
+      entityId: conversationId,
       action: 'message_updated',
       metadata: {
         conversationId,
+        messageId: message.id,
         senderUsername: user.username,
       },
     });
@@ -452,10 +520,11 @@ export class ChatController {
       body: `${user.username} deleted a message.`,
       actorId: user.sub,
       entityType: 'CONVERSATION',
-      entityId: message.id,
+      entityId: conversationId,
       action: 'message_deleted',
       metadata: {
         conversationId,
+        messageId: message.id,
         senderUsername: user.username,
       },
     });
@@ -484,10 +553,11 @@ export class ChatController {
         body: `${user.username} reacted to your message.`,
         actorId: user.sub,
         entityType: 'CONVERSATION',
-        entityId: messageId,
+        entityId: conversationId,
         action: 'message_reaction_created',
         metadata: {
           conversationId,
+          messageId,
           reactionType: dto.type,
           pointsAwarded: result.pointsAwarded,
         },

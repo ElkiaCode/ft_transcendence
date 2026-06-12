@@ -8,6 +8,10 @@ import { LoggingInterceptor } from './utils/logger/logger';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const corsOrigins = (process.env.CORS_ORIGIN ?? 'https://localhost')
+    .split(',')
+    .map((origin) => origin.trim().replace(/\/$/, ''))
+    .filter(Boolean);
 
   app.setGlobalPrefix('api');
   app.use(cookieParser());
@@ -21,7 +25,7 @@ async function bootstrap() {
   );
   app.useGlobalInterceptors(new LoggingInterceptor());
   app.enableCors({
-    origin: ['http://localhost:3000', 'https://localhost:3000'],
+    origin: corsOrigins,
     credentials: true,
   });
   const config = new DocumentBuilder()
@@ -33,7 +37,7 @@ async function bootstrap() {
   SwaggerModule.setup('api/docs', app, document); // This creates the /api route
 
   await app.listen(process.env.PORT ?? 3001);
-  console.log(`🚀 Backend is running on: http://localhost:${process.env.PORT}`);
+  console.log(`Backend is running on port ${process.env.PORT ?? 3001}`);
 }
 bootstrap().catch((err) => {
   console.error('Error starting server:', err);

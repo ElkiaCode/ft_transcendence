@@ -9,7 +9,9 @@ import {
   UseInterceptors,
   Query,
   Param,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -18,6 +20,8 @@ import type { JwtPayload } from '../auth/types/jwt-payload.type';
 import { EraseMyDataDto } from '../auth/dto/erase-my-data.dto';
 import { UpdateProfileDto } from './dto/dto';
 import { UpdatePasswordDto } from './dto/update-password.dto';
+import { ConfirmDataErasureDto } from './dto/confirm-data-erasure.dto';
+import { clearRefreshCookie } from '../auth/utils/refresh-cookie.util';
 
 @Controller('users')
 export class UsersController {
@@ -80,8 +84,30 @@ export class UsersController {
 
   @UseGuards(JwtAuthGuard)
   @Post('me/erase-data')
-  eraseMyData(@CurrentUser() user: JwtPayload, @Body() dto: EraseMyDataDto) {
-    return this.usersService.eraseMyData(user.sub, dto);
+  requestDataErasure(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: EraseMyDataDto,
+  ) {
+    return this.usersService.requestDataErasure(user.sub, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('me/confirm-data-erasure')
+  async confirmDataErasure(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: ConfirmDataErasureDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.usersService.confirmDataErasure(
+      user.sub,
+      dto.token,
+      dto.currentPassword,
+    );
+
+    clearRefreshCookie(response);
+    response.clearCookie('access_token');
+
+    return result;
   }
 
   @UseGuards(JwtAuthGuard)

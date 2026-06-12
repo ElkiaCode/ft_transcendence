@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -23,7 +24,7 @@ export class AdminService {
     userId: string,
     input: NotificationInput,
   ): Promise<Notification> {
-    const notification = this.notificationsService.createFromInput(
+    const notification = await this.notificationsService.createFromInput(
       userId,
       input,
     );
@@ -47,6 +48,24 @@ export class AdminService {
 
     if (isTargetUserExist.isBanned) {
       throw new BadRequestException('User already banned');
+    }
+
+    const actor = await this.prisma.client.user.findUnique({
+      where: { id: actorUserId },
+      select: { globalRole: true },
+    });
+
+    if (!actor || !['ADMIN', 'MODERATOR'].includes(actor.globalRole)) {
+      throw new ForbiddenException('User cannot perform moderation actions');
+    }
+
+    if (
+      actor.globalRole === 'MODERATOR' &&
+      ['ADMIN', 'MODERATOR'].includes(isTargetUserExist.globalRole)
+    ) {
+      throw new ForbiddenException(
+        'Moderators cannot ban administrators or other moderators',
+      );
     }
 
     const [updateUser] = await this.prisma.client.$transaction([

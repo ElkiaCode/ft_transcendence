@@ -13,6 +13,54 @@ import {
 } from '../moderation/auto-moderation.service';
 import { Prisma } from '@prisma/client';
 
+const publicChatUserSelect = {
+  id: true,
+  username: true,
+  profile: {
+    select: {
+      displayName: true,
+      bio: true,
+      avatarUrl: true,
+    },
+  },
+} satisfies Prisma.UserSelect;
+
+const publicChatMessageSelect = {
+  id: true,
+  conversationId: true,
+  senderId: true,
+  content: true,
+  type: true,
+  isEdited: true,
+  deletedAt: true,
+  createdAt: true,
+  updatedAt: true,
+  sender: {
+    select: publicChatUserSelect,
+  },
+  reads: {
+    select: {
+      id: true,
+      userId: true,
+      readAt: true,
+    },
+    orderBy: {
+      readAt: 'asc',
+    },
+  },
+  reactions: {
+    select: {
+      id: true,
+      userId: true,
+      type: true,
+      createdAt: true,
+    },
+    orderBy: {
+      createdAt: 'asc',
+    },
+  },
+} satisfies Prisma.MessageSelect;
+
 @Injectable()
 export class ChatService {
   private readonly positiveReactionPointValue = 5;
@@ -62,7 +110,7 @@ export class ChatService {
         },
       });
 
-    if (!membership) {
+    if (!membership || membership.leftAt) {
       throw new ForbiddenException(
         'you are not a participant of this conversation',
       );
@@ -136,7 +184,7 @@ export class ChatService {
         include: { conversation: true },
       });
 
-    if (!membership) {
+    if (!membership || membership.leftAt) {
       throw new ForbiddenException(
         'You are not a participant of this conversation',
       );
@@ -247,9 +295,9 @@ export class ChatService {
         },
       });
 
-    if (!membership) {
+    if (!membership || membership.leftAt) {
       throw new ForbiddenException(
-        'you are not and were never a participant of this conversation',
+        'you are not an active participant of this conversation',
       );
     }
 
@@ -280,9 +328,7 @@ export class ChatService {
       participants: {
         include: {
           user: {
-            include: {
-              profile: true,
-            },
+            select: publicChatUserSelect,
           },
         },
       },
@@ -368,9 +414,7 @@ export class ChatService {
         participants: {
           include: {
             user: {
-              include: {
-                profile: true,
-              },
+              select: publicChatUserSelect,
             },
           },
         },
@@ -471,9 +515,7 @@ export class ChatService {
         participants: {
           include: {
             user: {
-              include: {
-                profile: true,
-              },
+              select: publicChatUserSelect,
             },
           },
         },
@@ -515,7 +557,7 @@ export class ChatService {
         },
       });
 
-    if (!targetMembership) {
+    if (!targetMembership || targetMembership.leftAt) {
       throw new NotFoundException('target user is not in this conversation');
     }
 
@@ -527,7 +569,7 @@ export class ChatService {
 
     const remainingParticipantsCount =
       await this.prisma.client.conversationParticipant.count({
-        where: { conversationId },
+        where: { conversationId, leftAt: null },
       });
 
     if (remainingParticipantsCount <= 1) {
@@ -574,7 +616,7 @@ export class ChatService {
         },
       });
 
-    if (!membership) {
+    if (!membership || membership.leftAt) {
       throw new ForbiddenException(
         'You are not a participant of this conversation',
       );
@@ -588,7 +630,7 @@ export class ChatService {
 
     const participants =
       await this.prisma.client.conversationParticipant.findMany({
-        where: { conversationId },
+        where: { conversationId, leftAt: null },
         orderBy: { joinedAt: 'asc' },
       });
 
@@ -680,7 +722,7 @@ export class ChatService {
         participants: {
           include: {
             user: {
-              include: { profile: true },
+              select: publicChatUserSelect,
             },
           },
         },
@@ -689,7 +731,7 @@ export class ChatService {
           take: 1,
           include: {
             sender: {
-              include: { profile: true },
+              select: publicChatUserSelect,
             },
           },
         },
@@ -734,44 +776,20 @@ export class ChatService {
   }
 
   async listMessages(userId: string, conversationId: string) {
-    // 1. Get the membership record (including those who left)
     const membership = await this.ensureConversationMembership(
       userId,
       conversationId,
     );
 
-    // 2. Filter messages by the time the user was actually in the group
     return this.prisma.client.message
       .findMany({
         where: {
           conversationId,
           createdAt: {
             gte: membership.joinedAt,
-            // If leftAt is null, they are still in the group (use current date)
-            ...(membership.leftAt ? { lte: membership.leftAt } : {}),
           },
         },
-        include: {
-          sender: {
-            include: { profile: true },
-          },
-          reads: {
-            include: {
-              user: {
-                include: { profile: true },
-              },
-            },
-            orderBy: { readAt: 'asc' },
-          },
-          reactions: {
-            include: {
-              user: {
-                include: { profile: true },
-              },
-            },
-            orderBy: { createdAt: 'asc' },
-          },
-        },
+        select: publicChatMessageSelect,
         orderBy: { createdAt: 'desc' },
         take: 100,
       })
@@ -789,7 +807,7 @@ export class ChatService {
         },
         include: {
           user: {
-            include: { profile: true },
+            select: publicChatUserSelect,
           },
         },
         orderBy: { joinedAt: 'asc' },
@@ -849,25 +867,7 @@ export class ChatService {
         content: trimmed,
         isEdited: true,
       },
-      include: {
-        sender: {
-          include: { profile: true },
-        },
-        reads: {
-          include: {
-            user: {
-              include: { profile: true },
-            },
-          },
-        },
-        reactions: {
-          include: {
-            user: {
-              include: { profile: true },
-            },
-          },
-        },
-      },
+      select: publicChatMessageSelect,
     });
   }
 
@@ -903,25 +903,7 @@ export class ChatService {
         content: null,
         deletedAt: new Date(),
       },
-      include: {
-        sender: {
-          include: { profile: true },
-        },
-        reads: {
-          include: {
-            user: {
-              include: { profile: true },
-            },
-          },
-        },
-        reactions: {
-          include: {
-            user: {
-              include: { profile: true },
-            },
-          },
-        },
-      },
+      select: publicChatMessageSelect,
     });
   }
 
@@ -1177,13 +1159,7 @@ export class ChatService {
           content: this.automaticModerationPlaceholder,
           type: 'SYSTEM',
         },
-        include: {
-          sender: {
-            include: { profile: true },
-          },
-          reads: true,
-          reactions: true,
-        },
+        select: publicChatMessageSelect,
       });
 
       const moderation: ModerationApplyResult =
@@ -1206,13 +1182,7 @@ export class ChatService {
               content: `automatic moderation ${sender.username} is now bann cause: ${banReason}`,
               type: 'SYSTEM',
             },
-            include: {
-              sender: {
-                include: { profile: true },
-              },
-              reads: true,
-              reactions: true,
-            },
+            select: publicChatMessageSelect,
           })
         : null;
 
@@ -1244,11 +1214,7 @@ export class ChatService {
         content: trimmed,
         type: 'TEXT',
       },
-      include: {
-        sender: {
-          include: { profile: true },
-        },
-      },
+      select: publicChatMessageSelect,
     });
 
     if (moderationResult.action === 'REPORT') {
@@ -1272,13 +1238,7 @@ export class ChatService {
                 content: `automatic moderation ${sender.username} is now banned cause: ${banReason}`,
                 type: 'SYSTEM',
               },
-              include: {
-                sender: {
-                  include: { profile: true },
-                },
-                reads: true,
-                reactions: true,
-              },
+              select: publicChatMessageSelect,
             })
           : null;
 

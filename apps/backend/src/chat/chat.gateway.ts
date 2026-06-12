@@ -217,6 +217,21 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.to(`user:${userId}`).emit('notification.created', notification);
   }
 
+  emitConversationCreated(userId: string, conversation: unknown) {
+    this.server
+      .to(`user:${userId}`)
+      .emit('chat.conversation.created', conversation);
+  }
+
+  revokeConversationAccess(userId: string, conversationId: string) {
+    this.server.to(`user:${userId}`).emit('chat.conversation.accessRevoked', {
+      conversationId,
+    });
+    this.server
+      .in(`user:${userId}`)
+      .socketsLeave(`conversation:${conversationId}`);
+  }
+
   emitModerationWarning(userId: string, warning: unknown) {
     this.server.to(`user:${userId}`).emit('chat.moderation.warning', warning);
   }
@@ -239,6 +254,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         where: {
           conversationId: body.conversationId,
           userId: socketUser.sub,
+          leftAt: null,
         },
       });
 
@@ -259,7 +275,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() body: { conversationId: string },
   ) {
-    const user = await this.getLiveSocketUserOrThrow(client);
+    await this.getLiveSocketUserOrThrow(client);
 
     // await this.prisma.client.conversationParticipant.update({
     //   where: {
@@ -295,8 +311,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       body.conversationId,
       body.content,
     )) as unknown as ChatMessageResult;
-
-    console.log(`📩 Message received from ${client.id}:`, body);
 
     this.emitMessageCreated(body.conversationId, message);
 
@@ -498,6 +512,42 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     return {
       onlineUserIds: [...this.connectedUsers.keys()],
+    };
+  }
+
+  @SubscribeMessage('chat.presence.list')
+  async listConversationPresence(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() body: { conversationId: string },
+  ) {
+    const socketUser = await this.getLiveSocketUserOrThrow(client);
+
+    if (typeof body?.conversationId !== 'string') {
+      throw new WsException('invalid conversation presence payload');
+    }
+
+    await this.chatService.ensureConversationMembership(
+      socketUser.sub,
+      body.conversationId,
+    );
+
+    const participants =
+      await this.prisma.client.conversationParticipant.findMany({
+        where: {
+          conversationId: body.conversationId,
+          leftAt: null,
+        },
+        select: { userId: true },
+      });
+    const participantUserIds = participants.map(
+      (participant) => participant.userId,
+    );
+
+    return {
+      participantUserIds,
+      onlineUserIds: participantUserIds.filter((userId) =>
+        this.connectedUsers.has(userId),
+      ),
     };
   }
 
