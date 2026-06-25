@@ -11,8 +11,9 @@ export function HelloWorldBackground() {
       })),
     [],
   );
+
   return (
-    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+    <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
       {items.map((item, i) => (
         <div
           key={i}

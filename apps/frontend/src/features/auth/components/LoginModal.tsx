@@ -28,13 +28,13 @@ export function LoginModal({
     }
   };
 
-  const handleLogin42 = () => {
-    const clientId = process.env.NEXT_PUBLIC_42_CLIENT_ID;
-    const appUrl =
-      process.env.NEXT_PUBLIC_APP_URL ?? "https://localhost:8443";
-    const redirectUri = `${appUrl}/api/auth/42/callback`;
-    window.location.href = `https://api.intra.42.fr/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code`;
-  };
+const handleLogin42 = () => {
+  setError('');
+  const clientId = process.env.NEXT_PUBLIC_42_CLIENT_ID;
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? 'https://localhost:8443').trimEnd().replace(/\/$/, '');
+  const redirectUri = `${appUrl}/api/auth/42/callback`;
+  window.location.href = `https://api.intra.42.fr/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
+};
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50" onClick={onClose}>

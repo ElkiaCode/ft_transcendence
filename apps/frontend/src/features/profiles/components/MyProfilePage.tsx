@@ -219,7 +219,7 @@ function MyProfileSection() {
 
 export function MyProfilePage() {
   return (
-    <main className="min-h-screen flex flex-col relative overflow-hidden bg-black">
+    <main className="min-h-full flex flex-col relative overflow-hidden bg-black isolate">
       <HelloWorldBackground />
       <MyProfileSection />
     </main>

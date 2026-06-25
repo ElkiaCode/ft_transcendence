@@ -22,6 +22,8 @@ import { UpdateProfileDto } from './dto/dto';
 import { UpdatePasswordDto } from './dto/update-password.dto';
 import { ConfirmDataErasureDto } from './dto/confirm-data-erasure.dto';
 import { clearRefreshCookie } from '../auth/utils/refresh-cookie.util';
+import { RolesGuard } from '@/auth/guards/roles.guard';
+import { Roles } from '@/auth/decorators/roles.decorator';
 
 @Controller('users')
 export class UsersController {
@@ -49,6 +51,13 @@ export class UsersController {
   @Get('search')
   searchUsers(@CurrentUser() user: JwtPayload, @Query('q') q: string) {
     return this.usersService.searchUsers(user.sub, q);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'MODERATOR')
+  @Get('admin/search')
+  searchUsersAdmin(@Query('q') q: string) {
+    return this.usersService.searchUsersAdmin(q);
   }
 
   @UseGuards(JwtAuthGuard)
