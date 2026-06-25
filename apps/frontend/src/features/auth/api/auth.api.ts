@@ -357,3 +357,15 @@ export async function apiGetTopUsers() {
   if (!res.ok) return [];
   return res.json();
 }
+
+export async function apiSearchUsersAdmin(query: string) {
+  const res = await fetchWithAuth(
+    `${API_URL}/users/admin/search?q=${encodeURIComponent(query)}`,
+    {
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    },
+  );
+  if (!res.ok) return [];
+  return res.json();
+}

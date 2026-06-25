@@ -2,10 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ConfirmModal } from "@/components/common/ConfirmModal";
-import {
-  apiGetUserByUsername,
-  apiSearchUsers,
-} from "@/features/auth/api/auth.api";
+import { apiGetUserByUsername, apiSearchUsers, apiSearchUsersAdmin } from "@/lib/api/auth";
 import {
   apiAdjustPenaltyPoints,
   apiBanUser,
@@ -56,7 +53,7 @@ export function UsersTab({
     const timeout = setTimeout(async () => {
       setSearching(true);
       try {
-        const data = await apiSearchUsers(username.trim());
+        const data = await apiSearchUsersAdmin(username.trim());
         console.log("data", data);
         setSuggestions(data);
       } catch {
@@ -87,22 +84,24 @@ export function UsersTab({
     }
   };
 
-  const handleAction = async (
-    action: () => Promise<ActionResponse>,
-    successMsg: string,
-    promotedMsg?: string,
-  ) => {
-    try {
-      const res = await action();
-      setResult((prev) => (prev ? { ...prev, ...res.user } : null));
-      showToast(
-        promotedMsg && res.promoted ? promotedMsg : successMsg,
-        "success",
-      );
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "Action failed", "error");
+const handleAction = async (action: () => Promise<any>, successMsg: string, promotedMsg?: string) => {
+  if (!result) return;
+  const username = result.username;
+  try {
+    const res = await action();
+
+    const fresh = await apiGetUserByUsername(username);
+    if (fresh) setResult(fresh);
+
+    if (promotedMsg && res.promoted) {
+      showToast(promotedMsg, 'success');
+    } else {
+      showToast(successMsg, 'success');
     }
-  };
+  } catch (err: any) {
+    showToast(err.message, 'error');
+  }
+};
 
   return (
     <div className="flex flex-col gap-4">

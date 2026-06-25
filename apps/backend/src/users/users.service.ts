@@ -197,6 +197,57 @@ export class UsersService {
     }));
   }
 
+  async searchUsersAdmin(rawQuery: string) {
+  const q = rawQuery?.trim() ?? '';
+
+  if (q.length < 2) {
+    return [];
+  }
+
+  const users = await this.prisma.client.user.findMany({
+    where: {
+      OR: [
+        {
+          username: {
+            contains: q,
+            mode: 'insensitive',
+          },
+        },
+        {
+          profile: {
+            is: {
+              displayName: {
+                contains: q,
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+      ],
+    },
+    include: {
+      profile: true,
+    },
+    orderBy: [{ username: 'asc' }],
+    take: 20,
+  });
+
+  return users.map((user) => ({
+    id: user.id,
+    username: user.username,
+    isBanned: user.isBanned,
+    isActive: user.isActive,
+    globalRole: user.globalRole,
+    penaltyPoints: user.penaltyPoints,
+    profile: user.profile
+      ? {
+          displayName: user.profile.displayName,
+          avatarUrl: user.profile.avatarUrl,
+        }
+      : null,
+  }));
+}
+
   async getTopPositivePointUsers() {
     const users = await this.prisma.client.user.findMany({
       where: {

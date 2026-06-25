@@ -6,6 +6,7 @@ function getTrophy(i: number) {
   if (i === 2) return "🥉";
   return null;
 }
+
 function getRankColor(i: number) {
   if (i === 0) return "#FFD700";
   if (i === 1) return "#C0C0C0";
@@ -28,8 +29,7 @@ export function Leaderboard({ users }: { users: TopUser[] }) {
         {users.map((user, i) => (
           <div
             key={user.id}
-            className="flex items-center gap-3 px-4 py-3 border-b last:border-b-0"
-            style={{ backgroundColor: "white", border: "4px solid #00BABC" }}
+            className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 last:border-b-0 bg-white"
           >
             <span
               className="font-bold w-6 h-6 flex items-center justify-center text-base"
@@ -42,21 +42,18 @@ export function Leaderboard({ users }: { users: TopUser[] }) {
                 <img
                   src={user.profile.avatarUrl}
                   alt={user.username}
-                  className="w-full h-full object-cover bg-white"
+                  className="w-full h-full object-cover"
                 />
               ) : (
-                <span className="text-black text-xs font-bold">
+                <span className="text-white text-xs font-bold">
                   {user.username.charAt(0).toUpperCase()}
                 </span>
               )}
             </div>
-            <span
-              className="flex-1 text-sm font-medium"
-              style={{ color: "black" }}
-            >
+            <span className="flex-1 text-sm font-medium text-black">
               {user.profile?.displayName ?? user.username}
             </span>
-            <span className="font-bold text-sm" style={{ color: "black" }}>
+            <span className="font-bold text-sm text-black">
               {user.penaltyPoints} pts
             </span>
           </div>

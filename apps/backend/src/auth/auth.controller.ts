@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Post,
@@ -9,6 +8,7 @@ import {
   Get,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { Request as ExpressRequest, Response as ExpressResponse } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -29,7 +29,7 @@ export class AuthController {
   @Post('register')
   async register(
     @Body() dto: RegisterDto,
-    @Res({ passthrough: true }) response: Response,
+    @Res({ passthrough: true }) response: ExpressResponse,
   ) {
     const result = await this.authService.register(dto);
 
@@ -52,7 +52,7 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async login(
     @Body() dto: LoginDto,
-    @Res({ passthrough: true }) response: Response,
+    @Res({ passthrough: true }) response: ExpressResponse,
   ) {
     const result = await this.authService.login(dto);
 
@@ -70,8 +70,8 @@ export class AuthController {
 
   @Post('refresh')
   async refresh(
-    @Req() request: Request,
-    @Res({ passthrough: true }) response: Response,
+    @Req() request: ExpressRequest,
+    @Res({ passthrough: true }) response: ExpressResponse,
   ) {
     const rawRefreshToken = getRefreshTokenFromRequest(request);
     const result = await this.authService.refresh(rawRefreshToken);
@@ -90,8 +90,8 @@ export class AuthController {
 
   @Post('logout')
   async logout(
-    @Req() request: Request,
-    @Res({ passthrough: true }) response: Response,
+    @Req() request: ExpressRequest,
+    @Res({ passthrough: true }) response: ExpressResponse,
   ) {
     const rawRefreshToken = getRefreshTokenFromRequest(request);
 
@@ -104,20 +104,34 @@ export class AuthController {
   }
 
   @Get('42/callback')
-  async loginWith42(@Query('code') code: string, @Res() response: Response) {
-    if (!code) throw new BadRequestException('missing code');
+  async loginWith42(
+    @Query('code') code: string,
+    @Res() response: ExpressResponse,
+  ) {
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL') ?? 'https://localhost:8443/';
 
-    const result = await this.authService.loginWith42(code);
+    if (!code) {
+      return response.redirect(`${frontendUrl}/?error=oauth_missing_code`);
+    }
 
-    setRefreshCookie(
-      response,
-      result.refreshToken,
-      this.authService.getRefreshTokenDays(),
-    );
-    const frontendUrl = this.configService.get<string>(
-      'FRONTEND_URL',
-      'https://localhost:8443',
-    );
-    return response.redirect(frontendUrl);
+    try {
+      const result = await this.authService.loginWith42(code);
+
+      setRefreshCookie(
+        response,
+        result.refreshToken,
+        this.authService.getRefreshTokenDays(),
+      );
+
+      return response.redirect(`${frontendUrl}/`);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'oauth_failed';
+
+      return response.redirect(
+        `${frontendUrl}/?error=oauth_failed&error_message=${encodeURIComponent(message)}`,
+      );
+    }
   }
 }
