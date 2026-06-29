@@ -547,6 +547,17 @@ export class ChatController {
     );
 
     if (result.pointsAwarded > 0) {
+      this.chatGateway.emitMessageReactionCreated(conversationId, {
+        conversationId: result.conversationId,
+        messageId: result.messageId,
+        reaction: {
+          id: result.reaction.id,
+          userId: result.reaction.userId,
+          type: result.reaction.type,
+          createdAt: result.reaction.createdAt,
+        },
+      });
+
       await this.notifyUser(result.sender.id, {
         type: 'SYSTEM',
         title: 'New reaction',

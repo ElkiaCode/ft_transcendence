@@ -9,19 +9,27 @@ describe('ChatController realtime conversation creation', () => {
   function createController() {
     const createOrGetDirectConversation = jest.fn();
     const createGroupConversation = jest.fn();
+    const addMessageReaction = jest.fn();
     const emitConversationCreated = jest.fn();
+    const emitMessageReactionCreated = jest.fn();
+    const createFromInput = jest.fn().mockResolvedValue({
+      userId: 'sender-id',
+    });
     const createFromInputForMany = jest.fn().mockResolvedValue([]);
 
     const controller = new ChatController(
       {
         createOrGetDirectConversation,
         createGroupConversation,
+        addMessageReaction,
       } as unknown as ChatService,
       {
         emitConversationCreated,
+        emitMessageReactionCreated,
         emitNotificationCreated: jest.fn(),
       } as unknown as ChatGateway,
       {
+        createFromInput,
         createFromInputForMany,
       } as unknown as NotificationsService,
     );
@@ -30,7 +38,9 @@ describe('ChatController realtime conversation creation', () => {
       controller,
       createOrGetDirectConversation,
       createGroupConversation,
+      addMessageReaction,
       emitConversationCreated,
+      emitMessageReactionCreated,
     };
   }
 
@@ -131,5 +141,44 @@ describe('ChatController realtime conversation creation', () => {
         unreadCount: 0,
       });
     }
+  });
+
+  it('emits a realtime reaction event when a new reaction is created', async () => {
+    const { controller, addMessageReaction, emitMessageReactionCreated } =
+      createController();
+    const createdAt = new Date('2026-06-28T10:00:00.000Z');
+    addMessageReaction.mockResolvedValue({
+      conversationId: 'conversation-1',
+      messageId: 'message-1',
+      reaction: {
+        id: 'reaction-1',
+        userId: 'user-a',
+        type: 'HEART',
+        createdAt,
+      },
+      pointsAwarded: 5,
+      sender: {
+        id: 'sender-id',
+        username: 'sender',
+        penaltyPoints: 5,
+        globalRole: 'USER',
+      },
+      senderPromoted: false,
+    });
+
+    await controller.addMessageReaction(actor, 'conversation-1', 'message-1', {
+      type: 'HEART',
+    });
+
+    expect(emitMessageReactionCreated).toHaveBeenCalledWith('conversation-1', {
+      conversationId: 'conversation-1',
+      messageId: 'message-1',
+      reaction: {
+        id: 'reaction-1',
+        userId: 'user-a',
+        type: 'HEART',
+        createdAt,
+      },
+    });
   });
 });

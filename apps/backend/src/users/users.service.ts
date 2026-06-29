@@ -19,6 +19,12 @@ import {
   generateDataErasureToken,
   hashDataErasureToken,
 } from './utils/data-erasure-token.util';
+import type { Prisma } from '@prisma/client';
+
+type RevokedConversationAccess = {
+  conversationId: string;
+  userIds: string[];
+};
 
 @Injectable()
 export class UsersService {
@@ -137,6 +143,143 @@ export class UsersService {
     }
   }
 
+  private async cleanupChatConversationsForDataErasure(
+    tx: Prisma.TransactionClient,
+    userId: string,
+  ): Promise<RevokedConversationAccess[]> {
+    const now = new Date();
+    const conversations = await tx.conversation.findMany({
+      where: {
+        participants: {
+          some: { userId },
+        },
+      },
+      select: {
+        id: true,
+        type: true,
+        participants: {
+          where: { leftAt: null },
+          orderBy: { joinedAt: 'asc' },
+          select: {
+            userId: true,
+            role: true,
+            joinedAt: true,
+          },
+        },
+      },
+    });
+
+    if (conversations.length === 0) {
+      return [];
+    }
+
+    const conversationIds = conversations.map(
+      (conversation) => conversation.id,
+    );
+    const conversationsToClose: string[] = [];
+    const revocations: RevokedConversationAccess[] = [];
+    const ownershipTransfers: Array<{
+      conversationId: string;
+      userId: string;
+    }> = [];
+
+    for (const conversation of conversations) {
+      const remainingParticipants = conversation.participants.filter(
+        (participant) => participant.userId !== userId,
+      );
+
+      if (conversation.type === 'DIRECT') {
+        conversationsToClose.push(conversation.id);
+        revocations.push({
+          conversationId: conversation.id,
+          userIds: remainingParticipants.map(
+            (participant) => participant.userId,
+          ),
+        });
+        continue;
+      }
+
+      if (remainingParticipants.length <= 1) {
+        conversationsToClose.push(conversation.id);
+        revocations.push({
+          conversationId: conversation.id,
+          userIds: remainingParticipants.map(
+            (participant) => participant.userId,
+          ),
+        });
+        continue;
+      }
+
+      const hasRemainingOwner = remainingParticipants.some(
+        (participant) => participant.role === 'OWNER',
+      );
+
+      if (!hasRemainingOwner) {
+        ownershipTransfers.push({
+          conversationId: conversation.id,
+          userId: remainingParticipants[0].userId,
+        });
+      }
+    }
+
+    if (conversationsToClose.length > 0) {
+      await tx.conversationParticipant.updateMany({
+        where: {
+          conversationId: { in: conversationsToClose },
+          userId: { not: userId },
+          leftAt: null,
+        },
+        data: {
+          leftAt: now,
+        },
+      });
+    }
+
+    for (const transfer of ownershipTransfers) {
+      await tx.conversationParticipant.update({
+        where: {
+          conversationId_userId: {
+            conversationId: transfer.conversationId,
+            userId: transfer.userId,
+          },
+        },
+        data: {
+          role: 'OWNER',
+        },
+      });
+    }
+
+    await tx.conversation.updateMany({
+      where: {
+        id: { in: conversationIds },
+      },
+      data: {
+        updatedAt: now,
+      },
+    });
+
+    return revocations.filter(
+      (revocation) => revocation.userIds.length > 0,
+    );
+  }
+
+  private emitRevokedConversationAccess(
+    revocations: RevokedConversationAccess[],
+  ) {
+    if (typeof this.chatGateway.revokeConversationAccess !== 'function') {
+      return;
+    }
+
+    for (const revocation of revocations) {
+      for (const userId of revocation.userIds) {
+        this.chatGateway.revokeConversationAccess(
+          userId,
+          revocation.conversationId,
+        );
+      }
+    }
+  }
+
   async searchUsers(currentUserId: string, rawQuery: string) {
     const q = rawQuery?.trim() ?? '';
 
@@ -147,24 +290,29 @@ export class UsersService {
     const users = await this.prisma.client.user.findMany({
       where: {
         id: { not: currentUserId },
-        isActive: true,
-        isBanned: false,
-        OR: [
+        AND: [
           {
-            username: {
-              contains: q,
-              mode: 'insensitive',
-            },
+            OR: [{ isActive: true }, { isBanned: true }],
           },
           {
-            profile: {
-              is: {
-                displayName: {
+            OR: [
+              {
+                username: {
                   contains: q,
                   mode: 'insensitive',
                 },
               },
-            },
+              {
+                profile: {
+                  is: {
+                    displayName: {
+                      contains: q,
+                      mode: 'insensitive',
+                    },
+                  },
+                },
+              },
+            ],
           },
         ],
       },
@@ -186,6 +334,7 @@ export class UsersService {
     return users.map((user) => ({
       id: user.id,
       username: user.username,
+      isBanned: user.isBanned,
       isBlockedByCurrentUser: user.blocksReceived.length > 0,
       hasBlockedCurrentUser: user.blocksInitiated.length > 0,
       profile: user.profile
@@ -198,55 +347,55 @@ export class UsersService {
   }
 
   async searchUsersAdmin(rawQuery: string) {
-  const q = rawQuery?.trim() ?? '';
+    const q = rawQuery?.trim() ?? '';
 
-  if (q.length < 2) {
-    return [];
-  }
+    if (q.length < 2) {
+      return [];
+    }
 
-  const users = await this.prisma.client.user.findMany({
-    where: {
-      OR: [
-        {
-          username: {
-            contains: q,
-            mode: 'insensitive',
+    const users = await this.prisma.client.user.findMany({
+      where: {
+        OR: [
+          {
+            username: {
+              contains: q,
+              mode: 'insensitive',
+            },
           },
-        },
-        {
-          profile: {
-            is: {
-              displayName: {
-                contains: q,
-                mode: 'insensitive',
+          {
+            profile: {
+              is: {
+                displayName: {
+                  contains: q,
+                  mode: 'insensitive',
+                },
               },
             },
           },
-        },
-      ],
-    },
-    include: {
-      profile: true,
-    },
-    orderBy: [{ username: 'asc' }],
-    take: 20,
-  });
+        ],
+      },
+      include: {
+        profile: true,
+      },
+      orderBy: [{ username: 'asc' }],
+      take: 20,
+    });
 
-  return users.map((user) => ({
-    id: user.id,
-    username: user.username,
-    isBanned: user.isBanned,
-    isActive: user.isActive,
-    globalRole: user.globalRole,
-    penaltyPoints: user.penaltyPoints,
-    profile: user.profile
-      ? {
-          displayName: user.profile.displayName,
-          avatarUrl: user.profile.avatarUrl,
-        }
-      : null,
-  }));
-}
+    return users.map((user) => ({
+      id: user.id,
+      username: user.username,
+      isBanned: user.isBanned,
+      isActive: user.isActive,
+      globalRole: user.globalRole,
+      penaltyPoints: user.penaltyPoints,
+      profile: user.profile
+        ? {
+            displayName: user.profile.displayName,
+            avatarUrl: user.profile.avatarUrl,
+          }
+        : null,
+    }));
+  }
 
   async getTopPositivePointUsers() {
     const users = await this.prisma.client.user.findMany({
@@ -836,47 +985,57 @@ export class UsersService {
 
     await this.deleteLocalAvatar(user.profile?.avatarUrl);
 
-    await this.prisma.client.$transaction(async (tx) => {
-      const claimedRequest = await tx.dataErasureRequest.deleteMany({
-        where: {
-          id: request.id,
-          userId: authenticatedUserId,
-          tokenHash,
-          expiresAt: { gt: new Date() },
-        },
-      });
-
-      if (claimedRequest.count !== 1) {
-        throw new BadRequestException(
-          'invalid or expired deletion confirmation',
-        );
-      }
-
-      await tx.notification.deleteMany({
-        where: {
-          OR: [{ actorId: user.id }, { entityId: user.id }],
-        },
-      });
-      await tx.report.deleteMany({
-        where: { creatorId: user.id },
-      });
-      await tx.moderationAction.deleteMany({
-        where: { targetUserId: user.id },
-      });
-      await tx.conversation.updateMany({
-        where: {
-          participants: {
-            some: { userId: user.id },
+    const revokedConversationAccess = await this.prisma.client.$transaction(
+      async (tx) => {
+        const claimedRequest = await tx.dataErasureRequest.deleteMany({
+          where: {
+            id: request.id,
+            userId: authenticatedUserId,
+            tokenHash,
+            expiresAt: { gt: new Date() },
           },
-        },
-        data: {
-          participantHash: null,
-        },
-      });
-      await tx.user.delete({
-        where: { id: user.id },
-      });
-    });
+        });
+
+        if (claimedRequest.count !== 1) {
+          throw new BadRequestException(
+            'invalid or expired deletion confirmation',
+          );
+        }
+
+        await tx.notification.deleteMany({
+          where: {
+            OR: [{ actorId: user.id }, { entityId: user.id }],
+          },
+        });
+        await tx.report.deleteMany({
+          where: { creatorId: user.id },
+        });
+        await tx.moderationAction.deleteMany({
+          where: { targetUserId: user.id },
+        });
+        await tx.conversation.updateMany({
+          where: {
+            participants: {
+              some: { userId: user.id },
+            },
+          },
+          data: {
+            participantHash: null,
+          },
+        });
+        const chatCleanup = await this.cleanupChatConversationsForDataErasure(
+          tx,
+          user.id,
+        );
+        await tx.user.delete({
+          where: { id: user.id },
+        });
+
+        return chatCleanup;
+      },
+    );
+
+    this.emitRevokedConversationAccess(revokedConversationAccess);
 
     try {
       await this.notifyAdminsAndModerators({

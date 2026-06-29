@@ -3,6 +3,7 @@ import type { UserProfile } from "@/features/auth/types/auth.types";
 export type SearchUser = {
   id: string;
   username: string;
+  isBanned?: boolean;
   isBlockedByCurrentUser: boolean;
   hasBlockedCurrentUser: boolean;
   profile: {
@@ -31,6 +32,7 @@ export type MessageReaction = {
   id?: string;
   userId: string;
   type: ReactionType;
+  createdAt?: string;
 };
 
 export type MessageRead = {

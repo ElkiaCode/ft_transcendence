@@ -739,11 +739,22 @@ export class ChatService {
       orderBy: { updatedAt: 'desc' },
     });
 
-    return conversations.map((conv) => {
-      // 1. Find the specific membership for the current user to get their 'joinedAt'
-      const myMembership = conv.participants.find((p) => p.userId === userId);
+    const visibleConversations = conversations.filter((conv) => {
+      const activeParticipants = conv.participants.filter(
+        (participant) => participant.leftAt == null,
+      );
 
-      const otherUser = conv.participants.find(
+      return activeParticipants.length >= 2;
+    });
+
+    return visibleConversations.map((conv) => {
+      const activeParticipants = conv.participants.filter(
+        (participant) => participant.leftAt == null,
+      );
+      // 1. Find the specific membership for the current user to get their 'joinedAt'
+      const myMembership = activeParticipants.find((p) => p.userId === userId);
+
+      const otherUser = activeParticipants.find(
         (p) => p.userId !== userId,
       )?.user;
 
@@ -1126,20 +1137,23 @@ export class ChatService {
         conversationId,
         userId,
       );
-      if (otherIds.length > 0) {
-        const block = await this.prisma.client.block.findFirst({
-          where: {
-            OR: [
-              { blockerId: userId, blockedId: otherIds[0] },
-              { blockerId: otherIds[0], blockedId: userId },
-            ],
-          },
-        });
-        if (block) {
-          throw new ForbiddenException(
-            'messaging is blocked between these users',
-          );
-        }
+      if (otherIds.length !== 1) {
+        throw new BadRequestException(
+          'direct conversation is no longer available',
+        );
+      }
+
+      const otherId = otherIds[0];
+      const block = await this.prisma.client.block.findFirst({
+        where: {
+          OR: [
+            { blockerId: userId, blockedId: otherId },
+            { blockerId: otherId, blockedId: userId },
+          ],
+        },
+      });
+      if (block) {
+        throw new ForbiddenException('messaging is blocked between these users');
       }
     }
 

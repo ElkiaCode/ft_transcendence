@@ -18,8 +18,14 @@ export function SearchDropdown({
       {results.map((user) => (
         <div
           key={user.id}
-          onClick={() => onSelectUser(user)}
-          className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-300 cursor-pointer"
+          onClick={() => {
+            if (!user.isBanned) onSelectUser(user);
+          }}
+          className={`flex items-center gap-3 p-2 rounded-lg ${
+            user.isBanned
+              ? "cursor-not-allowed opacity-70"
+              : "hover:bg-gray-300 cursor-pointer"
+          }`}
         >
           <div className="w-10 h-10 ColorsS rounded-full shrink-0 overflow-hidden flex items-center justify-center text-white font-medium">
             {user.profile?.avatarUrl ? (
@@ -37,6 +43,9 @@ export function SearchDropdown({
             <p className="text-sm text-gray-700 font-normal">
               {user.profile?.displayName}
             </p>
+            {user.isBanned && (
+              <p className="text-xs font-medium text-red-600">Banned user</p>
+            )}
             {user.isBlockedByCurrentUser && (
               <p className="text-xs font-medium text-red-600">
                 You blocked this user

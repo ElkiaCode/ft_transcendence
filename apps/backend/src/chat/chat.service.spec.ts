@@ -264,6 +264,22 @@ describe('ChatService', () => {
       expect(prisma.client.message.create).toHaveBeenCalledTimes(2); // One for text, one for system announcement
       expect(prisma.client.conversation.update).toHaveBeenCalled();
     });
+
+    it('Scenario 5: should reject an orphaned direct conversation', async () => {
+      jest
+        .spyOn(prisma.client.conversation, 'findUnique')
+        .mockResolvedValue({ type: 'DIRECT' } as any);
+      jest
+        .spyOn(prisma.client.conversationParticipant, 'findMany')
+        .mockResolvedValue([{ userId }] as any);
+
+      await expect(
+        service.sendMessage(userId, convId, 'hello'),
+      ).rejects.toThrow(
+        new BadRequestException('direct conversation is no longer available'),
+      );
+      expect(autoModerationService.analyze).not.toHaveBeenCalled();
+    });
   });
 
   describe('addMessageReaction', () => {
@@ -742,6 +758,66 @@ describe('ChatService', () => {
       expect(result[0].name).toBe('Group chat'); // Correctly picked the other user
       expect(result[0].type).toBe('group');
       expect(result[0].lastMessage).toBe('Hi!');
+    });
+
+    it('Scenario 3: should hide orphaned conversations after a participant was erased', async () => {
+      const mockDbResult = [
+        {
+          id: 'orphan-direct',
+          type: 'DIRECT',
+          participants: [
+            {
+              userId: 'me',
+              leftAt: null,
+              joinedAt: new Date('2026-01-01'),
+              user: { username: 'me' },
+            },
+          ],
+          messages: [],
+        },
+        {
+          id: 'orphan-group',
+          type: 'GROUP',
+          title: 'Old group',
+          participants: [
+            {
+              userId: 'me',
+              leftAt: null,
+              joinedAt: new Date('2026-01-01'),
+              user: { username: 'me' },
+            },
+          ],
+          messages: [],
+        },
+        {
+          id: 'valid-direct',
+          type: 'DIRECT',
+          participants: [
+            {
+              userId: 'me',
+              leftAt: null,
+              joinedAt: new Date('2026-01-01'),
+              user: { username: 'me' },
+            },
+            {
+              userId: 'other',
+              leftAt: null,
+              joinedAt: new Date('2026-01-01'),
+              user: { username: 'Yann', profile: { avatarUrl: null } },
+            },
+          ],
+          messages: [],
+        },
+      ];
+
+      jest
+        .spyOn(prisma.client.conversation, 'findMany')
+        .mockResolvedValue(mockDbResult as any);
+
+      const result = await service.listMyConversations('me');
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('valid-direct');
     });
   });
 

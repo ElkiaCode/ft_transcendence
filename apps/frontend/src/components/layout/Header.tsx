@@ -14,10 +14,22 @@ const ERROR_MESSAGES: Record<string, string> = {
   oauth_failed: 'Login with 42 failed.',
 };
 
+const getMailpitUrl = (appUrl?: string) => {
+  try {
+    const hostname = appUrl ? new URL(appUrl).hostname : 'localhost';
+    return `https://${hostname}:8025`;
+  } catch {
+    return 'https://localhost:8025';
+  }
+};
+
 export default function Header() {
   const [showLogin, setShowLogin] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
   const [loginError, setLoginError] = useState('');
+  const [mailpitUrl, setMailpitUrl] = useState(() =>
+    getMailpitUrl(process.env.NEXT_PUBLIC_APP_URL),
+  );
   const [res, setRes] = useState("");
 
   const logout = useAuthStore((s) => s.logout);
@@ -29,6 +41,8 @@ export default function Header() {
   };
 
   useEffect(() => {
+    setMailpitUrl(`https://${window.location.hostname}:8025`);
+
     const params = new URLSearchParams(window.location.search);
     const error = params.get('error');
     if (!error) return;
@@ -58,6 +72,16 @@ export default function Header() {
               <Link className="hover:underline" href="/terms">
                 Terms of Service
               </Link>
+              {user && (
+                <a
+                  className="rounded border border-gray-400 px-2 py-0.5 text-gray-700 hover:bg-white"
+                  href={mailpitUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  mail
+                </a>
+              )}
             </div>
           </div>
           <FriendsMenu user={user} />

@@ -35,7 +35,12 @@ describe('UsersService privacy behavior', () => {
         deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       conversation: {
+        findMany: jest.fn().mockResolvedValue([]),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      conversationParticipant: {
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        update: jest.fn().mockResolvedValue({}),
       },
       dataErasureRequest,
       $transaction: jest.fn(
@@ -50,12 +55,15 @@ describe('UsersService privacy behavior', () => {
     const notificationsService = {
       createFromInputForMany: jest.fn().mockResolvedValue([]),
     };
+    const chatGateway = {
+      revokeConversationAccess: jest.fn(),
+    };
     const service = new UsersService(
       {
         client,
       } as unknown as PrismaService,
       notificationsService as unknown as NotificationsService,
-      {} as ChatGateway,
+      chatGateway as unknown as ChatGateway,
       mailService as unknown as MailService,
     );
 
@@ -66,16 +74,18 @@ describe('UsersService privacy behavior', () => {
       deleteUser,
       dataErasureRequest,
       mailService,
+      chatGateway,
       client,
     };
   }
 
-  it('keeps blocked users searchable and exposes both block directions', async () => {
+  it('keeps blocked and banned users searchable with public safety flags', async () => {
     const { service, findMany } = createService();
     findMany.mockResolvedValue([
       {
         id: 'user-b',
         username: 'blocked-user',
+        isBanned: false,
         profile: null,
         blocksReceived: [{ id: 'block-a-to-b' }],
         blocksInitiated: [],
@@ -83,9 +93,18 @@ describe('UsersService privacy behavior', () => {
       {
         id: 'user-c',
         username: 'blocker-user',
+        isBanned: false,
         profile: null,
         blocksReceived: [],
         blocksInitiated: [{ id: 'block-c-to-a' }],
+      },
+      {
+        id: 'user-d',
+        username: 'banned-user',
+        isBanned: true,
+        profile: null,
+        blocksReceived: [],
+        blocksInitiated: [],
       },
     ]);
 
@@ -102,10 +121,25 @@ describe('UsersService privacy behavior', () => {
         isBlockedByCurrentUser: false,
         hasBlockedCurrentUser: true,
       }),
+      expect.objectContaining({
+        id: 'user-d',
+        isBanned: true,
+      }),
     ]);
     expect(findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.not.objectContaining({ NOT: expect.anything() }),
+      }),
+    );
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          AND: expect.arrayContaining([
+            expect.objectContaining({
+              OR: expect.arrayContaining([{ isBanned: true }]),
+            }),
+          ]),
+        }),
       }),
     );
   });
@@ -182,6 +216,9 @@ describe('UsersService privacy behavior', () => {
       createService();
     const filename = `gdpr-avatar-${Date.now()}.png`;
     const avatarPath = join(process.cwd(), 'uploads', filename);
+    const localApiUrl = (
+      process.env.API_URL || 'https://localhost:8443'
+    ).replace(/\/$/, '');
     const notifySpy = jest
       .spyOn(service as never, 'notifyAdminsAndModerators' as never)
       .mockResolvedValue([] as never);
@@ -200,7 +237,7 @@ describe('UsersService privacy behavior', () => {
         email: 'personal@example.com',
         passwordHash: null,
         profile: {
-          avatarUrl: `https://localhost:8443/uploads/${filename}`,
+          avatarUrl: `${localApiUrl}/uploads/${filename}`,
         },
       },
     });
@@ -241,6 +278,94 @@ describe('UsersService privacy behavior', () => {
         participantHash: null,
       },
     });
+  });
+
+  it('closes orphaned chat conversations and transfers group ownership during data erasure', async () => {
+    const { service, dataErasureRequest, client, chatGateway } =
+      createService();
+    const rawToken = 'h'.repeat(64);
+
+    dataErasureRequest.findUnique.mockResolvedValue({
+      id: 'request-id',
+      userId: 'deleted-user-id',
+      tokenHash: hashDataErasureToken(rawToken),
+      expiresAt: new Date(Date.now() + 60_000),
+      createdAt: new Date(),
+      user: {
+        id: 'deleted-user-id',
+        username: 'personal-username',
+        email: 'personal@example.com',
+        passwordHash: null,
+        profile: null,
+      },
+    });
+    client.conversation.findMany.mockResolvedValue([
+      {
+        id: 'direct-conversation-id',
+        type: 'DIRECT',
+        participants: [
+          {
+            userId: 'deleted-user-id',
+            role: 'OWNER',
+            joinedAt: new Date('2026-01-01T00:00:00.000Z'),
+          },
+          {
+            userId: 'remaining-user-id',
+            role: 'OWNER',
+            joinedAt: new Date('2026-01-01T00:00:00.000Z'),
+          },
+        ],
+      },
+      {
+        id: 'group-conversation-id',
+        type: 'GROUP',
+        participants: [
+          {
+            userId: 'deleted-user-id',
+            role: 'OWNER',
+            joinedAt: new Date('2026-01-01T00:00:00.000Z'),
+          },
+          {
+            userId: 'member-one-id',
+            role: 'MEMBER',
+            joinedAt: new Date('2026-01-02T00:00:00.000Z'),
+          },
+          {
+            userId: 'member-two-id',
+            role: 'MEMBER',
+            joinedAt: new Date('2026-01-03T00:00:00.000Z'),
+          },
+        ],
+      },
+    ]);
+
+    await service.confirmDataErasure('deleted-user-id', rawToken);
+
+    expect(client.conversationParticipant.updateMany).toHaveBeenCalledWith({
+      where: {
+        conversationId: { in: ['direct-conversation-id'] },
+        userId: { not: 'deleted-user-id' },
+        leftAt: null,
+      },
+      data: {
+        leftAt: expect.any(Date),
+      },
+    });
+    expect(client.conversationParticipant.update).toHaveBeenCalledWith({
+      where: {
+        conversationId_userId: {
+          conversationId: 'group-conversation-id',
+          userId: 'member-one-id',
+        },
+      },
+      data: {
+        role: 'OWNER',
+      },
+    });
+    expect(chatGateway.revokeConversationAccess).toHaveBeenCalledWith(
+      'remaining-user-id',
+      'direct-conversation-id',
+    );
   });
 
   it('rejects a valid token used by another authenticated user', async () => {

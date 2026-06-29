@@ -356,6 +356,7 @@ export class ModerationService {
           data: {
             isBanned: false,
             isActive: true,
+            penaltyPoints: 0,
           },
         });
       }

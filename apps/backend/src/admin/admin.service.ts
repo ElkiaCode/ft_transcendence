@@ -138,7 +138,7 @@ export class AdminService {
 
     const updateUser = await this.prisma.client.user.update({
       where: { id: targetUserId },
-      data: { isBanned: false, isActive: true },
+      data: { isBanned: false, isActive: true, penaltyPoints: 0 },
       include: { profile: true },
     });
 
@@ -162,6 +162,7 @@ export class AdminService {
         email: updateUser.email,
         username: updateUser.username,
         globalRole: updateUser.globalRole,
+        penaltyPoints: updateUser.penaltyPoints,
         isActive: updateUser.isActive,
         isBanned: updateUser.isBanned,
         profile: updateUser.profile

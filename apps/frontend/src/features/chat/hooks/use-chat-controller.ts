@@ -48,6 +48,9 @@ export function useChatController() {
   const socketRef = useRef<Socket | null>(null);
   const isTypingRef = useRef(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingConversationQueryRef = useRef<string | null | undefined>(
+    undefined,
+  );
 
   const membersRef = useRef<GroupMember[]>([]);
   const selectedConvRef = useRef<Conversation | null>(null);
@@ -119,8 +122,12 @@ export function useChatController() {
   const updateConversationQuery = useCallback(
     (conversationId: string | null) => {
       const currentConversationId = searchParams.get("conversation");
+      pendingConversationQueryRef.current = conversationId;
 
-      if (currentConversationId === conversationId) return;
+      if (currentConversationId === conversationId) {
+        pendingConversationQueryRef.current = undefined;
+        return;
+      }
 
       const params = new URLSearchParams(searchParams.toString());
 
@@ -139,11 +146,21 @@ export function useChatController() {
   );
 
   const resetConversationUnreadCount = useCallback((conversationId: string) => {
-    setConversations((prev) =>
-      prev.map((conv) =>
-        conv.id === conversationId ? { ...conv, unreadCount: 0 } : conv,
-      ),
-    );
+    setConversations((prev) => {
+      let didChange = false;
+
+      const next = prev.map((conv) => {
+        if (conv.id !== conversationId || (conv.unreadCount ?? 0) === 0) {
+          return conv;
+        }
+
+        didChange = true;
+
+        return { ...conv, unreadCount: 0 };
+      });
+
+      return didChange ? next : prev;
+    });
   }, []);
 
   const markConversationNotificationsAsRead = useCallback(
@@ -160,8 +177,24 @@ export function useChatController() {
     [markConversationAsRead],
   );
 
+  const closeConversationOverlays = useCallback(() => {
+    setMenu(null);
+    setReportModal(null);
+    setEditModal(null);
+    setDeleteModal(null);
+    setGroupModal(false);
+    setGroupMenuOpen(false);
+    setInviteModal(false);
+    setMembersModal(false);
+    setRenameModal(false);
+    setLeaveModal(false);
+    setSearchResults([]);
+    setSearchQuery("");
+  }, []);
+
   const handleSelectConversation = useCallback(
     (conversation: Conversation | null) => {
+      closeConversationOverlays();
       presenceParticipantIdsRef.current = new Set();
       setOnlineUserIds(new Set());
       setSelectedConvState(conversation);
@@ -176,6 +209,7 @@ export function useChatController() {
       void markConversationNotificationsAsRead(conversation.id);
     },
     [
+      closeConversationOverlays,
       setActiveConversationId,
       updateConversationQuery,
       resetConversationUnreadCount,
@@ -200,6 +234,12 @@ export function useChatController() {
   useEffect(() => {
     selectedConvRef.current = selectedConv;
   }, [selectedConv]);
+
+  useEffect(() => {
+    if (pendingConversationQueryRef.current === queryConversationId) {
+      pendingConversationQueryRef.current = undefined;
+    }
+  }, [queryConversationId]);
 
   useEffect(() => {
     userIdRef.current = currentUserId;
@@ -239,6 +279,15 @@ export function useChatController() {
 
   useEffect(() => {
     if (!queryConversationId || conversations.length === 0) return;
+
+    const pendingConversationId = pendingConversationQueryRef.current;
+
+    if (
+      pendingConversationId !== undefined &&
+      pendingConversationId !== queryConversationId
+    ) {
+      return;
+    }
 
     const conversationFromQuery = conversations.find(
       (conv) => conv.id === queryConversationId,
@@ -345,6 +394,10 @@ export function useChatController() {
   };
 
   const handleSelectUser = async (searchUser: SearchUser) => {
+    if (searchUser.isBanned) {
+      return;
+    }
+
     try {
       const conv = await createOrGetDirectConversation(searchUser.id);
 
@@ -724,6 +777,47 @@ export function useChatController() {
       );
     };
 
+    const handleMessageReactionCreated = (payload: {
+      conversationId?: string;
+      messageId?: string;
+      reaction?: MessageReaction;
+    }) => {
+      if (
+        !payload?.conversationId ||
+        !payload.messageId ||
+        !payload.reaction ||
+        selectedConvRef.current?.id !== payload.conversationId
+      ) {
+        return;
+      }
+
+      setMessages((prev) =>
+        prev.map((message) => {
+          if (message.id !== payload.messageId) return message;
+
+          const reactions = message.reactions ?? [];
+
+          const alreadyExists = reactions.some((reaction) => {
+            if (reaction.id && payload.reaction?.id) {
+              return reaction.id === payload.reaction.id;
+            }
+
+            return (
+              reaction.userId === payload.reaction?.userId &&
+              reaction.type === payload.reaction?.type
+            );
+          });
+
+          if (alreadyExists) return message;
+
+          return {
+            ...message,
+            reactions: [...reactions, payload.reaction as MessageReaction],
+          };
+        }),
+      );
+    };
+
     const handleModerationWarning = (warning: {
       isBanned?: boolean;
       pointsLeftBeforeBan?: number;
@@ -884,6 +978,7 @@ export function useChatController() {
     socket.on("chat.message.created", handleMessageCreated);
     socket.on("chat.message.updated", handleMessageUpdated);
     socket.on("chat.message.deleted", handleMessageDeleted);
+    socket.on("chat.message.reaction.created", handleMessageReactionCreated);
     socket.on("chat.moderation.warning", handleModerationWarning);
     socket.on("chat.moderation.banned", handleModerationBanned);
     socket.on("chat.conversation.read", handleConversationRead);
@@ -925,6 +1020,7 @@ export function useChatController() {
       socket.off("chat.message.created", handleMessageCreated);
       socket.off("chat.message.updated", handleMessageUpdated);
       socket.off("chat.message.deleted", handleMessageDeleted);
+      socket.off("chat.message.reaction.created", handleMessageReactionCreated);
       socket.off("chat.moderation.warning", handleModerationWarning);
       socket.off("chat.moderation.banned", handleModerationBanned);
       socket.off("chat.conversation.read", handleConversationRead);

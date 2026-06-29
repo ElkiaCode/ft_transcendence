@@ -38,6 +38,10 @@ services:
       NODE_ENV: production
       HOSTNAME: 0.0.0.0
       PORT: 3000
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://localhost:8443}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://localhost:8443/api}
+      NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL:-https://localhost:8443}
+      NEXT_PUBLIC_42_CLIENT_ID: ${FORTYTWO_CLIENT_ID:-}
     networks:
       - transcendence
     healthcheck:
@@ -142,7 +146,7 @@ services:
       - --ui-tls-key
       - /etc/mailpit/certs/dev.key
     ports:
-      - "127.0.0.1:8025:8025"
+      - "0.0.0.0:8025:8025"
     volumes:
       - ./infra/nginx/certs:/etc/mailpit/certs:ro
     networks:

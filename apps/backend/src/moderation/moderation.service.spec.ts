@@ -537,7 +537,7 @@ describe('ModerationService', () => {
       expect(prismaMock.client.user.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: targetUserId },
-          data: { isBanned: false, isActive: true },
+          data: { isBanned: false, isActive: true, penaltyPoints: 0 },
         }),
       );
     });

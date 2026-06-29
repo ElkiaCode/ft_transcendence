@@ -157,6 +157,7 @@ describe('AdminService', () => {
         email: 'victim@gmail.com',
         username: 'victim',
         globalRole: 'USER',
+        penaltyPoints: -500,
         isActive: false,
         isBanned: true,
         profile: { displayName: 'Victim' },
@@ -165,6 +166,7 @@ describe('AdminService', () => {
       prismaMock.client.user.findUnique.mockResolvedValue(mockUser as any);
       prismaMock.client.user.update.mockResolvedValue({
         ...mockUser,
+        penaltyPoints: 0,
         isBanned: false,
         isActive: true,
       } as any);
@@ -172,6 +174,13 @@ describe('AdminService', () => {
       const result = await service.unbanUser(targetId, actorId);
 
       expect(result.message).toBe('user unbanned');
+      expect(result.user.penaltyPoints).toBe(0);
+      expect(prismaMock.client.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: targetId },
+          data: { isBanned: false, isActive: true, penaltyPoints: 0 },
+        }),
+      );
     });
   });
 

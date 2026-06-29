@@ -32,7 +32,9 @@ export function UserPickerModal({
       setSearchResults(
         results.filter(
           (user: SearchUser) =>
-            !user.isBlockedByCurrentUser && !user.hasBlockedCurrentUser,
+            !user.isBanned &&
+            !user.isBlockedByCurrentUser &&
+            !user.hasBlockedCurrentUser,
         ),
       );
     } catch {
@@ -157,7 +159,9 @@ export function CreateGroupModal({
       setSearchResults(
         results.filter(
           (user: SearchUser) =>
-            !user.isBlockedByCurrentUser && !user.hasBlockedCurrentUser,
+            !user.isBanned &&
+            !user.isBlockedByCurrentUser &&
+            !user.hasBlockedCurrentUser,
         ),
       );
     } catch {

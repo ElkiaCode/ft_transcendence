@@ -131,6 +131,11 @@ export function SearchPageContent() {
                   <p className="text-sm font-medium text-gray-900">
                     {user.username}
                   </p>
+                  {user.isBanned && (
+                    <p className="text-xs font-medium text-red-600">
+                      Banned user
+                    </p>
+                  )}
                   {user.isBlockedByCurrentUser && (
                     <p className="text-xs font-medium text-red-600">
                       You blocked this user
@@ -211,7 +216,14 @@ export function SearchPageContent() {
               View profile
             </button>
 
-            {!menuUser.isBlockedByCurrentUser &&
+            {menuUser.isBanned && (
+              <p className="px-4 py-2 text-xs font-medium text-red-600">
+                Banned user
+              </p>
+            )}
+
+            {!menuUser.isBanned &&
+              !menuUser.isBlockedByCurrentUser &&
               !menuUser.hasBlockedCurrentUser && (
                 <button
                   onClick={() => {

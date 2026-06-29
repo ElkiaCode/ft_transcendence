@@ -23,7 +23,7 @@ export function SidebarSearch({
   const router = useRouter();
 
   return (
-    <div className="w-1/4 bg-gray-200 text-black flex flex-col p-4 gap-4 overflow-hidden">
+    <div className="relative z-10 w-1/4 bg-gray-200 text-black flex flex-col p-4 gap-4 overflow-hidden">
       <div className="flex gap-2 items-center">
         <input
           type="text"
@@ -51,12 +51,10 @@ export function SidebarSearch({
         {conversations.map((conv) => (
           <div
             key={conv.id}
+            onClick={() => onSelectConv(conv)}
             className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition ${selectedConvId === conv.id ? "bg-white/70" : ""} ${(conv.unreadCount ?? 0) > 0 ? "font-bold" : ""}`}
           >
-            <div
-              onClick={() => onSelectConv(conv)}
-              className="flex items-center gap-3 flex-1"
-            >
+            <div className="flex items-center gap-3 flex-1">
               <div
                 className={`w-10 h-10 ColorsS rounded-full flex items-center justify-center text-white overflow-hidden $`}
               >
